@@ -3,6 +3,11 @@ class PromptView {
     constructor(data) {
         this.data = data || [];
         this.filter = 'all';
+        this.skillInstallCommand = [
+            'python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py',
+            '  --repo zenoyang-ai/nihaixia-tianji-skill',
+            '  --path skills/nihaixia-tianji'
+        ].join(' \\\n');
         this.render();
     }
 
@@ -14,6 +19,20 @@ class PromptView {
             <div class="prompt-notice">
                 <strong>天纪提示词</strong> —— 基于倪海厦天纪的天机道、人间道、地脉道框架，结合现代自我成长与行动规划视角的现代化转译。
                 所有提示词仅供学习参考，不构成医疗、投资、婚姻等重大决策的唯一依据。"命境建构论"为本站现代化表达，不作为倪海厦原文训诂。
+            </div>
+            <div class="prompt-skill-card">
+                <div class="prompt-skill-copy">
+                    <div class="prompt-skill-kicker">Agent Skill 版本</div>
+                    <h2>一行命令安装天纪提示词 Skill</h2>
+                    <p>适合已经在使用 Codex / Agent 的用户。安装后可直接让 Agent 按八字、紫微、易经三才或小六壬流程调用这套提示词。</p>
+                </div>
+                <div class="prompt-skill-install">
+                    <pre>${this.escapeHtml(this.skillInstallCommand)}</pre>
+                    <div class="prompt-skill-actions">
+                        <button class="prompt-copy-btn skill-copy-btn" type="button">复制安装命令</button>
+                        <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-tianji-skill" target="_blank" rel="noopener">查看 GitHub</a>
+                    </div>
+                </div>
             </div>
             <div class="prompt-toolbar" id="prompt-toolbar">
                 <button class="prompt-filter active" data-filter="all">全部</button>
@@ -130,6 +149,11 @@ class PromptView {
             });
         }
 
+        const skillCopyBtn = document.querySelector('.skill-copy-btn');
+        if (skillCopyBtn) {
+            skillCopyBtn.addEventListener('click', () => this.handleSkillInstallCopy(skillCopyBtn));
+        }
+
         this.rebindCardEvents();
     }
 
@@ -149,7 +173,7 @@ class PromptView {
         });
 
         // Copy buttons
-        document.querySelectorAll('.prompt-copy-btn').forEach(btn => {
+        document.querySelectorAll('.prompt-copy-btn:not(.skill-copy-btn)').forEach(btn => {
             btn.addEventListener('click', () => this.handleCopy(btn));
         });
     }
@@ -190,6 +214,26 @@ class PromptView {
         if (!text) return;
 
         this.copyToClipboard(text).then(() => {
+            const originalText = btn.textContent;
+            btn.textContent = '已复制 ✓';
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('copied');
+            }, 1500);
+        }).catch(() => {
+            const originalText = btn.textContent;
+            btn.textContent = '复制失败，请手动选中';
+            btn.classList.add('copy-failed');
+            setTimeout(() => {
+                btn.textContent = originalText;
+                btn.classList.remove('copy-failed');
+            }, 2000);
+        });
+    }
+
+    handleSkillInstallCopy(btn) {
+        this.copyToClipboard(this.skillInstallCommand).then(() => {
             const originalText = btn.textContent;
             btn.textContent = '已复制 ✓';
             btn.classList.add('copied');

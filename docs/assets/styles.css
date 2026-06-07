@@ -1248,6 +1248,86 @@ body {
     color: var(--text);
 }
 
+.prompt-skill-card {
+    display: grid;
+    grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
+    gap: 18px;
+    align-items: stretch;
+    background: #f7f0fb;
+    border: 1px solid #d5b8e8;
+    border-left: 4px solid #8e44ad;
+    border-radius: 0 8px 8px 0;
+    padding: 18px 20px;
+    margin-bottom: 20px;
+}
+
+.prompt-skill-kicker {
+    font-size: 11px;
+    font-weight: 700;
+    color: #8e44ad;
+    letter-spacing: 0.08em;
+    margin-bottom: 6px;
+}
+
+.prompt-skill-copy h2 {
+    font-size: 18px;
+    color: var(--ink);
+    margin-bottom: 8px;
+}
+
+.prompt-skill-copy p {
+    font-size: 13px;
+    color: var(--text-light);
+    line-height: 1.6;
+}
+
+.prompt-skill-install {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.prompt-skill-install pre {
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid #d5b8e8;
+    border-radius: 6px;
+    background: #fffaf1;
+    color: var(--text);
+    font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+    font-size: 12px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    word-break: break-word;
+}
+
+.prompt-skill-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.prompt-skill-link {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 16px;
+    border: 1px solid #8e44ad;
+    border-radius: 6px;
+    color: #8e44ad;
+    background: rgba(255, 250, 241, 0.72);
+    font-size: 12px;
+    font-weight: 500;
+    text-decoration: none;
+    transition: all 0.2s;
+}
+
+.prompt-skill-link:hover {
+    background: #8e44ad;
+    color: #fff;
+}
+
 .prompt-toolbar {
     display: flex;
     gap: 6px;
@@ -1544,6 +1624,7 @@ body {
     .reader-content { max-height: 50vh; }
 
     .prompts-view { padding: 16px; }
+    .prompt-skill-card { grid-template-columns: 1fr; padding: 14px 16px; }
     .prompt-toolbar { gap: 4px; }
     .prompt-filter { padding: 6px 12px; font-size: 12px; }
     .prompt-card-header { padding: 14px 16px 12px; }
