@@ -1250,9 +1250,9 @@ body {
 
 .prompt-skill-card {
     display: grid;
-    grid-template-columns: minmax(0, 0.9fr) minmax(320px, 1.1fr);
-    gap: 18px;
-    align-items: stretch;
+    grid-template-columns: minmax(240px, 0.8fr) minmax(0, 1.2fr);
+    gap: 20px;
+    align-items: center;
     background: #f7f0fb;
     border: 1px solid #d5b8e8;
     border-left: 4px solid #8e44ad;
@@ -1285,20 +1285,39 @@ body {
     display: flex;
     flex-direction: column;
     gap: 10px;
+    min-width: 0;
 }
 
-.prompt-skill-install pre {
-    margin: 0;
-    padding: 12px 14px;
+.prompt-terminal {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    padding: 10px 12px;
     border: 1px solid #d5b8e8;
     border-radius: 6px;
     background: #fffaf1;
     color: var(--text);
+}
+
+.prompt-terminal-mark {
+    color: #8e44ad;
     font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
     font-size: 12px;
-    line-height: 1.55;
-    white-space: pre-wrap;
-    word-break: break-word;
+    font-weight: 700;
+}
+
+.prompt-terminal code {
+    display: block;
+    min-width: 0;
+    overflow-x: auto;
+    padding-bottom: 1px;
+    font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
+    font-size: 11px;
+    line-height: 1.5;
+    white-space: nowrap;
+    scrollbar-width: thin;
 }
 
 .prompt-skill-actions {
@@ -1306,6 +1325,7 @@ body {
     gap: 10px;
     align-items: center;
     flex-wrap: wrap;
+    justify-content: flex-end;
 }
 
 .prompt-skill-link {

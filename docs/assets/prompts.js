@@ -8,6 +8,7 @@ class PromptView {
             '  --repo zenoyang-ai/nihaixia-tianji-skill',
             '  --path skills/nihaixia-tianji'
         ].join(' \\\n');
+        this.skillInstallDisplay = 'python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo zenoyang-ai/nihaixia-tianji-skill --path skills/nihaixia-tianji';
         this.render();
     }
 
@@ -27,7 +28,10 @@ class PromptView {
                     <p>适合已经在使用 Codex / Agent 的用户。安装后可直接让 Agent 按八字、紫微、易经三才或小六壬流程调用这套提示词。</p>
                 </div>
                 <div class="prompt-skill-install">
-                    <pre>${this.escapeHtml(this.skillInstallCommand)}</pre>
+                    <div class="prompt-terminal">
+                        <span class="prompt-terminal-mark">$</span>
+                        <code>${this.escapeHtml(this.skillInstallDisplay)}</code>
+                    </div>
                     <div class="prompt-skill-actions">
                         <button class="prompt-copy-btn skill-copy-btn" type="button">复制安装命令</button>
                         <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-tianji-skill" target="_blank" rel="noopener">查看 GitHub</a>
