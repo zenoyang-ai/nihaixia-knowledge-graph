@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>倪海厦知识图谱</title>
+    <link rel="stylesheet" href="assets/styles.css">
+    <!-- D3 完整包（力导向 + 拖拽 + 缩放） -->
+    <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+    <!-- marked.js 用于 Markdown 渲染 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@12/marked.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- 顶部导航 -->
+        <header class="header">
+            <div class="header-content">
+                <button class="sidebar-toggle" id="sidebar-toggle" aria-label="切换目录">
+                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                    </svg>
+                </button>
+                <a href="#/" class="logo">倪海厦知识图谱</a>
+                <nav class="nav">
+                    <a href="#/" class="nav-btn" data-route="/">总览</a>
+                    <a href="#/path" class="nav-btn" data-route="/path">学习路径</a>
+                    <a href="#/graph" class="nav-btn" data-route="/graph">知识图谱</a>
+                    <a href="#/prompts" class="nav-btn" data-route="/prompts">天纪提示词</a>
+                </nav>
+                <div class="header-search">
+                    <input type="text" id="global-search" placeholder="搜索节点..." autocomplete="off">
+                    <div class="search-dropdown" id="search-dropdown"></div>
+                </div>
+                <span class="node-count" id="node-count">70 个节点</span>
+            </div>
+        </header>
+
+        <!-- 左侧目录栏 -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <span class="sidebar-title">目录</span>
+                <span class="sidebar-count" id="sidebar-count"></span>
+            </div>
+            <nav class="sidebar-nav" id="sidebar-nav">
+                <!-- 由 JS 动态生成 -->
+            </nav>
+        </aside>
+
+        <!-- 主内容区 -->
+        <main class="main" id="main-content">
+            <!-- 总览视图 -->
+            <div id="view-overview" class="view active">
+                <section class="hero-new">
+                    <div class="eyebrow">NI HAIXIA KNOWLEDGE ATLAS</div>
+                    <h1 class="hero-title">倪海厦<br><span class="hero-title-accent">知识图谱</span></h1>
+                    <p class="hero-subtitle">从底层框架到案例研读，五个层级系统梳理倪海厦的中医与天纪体系</p>
+                </section>
+
+                <!-- 五层阶段卡片 -->
+                <div class="stages-row" id="stages-row"></div>
+
+                <!-- 路径入口 -->
+                <div class="route-cards-new">
+                    <a href="#/path" class="route-card-new">
+                        <span class="route-card-num">01</span>
+                        <strong>人纪路径</strong>
+                        <span>从黄帝内经、伤寒论到经方、针灸与医案。</span>
+                    </a>
+                    <a href="#/path" class="route-card-new">
+                        <span class="route-card-num">02</span>
+                        <strong>天纪路径</strong>
+                        <span>从阴阳五行、易经象数，进入三才与天人关系。</span>
+                    </a>
+                    <a href="#/graph" class="route-card-new">
+                        <span class="route-card-num">03</span>
+                        <strong>知识图谱</strong>
+                        <span>交互式力导向图，探索节点间的知识网络。</span>
+                    </a>
+                    <a href="#/prompts" class="route-card-new">
+                        <span class="route-card-num">04</span>
+                        <strong>天纪提示词</strong>
+                        <span>可直接复制的玄学分析提示词，八字、紫微、易经、小六壬。</span>
+                    </a>
+                </div>
+
+                <div class="overview-footer">
+                    <p>本网站仅供个人学习研究，不构成医疗建议。如有健康问题，请咨询专业医师。</p>
+                </div>
+            </div>
+
+            <!-- 学习路径视图 -->
+            <div id="view-path" class="view">
+                <div class="path-view">
+                    <div class="path-tabs">
+                        <button class="path-tab active" data-path="renji">人纪</button>
+                        <button class="path-tab" data-path="tianji">天纪</button>
+                    </div>
+                    <div id="renji-path" class="path-content active">
+                        <h2>倪海厦人纪学习路径</h2>
+                        <p class="path-desc">人纪是倪海厦的中医教学体系，以五大经典为核心，从理论到临床逐步深入。</p>
+                        <div class="path-stages" id="renji-stages"></div>
+                    </div>
+                    <div id="tianji-path" class="path-content">
+                        <h2>倪海厦天纪学习路径</h2>
+                        <p class="path-desc">天纪是倪海厦的"天人地三才"体系，以易经为轴，涵盖紫微斗数、风水堪舆、四柱命理等。</p>
+                        <div class="path-stages" id="tianji-stages"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 知识图谱视图 -->
+            <div id="view-graph" class="view">
+                <div class="graph-view">
+                    <div class="graph-container">
+                        <div class="graph-canvas" id="graph-canvas">
+                            <!-- d3-force SVG 渲染到此处 -->
+                        </div>
+                        
+                        <!-- 左下角图例卡 -->
+                        <div class="graph-legend">
+                            <div class="graph-legend-title">层级</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#c0392b"></span>底层框架</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#2980b9"></span>辨证框架</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#27ae60"></span>方法工具</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#d4a017"></span>案例研读</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#8e44ad"></span>天纪体系</div>
+                            <div class="graph-legend-divider"></div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="width:14px;height:14px;background:#999"></span>核心节点</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="width:7px;height:7px;background:#999"></span>普通节点</div>
+                            <div class="graph-legend-divider"></div>
+                            <div class="graph-legend-hint">拖拽 · 滚轮缩放 · 点击查看</div>
+                        </div>
+
+                        <div class="graph-detail-panel" id="graph-detail-panel">
+                            <p class="placeholder">点击节点查看详情</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 提示词工具包视图 -->
+            <div id="view-prompts" class="view">
+                <div class="prompts-view" id="prompts-view">
+                    <!-- 由 prompts.js 动态渲染 -->
+                </div>
+            </div>
+
+            <!-- 概念详情页 -->
+            <div id="view-note" class="view">
+                <div class="note-view" id="note-view">
+                    <!-- 由 JS 动态渲染 -->
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 移动端遮罩 -->
+    <div class="sidebar-overlay" id="sidebar-overlay"></div>
+
+    <script src="assets/router.js"></script>
+    <script src="assets/sidebar.js"></script>
+    <script src="assets/graph.js"></script>
+    <script src="assets/detail.js"></script>
+    <script src="assets/overview.js"></script>
+    <script src="assets/path.js"></script>
+    <script src="assets/prompts.js"></script>
+    <script src="assets/search.js"></script>
+    <script src="assets/app.js"></script>
+</body>
+</html>

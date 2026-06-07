@@ -1,0 +1,38 @@
+# 原始资料（不提交）
+倪海厦资料/
+
+# 待审资料和构建中间产物（不提交）
+sources-review/
+/sources-public/
+
+# 二进制文件
+*.pdf
+*.doc
+*.docx
+*.ppt
+*.pptx
+*.xls
+*.xlsx
+
+# 环境和密钥
+.env
+*_TOKEN*
+*_SECRET*
+*.key
+
+# 系统文件
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# 任务状态（个人）
+60_系统协议/上下文交接/TASK_STATE.md
+60_系统协议/上下文交接/TASK_LOG.md
+
+# Obsidian 配置
+.obsidian/
