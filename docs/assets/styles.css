@@ -251,7 +251,7 @@ body {
     user-select: none;
 }
 
-.sidebar-group-header:hover { background: #f3e3ca; }
+.sidebar-group-header:hover { background: transparent; }
 
 .sidebar-group-dot {
     width: 6px;
