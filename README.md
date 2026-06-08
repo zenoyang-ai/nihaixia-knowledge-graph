@@ -5,7 +5,7 @@
 [在线访问](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/) · [内容声明](./CONTENT_NOTICE.md)
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
-![Nodes](https://img.shields.io/badge/nodes-70-purple)
+![Nodes](https://img.shields.io/badge/nodes-69-purple)
 ![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-brightgreen)
 
 这不是原文资料仓库，而是一个面向学习者的知识入口：用图谱、学习路径和知识卡片，把倪海厦的人纪、天纪、经方、针灸、本草、案例研读串起来。
@@ -16,7 +16,7 @@
 
 | 入口 | 适合做什么 |
 |---|---|
-| 知识图谱 | 看 70 个节点之间怎么互相连接 |
+| 知识图谱 | 看 69 个节点之间怎么互相连接 |
 | 学习路径 | 按人纪 / 天纪路径进入体系 |
 | 节点卡片 | 快速理解一个概念的定义、上下游、学习边界 |
 | 天纪提示词 | 用八字、紫微、易经、小六壬做结构化自我复盘 |
@@ -40,7 +40,7 @@
 
 ## 项目内容
 
-- 70 个知识节点
+- 69 个知识节点
 - 289 条图谱关系
 - 五层知识架构
 - 人纪 / 天纪学习路径
