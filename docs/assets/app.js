@@ -128,4 +128,27 @@ class NihaixiaApp {
 // 启动
 document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
+
+    // Footer 公众号浮层
+    const brandBtn = document.getElementById('footer-brand-btn');
+    const popover = document.getElementById('footer-popover');
+    if (brandBtn && popover) {
+        brandBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isOpen = popover.classList.toggle('show');
+            brandBtn.setAttribute('aria-expanded', isOpen);
+        });
+        document.addEventListener('click', (e) => {
+            if (!popover.contains(e.target) && e.target !== brandBtn) {
+                popover.classList.remove('show');
+                brandBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') {
+                popover.classList.remove('show');
+                brandBtn.setAttribute('aria-expanded', 'false');
+            }
+        });
+    }
 });

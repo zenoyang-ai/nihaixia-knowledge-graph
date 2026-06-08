@@ -206,6 +206,10 @@ body {
     width: 100%;
 }
 
+.sidebar.collapsed ~ .site-footer {
+    left: 0;
+}
+
 .sidebar-header {
     padding: 20px 20px 12px;
     display: flex;
@@ -884,7 +888,7 @@ body {
 /* 图例卡 */
 .graph-legend {
     position: absolute;
-    bottom: 16px;
+    bottom: 56px;
     left: 16px;
     background: rgba(255, 250, 241, 0.9);
     backdrop-filter: blur(8px);
@@ -1579,6 +1583,91 @@ body {
 .path-cta-link:hover {
     background: #8e44ad;
     color: #fff;
+}
+
+/* ============================================
+   Site Footer
+   ============================================ */
+
+.site-footer {
+    position: fixed;
+    bottom: 0;
+    left: var(--sidebar-w);
+    right: 0;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    font-size: 12px;
+    color: #b0a89e;
+    background: rgba(255, 250, 241, 0.9);
+    backdrop-filter: blur(8px);
+    border-top: 1px solid rgba(231, 216, 193, 0.5);
+    z-index: 80;
+}
+
+.footer-brand {
+    border: none;
+    background: none;
+    cursor: pointer;
+    font-size: 12px;
+    color: var(--accent);
+    font-weight: 600;
+    font-family: inherit;
+    padding: 0;
+    transition: opacity 0.15s;
+}
+
+.footer-brand:hover { opacity: 0.7; }
+
+.footer-popover {
+    position: fixed;
+    bottom: 52px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 200;
+    display: none;
+}
+
+.footer-popover.show { display: block; }
+
+.footer-popover-card {
+    background: #fff;
+    border-radius: 12px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+    text-align: center;
+    min-width: 200px;
+}
+
+.footer-popover-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--ink);
+    margin-bottom: 12px;
+}
+
+.footer-popover-qr {
+    width: 160px;
+    height: 160px;
+    border-radius: 8px;
+    object-fit: cover;
+    margin-bottom: 10px;
+}
+
+.footer-popover-hint {
+    font-size: 12px;
+    color: var(--text-light);
+}
+
+#view-graph .graph-view { padding-bottom: 40px; }
+
+@media (max-width: 768px) {
+    .site-footer { left: 0; font-size: 11px; height: 36px; }
+    .footer-popover { bottom: 44px; left: 16px; right: 16px; transform: none; }
+    .footer-popover-card { min-width: auto; }
+    .footer-popover-qr { width: 140px; height: 140px; }
 }
 
 /* ============================================
