@@ -874,7 +874,7 @@ body {
 
 .graph-canvas {
     position: absolute;
-    inset: 0;
+    inset: 0 0 40px 0;
     background: #f6f0e6;
     touch-action: none;
 }
@@ -1661,7 +1661,7 @@ body {
     color: var(--text-light);
 }
 
-#view-graph .graph-view { padding-bottom: 40px; }
+#view-graph .graph-view { padding-bottom: 0; }
 
 @media (max-width: 768px) {
     .site-footer { left: 0; font-size: 11px; height: 36px; }
