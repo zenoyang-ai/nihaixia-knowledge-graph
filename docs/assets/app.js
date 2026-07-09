@@ -67,6 +67,7 @@ class NihaixiaApp {
                 }, 50);
             }
         });
+        router.on('/qa', () => {});
         router.on('/note/:title', (params) => {
             const title = decodeURIComponent(params.title);
             if (this.noteDetail) this.noteDetail.render(title);
@@ -87,6 +88,7 @@ class NihaixiaApp {
         else if (path === '/path') viewName = 'path';
         else if (path === '/graph') viewName = 'graph';
         else if (path === '/prompts') viewName = 'prompts';
+        else if (path === '/qa') viewName = 'qa';
         else if (path.startsWith('/note/')) viewName = 'note';
         else viewName = 'overview';
 
@@ -128,6 +130,43 @@ class NihaixiaApp {
 // 启动
 document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
+
+    // AI 问答推荐问题复制
+    const qaToast = document.getElementById('qa-copy-toast');
+    const setQaToast = (message) => {
+        if (!qaToast) return;
+        qaToast.textContent = message;
+        qaToast.classList.add('show');
+        window.clearTimeout(qaToast.hideTimer);
+        qaToast.hideTimer = window.setTimeout(() => qaToast.classList.remove('show'), 1800);
+    };
+    const copyQuestion = async (text) => {
+        if (navigator.clipboard && window.isSecureContext) {
+            await navigator.clipboard.writeText(text);
+            return;
+        }
+        const textarea = document.createElement('textarea');
+        textarea.value = text;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        textarea.remove();
+    };
+    document.querySelectorAll('.qa-question-card').forEach((card) => {
+        card.addEventListener('click', async () => {
+            const question = card.dataset.question || card.textContent.trim();
+            try {
+                await copyQuestion(question);
+                setQaToast('已复制，可粘贴到 AI 问答框');
+            } catch (error) {
+                console.error('复制推荐问题失败:', error);
+                setQaToast('复制失败，请手动选择文本');
+            }
+        });
+    });
 
     // Footer 公众号浮层
     const brandBtn = document.getElementById('footer-brand-btn');

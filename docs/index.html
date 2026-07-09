@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>倪海厦知识图谱</title>
+    <link rel="icon" href="data:,">
     <link rel="stylesheet" href="assets/styles.css">
     <!-- D3 完整包（力导向 + 拖拽 + 缩放） -->
     <script src="vendor/d3.v7.min.js"></script>
@@ -26,6 +27,7 @@
                     <a href="#/path" class="nav-btn" data-route="/path">学习路径</a>
                     <a href="#/graph" class="nav-btn" data-route="/graph">知识图谱</a>
                     <a href="#/prompts" class="nav-btn" data-route="/prompts">天纪提示词</a>
+                    <a href="#/qa" class="nav-btn" data-route="/qa">AI 问答</a>
                 </nav>
                 <div class="header-search">
                     <input type="text" id="global-search" placeholder="搜索节点..." autocomplete="off">
@@ -142,6 +144,79 @@
             <div id="view-prompts" class="view">
                 <div class="prompts-view" id="prompts-view">
                     <!-- 由 prompts.js 动态渲染 -->
+                </div>
+            </div>
+
+            <!-- AI 问答视图 -->
+            <div id="view-qa" class="view">
+                <div class="qa-view">
+                    <section class="qa-hero">
+                        <div>
+                            <div class="eyebrow">YUANQI KNOWLEDGE QA</div>
+                            <h2>倪海厦知识库 AI 问答</h2>
+                            <p>基于腾讯元器「倪海厦知识库学习助手」，适合围绕倪海厦资料进行学习型提问。</p>
+                        </div>
+                        <a class="qa-open-link" href="https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true" target="_blank" rel="noopener">打开元器问答</a>
+                    </section>
+
+                    <div class="qa-notice">
+                        本问答仅供学习研究，不构成医疗建议；请勿用于诊断、处方、剂量或治疗决策。
+                    </div>
+
+                    <section class="qa-questions" aria-labelledby="qa-questions-title">
+                        <div class="qa-section-heading">
+                            <span id="qa-questions-title">推荐问题</span>
+                            <small>复制后粘贴到 AI 问答框</small>
+                        </div>
+                        <div class="qa-question-grid">
+                            <button type="button" class="qa-question-card" data-question="天纪里面的紫微斗数是说什么的？">天纪里面的紫微斗数是说什么的？</button>
+                            <button type="button" class="qa-question-card" data-question="倪海厦人纪和天纪的关系是什么？">倪海厦人纪和天纪的关系是什么？</button>
+                            <button type="button" class="qa-question-card" data-question="经方、针灸、本草在学习路径中分别承担什么作用？">经方、针灸、本草在学习路径中分别承担什么作用？</button>
+                            <button type="button" class="qa-question-card" data-question="学习伤寒论时应该先理解哪些核心节点？">学习伤寒论时应该先理解哪些核心节点？</button>
+                        </div>
+                        <div class="qa-copy-toast" id="qa-copy-toast" role="status" aria-live="polite"></div>
+                    </section>
+
+                    <section class="qa-shell" aria-label="腾讯元器倪海厦知识库问答">
+                        <div class="qa-shell-bar">
+                            <span>腾讯元器知识库智能体</span>
+                            <a href="https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true" target="_blank" rel="noopener">新窗口打开</a>
+                        </div>
+
+                        <div class="qa-yuanqi-frame-wrap">
+                            <iframe
+                                class="qa-yuanqi-frame"
+                                src="https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true"
+                                title="倪海厦知识库学习助手"
+                                loading="lazy"
+                                referrerpolicy="no-referrer-when-downgrade"></iframe>
+                        </div>
+
+                        <div class="qa-fallback">
+                            元器公开页可直接访问，但未登录用户可能无法在嵌入窗口内提问。若要实现本站内匿名问答，需要另接 Serverless 代理调用元器 API，且不得把 App Key、Token 或任何密钥写进前端代码。
+                        </div>
+                    </section>
+
+                    <section class="qa-plan" aria-label="站内问答方案">
+                        <div class="qa-section-heading">
+                            <span>站内原生问答下一步</span>
+                            <small>免费优先路线</small>
+                        </div>
+                        <div class="qa-setup-grid">
+                            <div>
+                                <strong>知识库底座</strong>
+                                <span>腾讯元器已发布，国内访问友好。</span>
+                            </div>
+                            <div>
+                                <strong>网页体验</strong>
+                                <span>当前先嵌入公开页；匿名提问需后端代理。</span>
+                            </div>
+                            <div>
+                                <strong>安全边界</strong>
+                                <span>密钥放在 Serverless 环境变量，不进入 GitHub Pages。</span>
+                            </div>
+                        </div>
+                    </section>
                 </div>
             </div>
 
