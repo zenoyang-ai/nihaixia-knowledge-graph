@@ -1,169 +1,94 @@
 /**
- * 倪海厦知识库问答 — CloudBase 云函数（HTTP）
- * 
- * 用途：前端调用本函数，函数转发到腾讯元器 API，
- *       密钥（YUANQI_TOKEN）放在 CloudBase 环境变量中，不暴露到前端。
- * 
- * 部署：tcb fn deploy yuanqi-proxy
- * 环境变量：在 cloudbaserc.json 的 envVariables 中设置 YUANQI_TOKEN
- * HTTP 绑定：部署后在 CloudBase 控制台 → 云函数 → yuanqi-proxy → 绑定域名/触发路径
+ * 倪海厦知识库问答 — CloudBase 事件函数
+ * 由 CloudBase HTTP 网关触发
+ * 使用 CloudBase AI SDK 直接调用大模型（多模型自动回退）
  */
 
-const YUANQI_API = 'https://open.hunyuan.tencent.com/openapi/v1/agent/chat/completions';
-const ASSISTANT_ID = '2075108259383652608';
+const cloudbase = require('@cloudbase/node-sdk');
 
-// 允许的 CORS 来源
 const ALLOWED_ORIGINS = [
   'https://zenoyang-ai.github.io',
   'http://localhost:8765',
   'http://127.0.0.1:8765',
 ];
 
-function corsHeaders(origin) {
+function buildResponse(statusCode, body, origin) {
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
-    'Access-Control-Allow-Origin': allowOrigin,
-    'Access-Control-Allow-Methods': 'POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Max-Age': '86400',
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json; charset=utf-8',
+      'Access-Control-Allow-Origin': allowOrigin,
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+    },
+    body: JSON.stringify(body),
   };
 }
 
-// 简单限流（内存级，非持久化）
-const rateMap = new Map();
+exports.main = async (event, context) => {
+  const origin = (event.headers && event.headers.origin) || '';
 
-function checkRate(ip) {
-  const now = Date.now();
-  const windowStart = now - 60_000;
-  const timestamps = rateMap.get(ip) || [];
-  const recent = timestamps.filter((t) => t > windowStart);
-  if (recent.length >= 20) return false; // 每分钟最多 20 次
-  recent.push(now);
-  rateMap.set(ip, recent);
-  return true;
-}
-
-// 定期清理过期 IP（每 5 分钟）
-setInterval(() => {
-  const cutoff = Date.now() - 60_000;
-  for (const [ip, timestamps] of rateMap) {
-    const valid = timestamps.filter((t) => t > cutoff);
-    if (valid.length === 0) rateMap.delete(ip);
-    else rateMap.set(ip, valid);
-  }
-}, 300_000);
-
-exports.main = async (event) => {
-  const headers = corsHeaders(event.headers?.origin || '');
-
-  // 预检请求
+  // OPTIONS 预检
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 204, headers };
+    return buildResponse(204, {}, origin);
   }
 
-  // 仅允许 POST
   if (event.httpMethod !== 'POST') {
-    return {
-      statusCode: 405,
-      headers,
-      body: JSON.stringify({ error: '仅支持 POST 请求' }),
-    };
-  }
-
-  // 限流
-  const ip = event.headers?.['x-forwarded-for'] || event.headers?.['x-real-ip'] || 'unknown';
-  if (!checkRate(ip)) {
-    return {
-      statusCode: 429,
-      headers,
-      body: JSON.stringify({ error: '请求过于频繁，请稍后再试' }),
-    };
+    return buildResponse(405, { error: '仅支持 POST 请求' }, origin);
   }
 
   // 解析请求体
+  let rawBody = event.body || '{}';
+  if (event.isBase64Encoded) {
+    rawBody = Buffer.from(rawBody, 'base64').toString('utf-8');
+  }
+
   let body;
   try {
-    body = JSON.parse(event.body || '{}');
+    body = JSON.parse(rawBody);
   } catch {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: '请求体必须是 JSON' }),
-    };
+    return buildResponse(400, { error: '请求体必须是 JSON' }, origin);
   }
 
-  const { message } = body;
-  if (!message || typeof message !== 'string' || message.trim().length === 0) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: '请提供 message 字段' }),
-    };
+  const { message } = body || {};
+  if (!message || typeof message !== 'string' || !message.trim()) {
+    return buildResponse(400, { error: '请提供 message 字段' }, origin);
   }
   if (message.length > 2000) {
-    return {
-      statusCode: 400,
-      headers,
-      body: JSON.stringify({ error: '消息长度不能超过 2000 字' }),
-    };
+    return buildResponse(400, { error: '消息长度不能超过 2000 字' }, origin);
   }
 
-  // 从环境变量读取密钥
-  const token = process.env.YUANQI_TOKEN;
-  if (!token) {
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({ error: '服务未配置 API 密钥' }),
-    };
-  }
-
-  // 调用元器 API
   try {
-    const apiResponse = await fetch(YUANQI_API, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${token}`,
-        'X-Source': 'openapi',
-      },
-      body: JSON.stringify({
-        assistant_id: ASSISTANT_ID,
-        user_id: ip,
-        stream: false,
-        messages: [
-          {
-            role: 'user',
-            content: [{ type: 'text', text: message.trim() }],
-          },
-        ],
-      }),
-    });
-
-    if (!apiResponse.ok) {
-      const errText = await apiResponse.text();
-      console.error('元器 API 错误:', apiResponse.status, errText);
-      return {
-        statusCode: 502,
-        headers,
-        body: JSON.stringify({ error: `元器 API 返回错误 (${apiResponse.status})` }),
-      };
+    const app = cloudbase.init({ env: 'zeno-d9g0gdvw4a57635c0' });
+    const ai = app.ai();
+    const model = ai.createModel('cloudbase');
+    
+    // 按优先级尝试多个模型
+    const models = ['hunyuan-lite', 'hunyuan-turbo', 'hy3-preview', 'deepseek-v4-flash'];
+    
+    for (const modelName of models) {
+      try {
+        console.log(`尝试模型: ${modelName}`);
+        const res = await model.generateText({
+          model: modelName,
+          messages: [
+            { role: 'user', content: `请以中医专家倪海厦的身份回答以下问题，用中文，专业准确：${message.trim()}` }
+          ],
+        });
+        if (res.text) {
+          console.log(`模型 ${modelName} 成功`);
+          return buildResponse(200, { reply: res.text }, origin);
+        }
+      } catch (e) {
+        console.log(`模型 ${modelName} 失败: ${e.message}`);
+      }
     }
-
-    const data = await apiResponse.json();
-    const reply = data?.choices?.[0]?.message?.content || '（未获取到回复内容）';
-
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({ reply }),
-    };
+    
+    throw new Error('所有模型调用失败');
   } catch (err) {
-    console.error('调用元器 API 失败:', err);
-    return {
-      statusCode: 502,
-      headers,
-      body: JSON.stringify({ error: '调用元器 API 失败，请稍后重试' }),
-    };
+    console.error('AI 调用失败:', err.message);
+    return buildResponse(502, { error: 'AI 服务暂时不可用，请稍后重试' }, origin);
   }
 };

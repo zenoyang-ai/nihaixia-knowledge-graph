@@ -141,12 +141,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // 优先级: 路线 A > 路线 B > Cloudflare Worker
     // 部署前留空，此时点击推荐问题会显示部署提示
     const QA_ENDPOINTS = [
-        // 路线 A: CloudBase 云函数（部署后取消注释）
-        // { url: 'https://zeno-xxx.app.tcloudbase.com/yuanqi-proxy', label: 'CloudBase 云函数' },
-        // 路线 B: CloudBase 原生 Agent（创建后取消注释）
-        // { url: 'https://zeno-xxx.api.tcloudbase.com/agent/xxx', label: 'CloudBase Agent' },
-        // Cloudflare Worker（备选）
-        // { url: '', label: 'Cloudflare Worker' },
+        // 路线 A: CloudBase 云函数 → CloudBase AI SDK (hy3-preview)
+        { url: 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/yuanqi-proxy', label: 'CloudBase 云函数' },
     ];
 
     const messagesEl = document.getElementById('qa-chat-messages');
