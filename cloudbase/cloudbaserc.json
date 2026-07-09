@@ -1,0 +1,18 @@
+{
+  "envId": "zeno",
+  "functionRoot": "./functions",
+  "functions": [
+    {
+      "name": "yuanqi-proxy",
+      "type": "HTTP",
+      "handler": "index.main",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "memorySize": 256,
+      "installDependency": true,
+      "envVariables": {
+        "YUANQI_TOKEN": "填入你的腾讯元器智能体 AppKey（Token）"
+      }
+    }
+  ]
+}

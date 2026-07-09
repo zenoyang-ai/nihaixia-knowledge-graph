@@ -132,11 +132,22 @@ document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
 
     // ============================================
-    // AI 问答 — 原生聊天框
+    // AI 问答 — 原生聊天框（双路线）
     // ============================================
-    // Worker URL：部署 Cloudflare Worker 后替换为实际地址
-    // 部署前留空，此时点击推荐问题会填入输入框（不发送）
-    const QA_WORKER_URL = '';
+    // 路线 A: CloudBase 云函数 → 代理元器 API
+    //   部署后获得 URL，形如 https://zeno-xxx.app.tcloudbase.com/yuanqi-proxy
+    // 路线 B: CloudBase 原生 Agent（Beta）
+    //   创建 Agent 后获得 API Endpoint，无需经过元器
+    // 优先级: 路线 A > 路线 B > Cloudflare Worker
+    // 部署前留空，此时点击推荐问题会显示部署提示
+    const QA_ENDPOINTS = [
+        // 路线 A: CloudBase 云函数（部署后取消注释）
+        // { url: 'https://zeno-xxx.app.tcloudbase.com/yuanqi-proxy', label: 'CloudBase 云函数' },
+        // 路线 B: CloudBase 原生 Agent（创建后取消注释）
+        // { url: 'https://zeno-xxx.api.tcloudbase.com/agent/xxx', label: 'CloudBase Agent' },
+        // Cloudflare Worker（备选）
+        // { url: '', label: 'Cloudflare Worker' },
+    ];
 
     const messagesEl = document.getElementById('qa-chat-messages');
     const inputEl = document.getElementById('qa-chat-input');
@@ -226,32 +237,46 @@ document.addEventListener('DOMContentLoaded', () => {
         addMessage('user', message.trim());
         addTyping();
 
-        if (!QA_WORKER_URL) {
-            // Worker 未部署，显示提示
+        // 过滤出有效 endpoint
+        const activeEndpoints = QA_ENDPOINTS.filter((ep) => ep.url && ep.url.trim());
+
+        if (activeEndpoints.length === 0) {
+            // 所有 endpoint 都未配置
             removeTyping();
-            addMessage('assistant', '问答服务尚未部署。\n\n请将 Cloudflare Worker 部署后，把 `QA_WORKER_URL` 填入 `docs/assets/app.js` 第 137 行，即可启用站内匿名问答。\n\n临时方案：可前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 提问（需登录）。');
-            setStatus('Worker 未部署，点击上方"打开元器问答"按钮可临时提问', true);
+            addMessage('assistant', '问答服务尚未部署。\n\n请选择以下任一方式启用：\n\n**路线 A（推荐）**：部署 CloudBase 云函数 → 把 URL 填入 `QA_ENDPOINTS`\n详见 `cloudbase/` 目录\n\n**路线 B**：创建 CloudBase 原生 Agent → 把 API Endpoint 填入 `QA_ENDPOINTS`\n详见 `cloudbase/CLOUDBASE_AGENT_GUIDE.md`\n\n**临时方案**：前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 提问（需登录）。');
+            setStatus('问答后端未部署，详见 cloudbase/ 目录', true);
         } else {
-            try {
-                setStatus('正在思考...');
-                const res = await fetch(QA_WORKER_URL, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ message: message.trim() }),
-                });
-                const data = await res.json();
-                removeTyping();
-                if (res.ok && data.reply) {
-                    addMessage('assistant', data.reply);
-                    clearStatus();
-                } else {
-                    addMessage('assistant', `抱歉，问答服务暂时不可用：${data.error || '未知错误'}`);
-                    setStatus(data.error || '请求失败', true);
+            // 逐个尝试 endpoint，直到成功
+            let lastError = '';
+            let success = false;
+            for (const endpoint of activeEndpoints) {
+                try {
+                    setStatus(`正在连接 ${endpoint.label}...`);
+                    const res = await fetch(endpoint.url, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ message: message.trim() }),
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.reply) {
+                        removeTyping();
+                        addMessage('assistant', data.reply);
+                        clearStatus();
+                        success = true;
+                        break;
+                    } else {
+                        lastError = data.error || '未知错误';
+                        console.warn(`Endpoint ${endpoint.label} 失败:`, lastError);
+                    }
+                } catch (err) {
+                    lastError = err.message || '网络错误';
+                    console.warn(`Endpoint ${endpoint.label} 异常:`, lastError);
                 }
-            } catch (err) {
+            }
+            if (!success) {
                 removeTyping();
-                addMessage('assistant', '抱歉，网络请求失败，请检查网络连接后重试。');
-                setStatus('网络请求失败', true);
+                addMessage('assistant', `抱歉，所有问答后端均不可用。\n\n最后错误：${lastError}\n\n可前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 临时提问。`);
+                setStatus('所有后端均不可用，请检查部署状态', true);
             }
         }
 

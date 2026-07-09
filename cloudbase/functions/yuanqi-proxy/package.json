@@ -1,0 +1,7 @@
+{
+  "name": "yuanqi-proxy",
+  "version": "1.0.0",
+  "description": "倪海厦知识库问答 — CloudBase 云函数代理元器 API",
+  "main": "index.js",
+  "dependencies": {}
+}
