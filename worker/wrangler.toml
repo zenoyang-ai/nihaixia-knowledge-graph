@@ -1,0 +1,12 @@
+# 倪海厦知识库问答 — Cloudflare Worker 配置
+# 部署：npx wrangler deploy
+name = "nihaixia-chat"
+main = "worker.js"
+compatibility_date = "2025-07-09"
+
+# 免费计划：每天 10 万次请求，完全够用
+# 部署后 Worker URL 形如：https://nihaixia-chat.<你的子域名>.workers.dev
+
+# 环境变量在 Cloudflare Dashboard 中设置：
+#   YUANQI_TOKEN = 你的腾讯元器智能体 Token（从元器 API 管理页面获取）
+# 不要在 wrangler.toml 中写密钥！

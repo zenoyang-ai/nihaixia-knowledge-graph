@@ -166,7 +166,7 @@
                     <section class="qa-questions" aria-labelledby="qa-questions-title">
                         <div class="qa-section-heading">
                             <span id="qa-questions-title">推荐问题</span>
-                            <small>复制后粘贴到 AI 问答框</small>
+                            <small>点击问题直接提问，无需登录</small>
                         </div>
                         <div class="qa-question-grid">
                             <button type="button" class="qa-question-card" data-question="天纪里面的紫微斗数是说什么的？">天纪里面的紫微斗数是说什么的？</button>
@@ -174,48 +174,30 @@
                             <button type="button" class="qa-question-card" data-question="经方、针灸、本草在学习路径中分别承担什么作用？">经方、针灸、本草在学习路径中分别承担什么作用？</button>
                             <button type="button" class="qa-question-card" data-question="学习伤寒论时应该先理解哪些核心节点？">学习伤寒论时应该先理解哪些核心节点？</button>
                         </div>
-                        <div class="qa-copy-toast" id="qa-copy-toast" role="status" aria-live="polite"></div>
                     </section>
 
-                    <section class="qa-shell" aria-label="腾讯元器倪海厦知识库问答">
-                        <div class="qa-shell-bar">
-                            <span>腾讯元器知识库智能体</span>
-                            <a href="https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true" target="_blank" rel="noopener">新窗口打开</a>
-                        </div>
-
-                        <div class="qa-yuanqi-frame-wrap">
-                            <iframe
-                                class="qa-yuanqi-frame"
-                                src="https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true"
-                                title="倪海厦知识库学习助手"
-                                loading="lazy"
-                                referrerpolicy="no-referrer-when-downgrade"></iframe>
-                        </div>
-
-                        <div class="qa-fallback">
-                            元器公开页可直接访问，但未登录用户可能无法在嵌入窗口内提问。若要实现本站内匿名问答，需要另接 Serverless 代理调用元器 API，且不得把 App Key、Token 或任何密钥写进前端代码。
-                        </div>
-                    </section>
-
-                    <section class="qa-plan" aria-label="站内问答方案">
-                        <div class="qa-section-heading">
-                            <span>站内原生问答下一步</span>
-                            <small>免费优先路线</small>
-                        </div>
-                        <div class="qa-setup-grid">
-                            <div>
-                                <strong>知识库底座</strong>
-                                <span>腾讯元器已发布，国内访问友好。</span>
-                            </div>
-                            <div>
-                                <strong>网页体验</strong>
-                                <span>当前先嵌入公开页；匿名提问需后端代理。</span>
-                            </div>
-                            <div>
-                                <strong>安全边界</strong>
-                                <span>密钥放在 Serverless 环境变量，不进入 GitHub Pages。</span>
+                    <section class="qa-chat" aria-label="倪海厦知识库 AI 问答">
+                        <div class="qa-chat-messages" id="qa-chat-messages" aria-live="polite">
+                            <div class="qa-chat-empty">
+                                <p>基于腾讯元器知识库，围绕倪海厦资料进行学习型提问。</p>
+                                <p class="qa-chat-empty-hint">点击上方推荐问题，或直接在下方输入你想了解的内容。</p>
                             </div>
                         </div>
+                        <div class="qa-chat-input-row">
+                            <textarea
+                                id="qa-chat-input"
+                                class="qa-chat-input"
+                                placeholder="输入你的问题，例如：倪海厦讲伤寒论的核心思想是什么？"
+                                rows="1"
+                                maxlength="2000"
+                                aria-label="输入问题"></textarea>
+                            <button type="button" class="qa-chat-send" id="qa-chat-send" aria-label="发送">
+                                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                    <path d="M2 10l16-8-8 16-2-6-6-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <div class="qa-chat-status" id="qa-chat-status"></div>
                     </section>
                 </div>
             </div>

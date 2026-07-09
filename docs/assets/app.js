@@ -131,41 +131,166 @@ class NihaixiaApp {
 document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
 
-    // AI 问答推荐问题复制
-    const qaToast = document.getElementById('qa-copy-toast');
-    const setQaToast = (message) => {
-        if (!qaToast) return;
-        qaToast.textContent = message;
-        qaToast.classList.add('show');
-        window.clearTimeout(qaToast.hideTimer);
-        qaToast.hideTimer = window.setTimeout(() => qaToast.classList.remove('show'), 1800);
-    };
-    const copyQuestion = async (text) => {
-        if (navigator.clipboard && window.isSecureContext) {
-            await navigator.clipboard.writeText(text);
-            return;
-        }
-        const textarea = document.createElement('textarea');
-        textarea.value = text;
-        textarea.setAttribute('readonly', '');
-        textarea.style.position = 'fixed';
-        textarea.style.left = '-9999px';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        textarea.remove();
-    };
-    document.querySelectorAll('.qa-question-card').forEach((card) => {
-        card.addEventListener('click', async () => {
-            const question = card.dataset.question || card.textContent.trim();
+    // ============================================
+    // AI 问答 — 原生聊天框
+    // ============================================
+    // Worker URL：部署 Cloudflare Worker 后替换为实际地址
+    // 部署前留空，此时点击推荐问题会填入输入框（不发送）
+    const QA_WORKER_URL = '';
+
+    const messagesEl = document.getElementById('qa-chat-messages');
+    const inputEl = document.getElementById('qa-chat-input');
+    const sendBtn = document.getElementById('qa-chat-send');
+    const statusEl = document.getElementById('qa-chat-status');
+
+    let isSending = false;
+
+    function setStatus(text, isError = false) {
+        if (!statusEl) return;
+        statusEl.textContent = text;
+        statusEl.style.color = isError ? '#b9362c' : '';
+    }
+
+    function clearStatus() {
+        if (!statusEl) return;
+        statusEl.textContent = '';
+        statusEl.style.color = '';
+    }
+
+    function removeEmptyState() {
+        const empty = messagesEl?.querySelector('.qa-chat-empty');
+        if (empty) empty.remove();
+    }
+
+    function addMessage(role, content) {
+        if (!messagesEl) return;
+        removeEmptyState();
+        const div = document.createElement('div');
+        div.className = `qa-chat-message ${role}`;
+        div.innerHTML = `
+            <span class="qa-chat-role">${role === 'user' ? '你' : '倪海厦知识库助手'}</span>
+            <div class="qa-chat-bubble">${formatContent(content)}</div>
+        `;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function formatContent(text) {
+        // 简单 markdown 处理：段落、列表、代码
+        return text
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/\n\n/g, '</p><p>')
+            .replace(/\n/g, '<br>')
+            .replace(/^|$/g, '<p>')
+            .replace(/<p><\/p>/g, '')
+            .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+            .replace(/`([^`]+)`/g, '<code>$1</code>')
+            .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+    }
+
+    function addTyping() {
+        if (!messagesEl) return;
+        removeEmptyState();
+        const div = document.createElement('div');
+        div.className = 'qa-chat-message assistant';
+        div.id = 'qa-typing-indicator';
+        div.innerHTML = `
+            <span class="qa-chat-role">倪海厦知识库助手</span>
+            <div class="qa-chat-bubble">
+                <span class="qa-chat-typing">
+                    <span class="qa-chat-typing-dot"></span>
+                    <span class="qa-chat-typing-dot"></span>
+                    <span class="qa-chat-typing-dot"></span>
+                </span>
+            </div>
+        `;
+        messagesEl.appendChild(div);
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    function removeTyping() {
+        const el = document.getElementById('qa-typing-indicator');
+        if (el) el.remove();
+    }
+
+    async function sendMessage(message) {
+        if (isSending || !message.trim()) return;
+        isSending = true;
+        sendBtn && (sendBtn.disabled = true);
+        inputEl && (inputEl.disabled = true);
+        clearStatus();
+
+        addMessage('user', message.trim());
+        addTyping();
+
+        if (!QA_WORKER_URL) {
+            // Worker 未部署，显示提示
+            removeTyping();
+            addMessage('assistant', '问答服务尚未部署。\n\n请将 Cloudflare Worker 部署后，把 `QA_WORKER_URL` 填入 `docs/assets/app.js` 第 137 行，即可启用站内匿名问答。\n\n临时方案：可前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 提问（需登录）。');
+            setStatus('Worker 未部署，点击上方"打开元器问答"按钮可临时提问', true);
+        } else {
             try {
-                await copyQuestion(question);
-                setQaToast('已复制，可粘贴到 AI 问答框');
-            } catch (error) {
-                console.error('复制推荐问题失败:', error);
-                setQaToast('复制失败，请手动选择文本');
+                setStatus('正在思考...');
+                const res = await fetch(QA_WORKER_URL, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: message.trim() }),
+                });
+                const data = await res.json();
+                removeTyping();
+                if (res.ok && data.reply) {
+                    addMessage('assistant', data.reply);
+                    clearStatus();
+                } else {
+                    addMessage('assistant', `抱歉，问答服务暂时不可用：${data.error || '未知错误'}`);
+                    setStatus(data.error || '请求失败', true);
+                }
+            } catch (err) {
+                removeTyping();
+                addMessage('assistant', '抱歉，网络请求失败，请检查网络连接后重试。');
+                setStatus('网络请求失败', true);
             }
+        }
+
+        isSending = false;
+        sendBtn && (sendBtn.disabled = false);
+        inputEl && (inputEl.disabled = false);
+        inputEl && inputEl.focus();
+    }
+
+    // 推荐问题点击 → 直接发送
+    document.querySelectorAll('.qa-question-card').forEach((card) => {
+        card.addEventListener('click', () => {
+            const question = card.dataset.question || card.textContent.trim();
+            if (inputEl) inputEl.value = question;
+            sendMessage(question);
         });
+    });
+
+    // 发送按钮
+    sendBtn && sendBtn.addEventListener('click', () => {
+        const msg = inputEl?.value || '';
+        if (inputEl) inputEl.value = '';
+        sendMessage(msg);
+    });
+
+    // 回车发送（Shift+Enter 换行）
+    inputEl && inputEl.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            const msg = inputEl.value;
+            inputEl.value = '';
+            sendMessage(msg);
+        }
+    });
+
+    // 自动调整输入框高度
+    inputEl && inputEl.addEventListener('input', () => {
+        inputEl.style.height = 'auto';
+        inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
     });
 
     // Footer 公众号浮层
