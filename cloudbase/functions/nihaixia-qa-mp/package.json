@@ -1,0 +1,9 @@
+{
+  "name": "nihaixia-qa-mp",
+  "version": "1.0.0",
+  "description": "倪海厦知识库 AI 问答 — 小程序专用云函数（兜底）",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3"
+  }
+}

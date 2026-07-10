@@ -1,0 +1,104 @@
+<!--pages/chat/chat.wxml-->
+<view class="chat-container">
+
+  <!-- 顶部操作栏 -->
+  <view class="chat-topbar" wx:if="{{messages.length > 0}}">
+    <view class="chat-topbar-title">倪海厦知识库问答</view>
+    <view class="chat-clear-btn" bindtap="onClearChat">
+      <text>清空</text>
+    </view>
+  </view>
+
+  <!-- 消息列表 -->
+  <scroll-view
+    class="chat-messages"
+    scroll-y
+    scroll-into-view="{{scrollToView}}"
+    scroll-with-animation
+    enhanced
+    show-scrollbar="{{false}}"
+  >
+    <!-- 欢迎区域 -->
+    <view class="welcome-section" wx:if="{{messages.length === 0}}">
+      <view class="welcome-title">倪海厦知识库</view>
+      <view class="welcome-subtitle">智能问答助手 · 经方派中医学习</view>
+      <view class="suggested-questions">
+        <view
+          class="suggested-item"
+          wx:for="{{suggestedQuestions}}"
+          wx:key="index"
+          bindtap="onSuggestedTap"
+          data-question="{{item}}"
+        >
+          <text class="suggested-icon">问</text>
+          <text class="suggested-text">{{item}}</text>
+        </view>
+      </view>
+    </view>
+
+    <!-- 消息列表 -->
+    <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}">
+      <!-- 用户消息 -->
+      <view class="msg-row msg-row-user" wx:if="{{item.role === 'user'}}">
+        <view class="msg-bubble msg-bubble-user">
+          <text>{{item.content}}</text>
+        </view>
+      </view>
+
+      <!-- AI 消息 -->
+      <view class="msg-row msg-row-ai" wx:else>
+        <view class="msg-avatar">
+          <text class="msg-avatar-text">倪</text>
+        </view>
+        <view class="msg-bubble msg-bubble-ai">
+          <block wx:if="{{item.content}}">
+            <rich-text nodes="{{item.html}}" wx:if="{{item.html}}"></rich-text>
+            <text wx:else>{{item.content}}</text>
+          </block>
+          <view wx:else class="typing-dots">
+            <view class="typing-dot"></view>
+            <view class="typing-dot"></view>
+            <view class="typing-dot"></view>
+          </view>
+          <view class="msg-provider" wx:if="{{item.provider}}">
+            <text>{{item.provider === 'cloudbase' ? '云开发' : item.provider === 'cloudfunction' ? '云函数' : item.provider === 'system' ? '系统' : '元器'}}</text>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <!-- 底部占位 -->
+    <view class="chat-bottom-spacer" id="chat-bottom"></view>
+  </scroll-view>
+
+  <!-- 输入区域 -->
+  <view class="chat-input-area">
+    <view class="chat-input-wrap">
+      <textarea
+        class="chat-input"
+        value="{{inputValue}}"
+        bindinput="onInput"
+        bindconfirm="onSend"
+        placeholder="请输入关于倪海厦学术体系的问题…"
+        placeholder-class="chat-input-placeholder"
+        confirm-type="send"
+        auto-height
+        maxlength="2000"
+        show-confirm-bar="{{false}}"
+        adjust-position="{{true}}"
+        cursor-spacing="20"
+        disabled="{{loading}}"
+      />
+      <view
+        class="chat-send-btn {{(inputValue.trim() && !loading) ? 'chat-send-btn-active' : ''}}"
+        bindtap="onSend"
+      >
+        <text>{{loading ? '…' : '发送'}}</text>
+      </view>
+    </view>
+    <view class="chat-input-hint">
+      <text>仅供学习研究，不提供医疗诊断或处方建议</text>
+    </view>
+  </view>
+
+</view>

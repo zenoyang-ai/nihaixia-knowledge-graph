@@ -9,6 +9,14 @@
       "runtime": "Nodejs18.15",
       "memorySize": 256,
       "installDependency": true
+    },
+    {
+      "name": "nihaixia-qa-mp",
+      "handler": "index.main",
+      "timeout": 60,
+      "runtime": "Nodejs18.15",
+      "memorySize": 256,
+      "installDependency": true
     }
   ]
 }
