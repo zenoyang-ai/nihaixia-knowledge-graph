@@ -132,24 +132,61 @@ document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
 
     // ============================================
-    // AI 问答 — 原生聊天框（双路线）
+    // AI 问答 — 统一问答路由（双线路自动切换）
     // ============================================
-    // 路线 A: CloudBase 云函数 → 代理元器 API
-    //   部署后获得 URL，形如 https://zeno-xxx.app.tcloudbase.com/yuanqi-proxy
-    // 路线 B: CloudBase 原生 Agent（Beta）
-    //   创建 Agent 后获得 API Endpoint，无需经过元器
-    // 优先级: 路线 A > 路线 B > Cloudflare Worker
-    // 部署前留空，此时点击推荐问题会显示部署提示
-    const QA_ENDPOINTS = [
-        // 路线 A: CloudBase 云函数 → CloudBase AI SDK (hy3-preview)
-        { url: 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/yuanqi-proxy', label: 'CloudBase 云函数' },
-    ];
+    // 统一路由：主线路 腾讯元器 → 备用线路 CloudBase Agent
+    // 两条线路均基于知识库 RAG，不使用通用模型兜底
+    const QA_ROUTER_URL = 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router';
+    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/webim/#/chat/EUXRpk?appid=2075218483281047808&experience=true';
 
     const messagesEl = document.getElementById('qa-chat-messages');
     const inputEl = document.getElementById('qa-chat-input');
     const sendBtn = document.getElementById('qa-chat-send');
     const statusEl = document.getElementById('qa-chat-status');
+    const clearBtn = document.getElementById('qa-chat-clear');
 
+    // ---- localStorage 会话管理 ----
+    const LS_SESSION_KEY = 'nihaixia_qa_session';
+    const LS_HISTORY_KEY = 'nihaixia_qa_history';
+    const MAX_HISTORY_ROUNDS = 6;
+
+    function getSessionId() {
+        let sid = localStorage.getItem(LS_SESSION_KEY);
+        if (!sid) {
+            sid = 'web-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8);
+            localStorage.setItem(LS_SESSION_KEY, sid);
+        }
+        return sid;
+    }
+
+    function getHistory() {
+        try {
+            const raw = localStorage.getItem(LS_HISTORY_KEY);
+            return raw ? JSON.parse(raw) : [];
+        } catch { return []; }
+    }
+
+    function saveHistory(messages) {
+        // 只保留最近 MAX_HISTORY_ROUNDS 轮
+        const trimmed = messages.slice(-MAX_HISTORY_ROUNDS * 2);
+        localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(trimmed));
+    }
+
+    function clearHistory() {
+        localStorage.removeItem(LS_HISTORY_KEY);
+        localStorage.removeItem(LS_SESSION_KEY);
+        if (messagesEl) {
+            messagesEl.innerHTML = `
+                <div class="qa-chat-empty">
+                    <p>基于腾讯元器知识库，围绕倪海厦资料进行学习型提问。</p>
+                    <p class="qa-chat-empty-hint">点击上方推荐问题，或直接在下方输入你想了解的内容。</p>
+                </div>`;
+        }
+        setStatus('对话已清空');
+        setTimeout(clearStatus, 2000);
+    }
+
+    // ---- 状态与消息渲染 ----
     let isSending = false;
 
     function setStatus(text, isError = false) {
@@ -169,13 +206,28 @@ document.addEventListener('DOMContentLoaded', () => {
         if (empty) empty.remove();
     }
 
-    function addMessage(role, content) {
+    function getProviderLabel(provider, degraded) {
+        if (provider === 'yuanqi') {
+            return degraded ? '腾讯元器知识库（降级）' : '腾讯元器知识库';
+        }
+        if (provider === 'cloudbase') {
+            return degraded ? 'CloudBase 知识库备用线路（降级）' : 'CloudBase 知识库备用线路';
+        }
+        return provider || '未知线路';
+    }
+
+    function addMessage(role, content, providerInfo) {
         if (!messagesEl) return;
         removeEmptyState();
         const div = document.createElement('div');
         div.className = `qa-chat-message ${role}`;
+        let providerTag = '';
+        if (role === 'assistant' && providerInfo) {
+            const degradedClass = providerInfo.degraded ? ' qa-provider-degraded' : '';
+            providerTag = `<span class="qa-provider-tag${degradedClass}">${getProviderLabel(providerInfo.provider, providerInfo.degraded)}</span>`;
+        }
         div.innerHTML = `
-            <span class="qa-chat-role">${role === 'user' ? '你' : '倪海厦知识库助手'}</span>
+            <span class="qa-chat-role">${role === 'user' ? '你' : '倪海厦知识库助手'}${providerTag}</span>
             <div class="qa-chat-bubble">${formatContent(content)}</div>
         `;
         messagesEl.appendChild(div);
@@ -183,7 +235,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function formatContent(text) {
-        // 简单 markdown 处理：段落、列表、代码
         return text
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
@@ -223,6 +274,13 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.remove();
     }
 
+    function buildErrorReply(errorMsg) {
+        let reply = `抱歉，问答服务暂时不可用。`;
+        if (errorMsg) reply += `\n\n原因：${errorMsg}`;
+        reply += `\n\n你可以：\n- 前往 [腾讯元器体验页](${YUANQI_EXPERIENCE_URL}) 直接提问\n- 关注公众号「数字问渡」使用元器小程序`;
+        return reply;
+    }
+
     async function sendMessage(message) {
         if (isSending || !message.trim()) return;
         isSending = true;
@@ -230,50 +288,51 @@ document.addEventListener('DOMContentLoaded', () => {
         inputEl && (inputEl.disabled = true);
         clearStatus();
 
-        addMessage('user', message.trim());
+        const trimmedMsg = message.trim();
+        addMessage('user', trimmedMsg);
+
+        // 更新历史
+        const history = getHistory();
+        history.push({ role: 'user', content: trimmedMsg });
+        saveHistory(history);
+
         addTyping();
 
-        // 过滤出有效 endpoint
-        const activeEndpoints = QA_ENDPOINTS.filter((ep) => ep.url && ep.url.trim());
+        // 构建请求：发送当前消息 + 历史上下文
+        const sessionId = getSessionId();
+        const messages = history.slice(-MAX_HISTORY_ROUNDS * 2).map(m => ({
+            role: m.role,
+            content: m.content,
+        }));
 
-        if (activeEndpoints.length === 0) {
-            // 所有 endpoint 都未配置
+        try {
+            setStatus('正在连接问答服务...');
+            const res = await fetch(QA_ROUTER_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ session_id: sessionId, messages }),
+            });
+            const data = await res.json();
+
             removeTyping();
-            addMessage('assistant', '问答服务尚未部署。\n\n请选择以下任一方式启用：\n\n**路线 A（推荐）**：部署 CloudBase 云函数 → 把 URL 填入 `QA_ENDPOINTS`\n详见 `cloudbase/` 目录\n\n**路线 B**：创建 CloudBase 原生 Agent → 把 API Endpoint 填入 `QA_ENDPOINTS`\n详见 `cloudbase/CLOUDBASE_AGENT_GUIDE.md`\n\n**临时方案**：前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 提问（需登录）。');
-            setStatus('问答后端未部署，详见 cloudbase/ 目录', true);
-        } else {
-            // 逐个尝试 endpoint，直到成功
-            let lastError = '';
-            let success = false;
-            for (const endpoint of activeEndpoints) {
-                try {
-                    setStatus(`正在连接 ${endpoint.label}...`);
-                    const res = await fetch(endpoint.url, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ message: message.trim() }),
-                    });
-                    const data = await res.json();
-                    if (res.ok && data.reply) {
-                        removeTyping();
-                        addMessage('assistant', data.reply);
-                        clearStatus();
-                        success = true;
-                        break;
-                    } else {
-                        lastError = data.error || '未知错误';
-                        console.warn(`Endpoint ${endpoint.label} 失败:`, lastError);
-                    }
-                } catch (err) {
-                    lastError = err.message || '网络错误';
-                    console.warn(`Endpoint ${endpoint.label} 异常:`, lastError);
-                }
+
+            if (res.ok && data.reply) {
+                const providerInfo = { provider: data.provider, degraded: data.degraded };
+                addMessage('assistant', data.reply, providerInfo);
+                clearStatus();
+                // 保存助手回复到历史
+                history.push({ role: 'assistant', content: data.reply });
+                saveHistory(history);
+            } else {
+                const errorMsg = data.error || `HTTP ${res.status}`;
+                addMessage('assistant', buildErrorReply(errorMsg));
+                setStatus('问答服务返回错误', true);
             }
-            if (!success) {
-                removeTyping();
-                addMessage('assistant', `抱歉，所有问答后端均不可用。\n\n最后错误：${lastError}\n\n可前往 [腾讯元器公开页](https://yuanqi.tencent.com/webim/#/chat/lebbJN?appid=2075108259383652608&experience=true) 临时提问。`);
-                setStatus('所有后端均不可用，请检查部署状态', true);
-            }
+        } catch (err) {
+            removeTyping();
+            const errorMsg = err.message || '网络错误';
+            addMessage('assistant', buildErrorReply(errorMsg));
+            setStatus('网络连接失败，请检查网络后重试', true);
         }
 
         isSending = false;
@@ -289,6 +348,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (inputEl) inputEl.value = question;
             sendMessage(question);
         });
+    });
+
+    // 清空对话按钮
+    clearBtn && clearBtn.addEventListener('click', () => {
+        clearHistory();
     });
 
     // 发送按钮

@@ -16,10 +16,13 @@ sources-review/
 
 # 发布包（本地生成）
 releases/*.zip
+qa-corpus/
+倪海厦-QA上传包/
 
 
 # 环境和密钥
 .env
+cloudbase/.env*
 *_TOKEN*
 *_SECRET*
 *.key
@@ -40,3 +43,6 @@ venv/
 
 # Obsidian 配置
 .obsidian/
+
+# Node.js
+node_modules/

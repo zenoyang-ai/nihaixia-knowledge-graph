@@ -3,15 +3,12 @@
   "functionRoot": "./functions",
   "functions": [
     {
-      "name": "yuanqi-proxy",
+      "name": "nihaixia-qa-router",
       "handler": "index.main",
       "timeout": 120,
       "runtime": "Nodejs18.15",
       "memorySize": 256,
-      "installDependency": true,
-      "envVariables": {
-        "YUANQI_TOKEN": "YUANQI_APP_KEY_REDACTED"
-      }
+      "installDependency": true
     }
   ]
 }
