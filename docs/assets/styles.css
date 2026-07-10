@@ -1826,6 +1826,19 @@ body {
 .qa-chat-bubble p:last-child { margin-bottom: 0; }
 .qa-chat-bubble ul, .qa-chat-bubble ol { margin: 6px 0; padding-left: 20px; }
 .qa-chat-bubble li { margin-bottom: 4px; }
+.qa-chat-bubble .qa-md-heading {
+    font-weight: 700;
+    font-size: 15px;
+    color: var(--ink);
+    margin: 12px 0 6px;
+    padding-bottom: 3px;
+    border-bottom: 1px solid rgba(231, 216, 193, 0.5);
+}
+.qa-chat-bubble .qa-md-heading:first-child { margin-top: 0; }
+.qa-chat-bubble a {
+    color: var(--accent-blue);
+    text-decoration: underline;
+}
 .qa-chat-bubble code {
     background: rgba(0,0,0,0.06);
     padding: 1px 5px;

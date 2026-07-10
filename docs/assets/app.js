@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 统一路由：主线路 腾讯元器 → 备用线路 CloudBase Agent
     // 两条线路均基于知识库 RAG，不使用通用模型兜底
     const QA_ROUTER_URL = 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router';
-    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/webim/#/chat/EUXRpk?appid=2075218483281047808&experience=true';
+    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/explore';
 
     const messagesEl = document.getElementById('qa-chat-messages');
     const inputEl = document.getElementById('qa-chat-input');
@@ -235,18 +235,109 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function formatContent(text) {
-        return text
+        // 先按行处理 markdown 结构
+        let lines = text.split('\n');
+        let html = [];
+        let inList = false;
+        let listType = '';
+
+        for (let line of lines) {
+            let trimmed = line.trim();
+
+            // 空行 → 段落分隔
+            if (trimmed === '') {
+                if (inList) { html.push(`</${listType}>`); inList = false; }
+                html.push('');
+                continue;
+            }
+
+            // 标题 ### / ## / #
+            let headingMatch = trimmed.match(/^(#{1,6})\s+(.*)/);
+            if (headingMatch) {
+                if (inList) { html.push(`</${listType}>`); inList = false; }
+                html.push(`<div class="qa-md-heading">${headingMatch[2]}</div>`);
+                continue;
+            }
+
+            // 有序列表 1. 2. 3.
+            let olMatch = trimmed.match(/^(\d+)\.\s+(.*)/);
+            if (olMatch) {
+                if (!inList || listType !== 'ol') {
+                    if (inList) html.push(`</${listType}>`);
+                    html.push('<ol>');
+                    inList = true;
+                    listType = 'ol';
+                }
+                html.push(`<li>${olMatch[2]}</li>`);
+                continue;
+            }
+
+            // 无序列表 - 或 *
+            let ulMatch = trimmed.match(/^[-*]\s+(.*)/);
+            if (ulMatch) {
+                if (!inList || listType !== 'ul') {
+                    if (inList) html.push(`</${listType}>`);
+                    html.push('<ul>');
+                    inList = true;
+                    listType = 'ul';
+                }
+                html.push(`<li>${ulMatch[1]}</li>`);
+                continue;
+            }
+
+            // 普通段落
+            if (inList) { html.push(`</${listType}>`); inList = false; }
+            html.push(`<p>${trimmed}</p>`);
+        }
+
+        if (inList) html.push(`</${listType}>`);
+
+        // 组装后处理行内格式
+        let result = html.join('\n');
+
+        // HTML 转义安全：行内标记替换
+        result = result
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/\n\n/g, '</p><p>')
-            .replace(/\n/g, '<br>')
-            .replace(/^|$/g, '<p>')
-            .replace(/<p><\/p>/g, '')
+            // 恢复我们生成的 HTML 标签
+            .replace(/&lt;div class="qa-md-heading"&gt;/g, '<div class="qa-md-heading">')
+            .replace(/&lt;\/div&gt;/g, '</div>')
+            .replace(/&lt;p&gt;/g, '<p>')
+            .replace(/&lt;\/p&gt;/g, '</p>')
+            .replace(/&lt;ol&gt;/g, '<ol>')
+            .replace(/&lt;\/ol&gt;/g, '</ol>')
+            .replace(/&lt;ul&gt;/g, '<ul>')
+            .replace(/&lt;\/ul&gt;/g, '</ul>')
+            .replace(/&lt;li&gt;/g, '<li>')
+            .replace(/&lt;\/li&gt;/g, '</li>')
+            .replace(/&lt;br&gt;/g, '<br>')
+            .replace(/&lt;strong&gt;/g, '<strong>')
+            .replace(/&lt;\/strong&gt;/g, '</strong>')
+            .replace(/&lt;em&gt;/g, '<em>')
+            .replace(/&lt;\/em&gt;/g, '</em>')
+            .replace(/&lt;pre&gt;&lt;code&gt;/g, '<pre><code>')
+            .replace(/&lt;\/code&gt;&lt;\/pre&gt;/g, '</code></pre>')
+            .replace(/&lt;code&gt;/g, '<code>')
+            .replace(/&lt;\/code&gt;/g, '</code>');
+
+        // 行内 markdown 格式
+        result = result
+            // 代码块
             .replace(/```(\w*)\n?([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
+            // 行内代码
             .replace(/`([^`]+)`/g, '<code>$1</code>')
+            // 加粗
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
-            .replace(/\*([^*]+)\*/g, '<em>$1</em>');
+            // 斜体
+            .replace(/\*([^*]+)\*/g, '<em>$1</em>')
+            // 链接 [text](url)
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+
+        // 清理空段落
+        result = result.replace(/<p><\/p>/g, '').replace(/\n\n+/g, '\n');
+
+        return result;
     }
 
     function addTyping() {
@@ -277,7 +368,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function buildErrorReply(errorMsg) {
         let reply = `抱歉，问答服务暂时不可用。`;
         if (errorMsg) reply += `\n\n原因：${errorMsg}`;
-        reply += `\n\n你可以：\n- 前往 [腾讯元器体验页](${YUANQI_EXPERIENCE_URL}) 直接提问\n- 关注公众号「数字问渡」使用元器小程序`;
+        reply += `\n\n你可以：\n- 前往 [腾讯元器平台](${YUANQI_EXPERIENCE_URL}) 搜索「倪海厦知识库」直接提问\n- 或稍后重试，系统会自动恢复`;
         return reply;
     }
 
