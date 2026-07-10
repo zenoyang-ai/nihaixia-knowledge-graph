@@ -282,49 +282,43 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     }
   }
 
-  async function tryCloudBase(normalized, requestId, startTime) {
-    const botId = env.CLOUDBASE_BOT_ID;
-    if (!botId) {
-      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'skipped', reason: 'not_configured' }));
-      return null;
-    }
+  // 倪海厦知识库 system prompt（嵌入核心知识上下文）
+  const NHS_SYSTEM_PROMPT = `你是「倪海厦知识库学习助手」，基于倪海厦（经方派中医大家）的学术体系回答问题。
 
+核心知识体系：
+1. 人纪：包含针灸大成、神农本草经、黄帝内经、伤寒论、金匮要略五部经典的教学解读。倪海厦强调六经辨证（太阳、阳明、少阳、太阴、少阴、厥阴），方证对应，经方原方原量。
+2. 天纪：包含紫微斗数、易经、阳宅风水、相术等玄学体系，强调天、地、人三才合一。
+3. 汉唐方剂：倪海厦对汉代和唐代经典方剂的讲解，如桂枝汤、麻黄汤、白虎汤、四逆汤等。
+4. 针灸：强调经络辨证、穴位配伍、针刺手法和灸法运用。
+5. 本草：基于神农本草经，将药物分为上中下三品，强调药性归经。
+
+回答要求：
+- 仅回答与倪海厦学术体系相关的问题
+- 保持学术严谨，引用原文出处
+- 不提供具体医疗诊断、处方或用药建议
+- 遇到超出知识范围的问题，如实告知
+- 用中文回答，排版清晰`;
+
+  async function tryCloudBase(normalized, requestId, startTime) {
     try {
       const app = _cloudbase.init({ env: 'zeno-d9g0gdvw4a57635c0' });
       const ai = app.ai();
-      const res = await ai.bot.sendMessage({
-        botId,
-        threadId: normalized.session_id || 'anon',
-        runId: requestId,
-        messages: normalized.messages.map((m, i) => ({
-          id: `msg-${i}`,
-          role: m.role,
-          content: m.content,
-        })),
-        tools: [],
-        context: [],
-        state: {},
-        forwardedProps: {},
+      const model = ai.createModel('cloudbase');
+
+      const messages = [
+        { role: 'system', content: NHS_SYSTEM_PROMPT },
+        ...normalized.messages,
+      ];
+
+      const res = await model.generateText({
+        model: 'hy3-preview',
+        messages,
+        temperature: 0.7,
+        maxTokens: 2000,
       });
 
-      let text = '';
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('timeout')), 25000)
-      );
-
-      const streamPromise = (async () => {
-        for await (const data of res.dataStream) {
-          if (data.type === 'TEXT_MESSAGE_CONTENT') {
-            text += data.delta;
-          } else if (data.type === 'RUN_ERROR') {
-            throw new Error(data.message || 'Agent 运行错误');
-          }
-        }
-      })();
-
-      await Promise.race([streamPromise, timeoutPromise]);
-
       const elapsed = Date.now() - startTime;
+      const text = res && res.text ? res.text.trim() : '';
 
       if (text) {
         console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 200, elapsed }));
@@ -368,7 +362,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         version: VERSION,
         providers: {
           yuanqi: !!(env.YUANQI_APP_ID && env.YUANQI_APP_KEY),
-          cloudbase: !!(env.CLOUDBASE_BOT_ID),
+          cloudbase: true, // 使用 SDK generateText，无需额外配置
         },
         primary: primaryProvider,
       }, origin, allowedOrigins);
@@ -454,7 +448,6 @@ const defaultRouter = createRouter({
   env: {
     YUANQI_APP_ID: process.env.YUANQI_APP_ID,
     YUANQI_APP_KEY: process.env.YUANQI_APP_KEY,
-    CLOUDBASE_BOT_ID: process.env.CLOUDBASE_BOT_ID,
     PRIMARY_PROVIDER: process.env.PRIMARY_PROVIDER || 'yuanqi',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765',
   },
