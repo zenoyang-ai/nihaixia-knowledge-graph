@@ -4,7 +4,7 @@
  *
  * 双线路架构：
  *   主线路：腾讯元器（知识库 RAG）
- *   备用线路：CloudBase 原生 Agent（知识库 RAG）
+ *   备用线路：CloudBase Agent（知识库 RAG，ai.bot.sendMessage）
  *
  * 禁止使用通用模型 generateText() 作为兜底。
  * 两条线路均基于知识库检索，不依赖无上下文的通用大模型。
@@ -12,7 +12,7 @@
 
 const cloudbase = require('@cloudbase/node-sdk');
 
-const VERSION = '1.0.0';
+const VERSION = '2.0.0';
 
 // ---------------------------------------------------------------------------
 // 医疗可执行请求检测 — 在本地拦截，绝不调用 provider
@@ -53,6 +53,10 @@ function normalizeRequest(body) {
     throw new Error('请提供 message 或 messages 字段');
   }
 
+  if (messages.length === 0) {
+    throw new Error('消息不能为空');
+  }
+
   // 校验每条消息
   for (const m of messages) {
     if (!m.role || !['user', 'assistant'].includes(m.role)) {
@@ -81,9 +85,6 @@ function normalizeRequest(body) {
   // 最多保留 12 条
   if (messages.length > 12) {
     messages = messages.slice(messages.length - 12);
-    // 截断后如果第一条是 assistant 且总条数为奇数，序列仍有效
-    // （交替角色 + 最后一条是 user 已在上面校验）
-    // 只有当截断后前两条角色相同时才需要再裁剪
     if (messages.length >= 2 && messages[0].role === messages[1].role) {
       messages = messages.slice(1);
     }
@@ -119,7 +120,7 @@ function parseAllowedOrigins(env) {
 }
 
 function buildResponse(statusCode, body, origin, allowedOrigins) {
-  const allowOrigin = allowedOrigins.includes(origin) ? origin : (allowedOrigins[0] || '');
+  const allowOrigin = allowedOrigins.includes(origin) ? origin : '';
   return {
     statusCode,
     headers: {
@@ -142,7 +143,7 @@ function buildResponse(statusCode, body, origin, allowedOrigins) {
 // ---------------------------------------------------------------------------
 class RateLimiter {
   constructor() {
-    this._window = new Map(); // ip -> { minute: { count, reset }, daily: { count, reset } }
+    this._window = new Map();
     this._concurrency = 0;
     this._maxConcurrency = 8;
     this._maxPerMinute = 10;
@@ -161,7 +162,6 @@ class RateLimiter {
       this._window.set(ip, entry);
     }
 
-    // 重置过期窗口
     if (now > entry.minute.reset) {
       entry.minute = { count: 0, reset: now + 60000 };
     }
@@ -169,15 +169,9 @@ class RateLimiter {
       entry.daily = { count: 0, reset: now + 86400000 };
     }
 
-    if (entry.minute.count >= this._maxPerMinute) {
-      return false;
-    }
-    if (entry.daily.count >= this._maxPerDay) {
-      return false;
-    }
-    if (this._concurrency >= this._maxConcurrency) {
-      return false;
-    }
+    if (entry.minute.count >= this._maxPerMinute) return false;
+    if (entry.daily.count >= this._maxPerDay) return false;
+    if (this._concurrency >= this._maxConcurrency) return false;
 
     entry.minute.count += 1;
     entry.daily.count += 1;
@@ -189,13 +183,10 @@ class RateLimiter {
     if (this._concurrency > 0) this._concurrency -= 1;
   }
 
-  // 定期清理过期条目
   cleanup() {
     const now = Date.now();
     for (const [ip, entry] of this._window) {
-      if (now > entry.daily.reset) {
-        this._window.delete(ip);
-      }
+      if (now > entry.daily.reset) this._window.delete(ip);
     }
   }
 }
@@ -207,7 +198,6 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
   const _fetch = fetchImpl || fetch;
   const _cloudbase = cloudbaseSdk || cloudbase;
   const _uuid = randomUUID || (() => {
-    // 简单的 request ID 生成，不依赖外部库
     const ts = Date.now().toString(36);
     const rand = Math.random().toString(36).slice(2, 10);
     return `${ts}-${rand}`;
@@ -217,10 +207,12 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
   const primaryProvider = (env && env.PRIMARY_PROVIDER) || 'yuanqi';
   const rateLimiter = new RateLimiter();
 
-  // 定期清理限流器（每 5 分钟）
   const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 300000);
   if (cleanupInterval.unref) cleanupInterval.unref();
 
+  // -----------------------------------------------------------------------
+  // 主线路：腾讯元器
+  // -----------------------------------------------------------------------
   async function tryYuanqi(normalized, requestId, startTime) {
     const appId = env.YUANQI_APP_ID;
     const appKey = env.YUANQI_APP_KEY;
@@ -255,7 +247,21 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
 
       if (res.ok) {
         const data = await res.json();
-        const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+        const choice = data.choices && data.choices[0];
+        const reply = (choice && choice.message && choice.message.content) || '';
+        const finishReason = (choice && choice.finish_reason) || '';
+
+        // finish_reason: "sensitive" → 返回安全提示，不切换备用
+        if (finishReason === 'sensitive') {
+          console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, reason: 'sensitive', elapsed }));
+          return buildResponse(200, {
+            reply: '您的问题涉及敏感内容，请调整后重试。',
+            provider: 'yuanqi',
+            degraded: false,
+            request_id: requestId,
+          }, '', allowedOrigins);
+        }
+
         if (reply) {
           console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, elapsed }));
           return buildResponse(200, {
@@ -267,7 +273,17 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         }
       }
 
-      // 无 reply、401、403、429、5xx 或超时 → 切换备用
+      // 400 请求格式错误 → 返回受控错误，不切换备用
+      if (res.status === 400) {
+        const data = await res.json().catch(() => ({}));
+        console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: 400, reason: 'bad_request', elapsed }));
+        return buildResponse(400, {
+          error: '请求格式错误，请检查输入后重试',
+          request_id: requestId,
+        }, '', allowedOrigins);
+      }
+
+      // 401、403、429、5xx、空答、超时 → 切换备用
       if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) {
         console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, elapsed }));
       } else {
@@ -277,68 +293,105 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     } catch (err) {
       clearTimeout(timeout);
       const elapsed = Date.now() - startTime;
-      console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: 'error', reason: err.name === 'AbortError' ? 'timeout' : err.message, elapsed }));
+      console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: 'error', reason: err.name === 'AbortError' ? 'timeout' : 'fetch_error', elapsed }));
       return null;
     }
   }
 
-  // 倪海厦知识库 system prompt（嵌入核心知识上下文）
-  const NHS_SYSTEM_PROMPT = `你是「倪海厦知识库学习助手」，基于倪海厦（经方派中医大家）的学术体系回答问题。
-
-核心知识体系：
-1. 人纪：包含针灸大成、神农本草经、黄帝内经、伤寒论、金匮要略五部经典的教学解读。倪海厦强调六经辨证（太阳、阳明、少阳、太阴、少阴、厥阴），方证对应，经方原方原量。
-2. 天纪：包含紫微斗数、易经、阳宅风水、相术等玄学体系，强调天、地、人三才合一。
-3. 汉唐方剂：倪海厦对汉代和唐代经典方剂的讲解，如桂枝汤、麻黄汤、白虎汤、四逆汤等。
-4. 针灸：强调经络辨证、穴位配伍、针刺手法和灸法运用。
-5. 本草：基于神农本草经，将药物分为上中下三品，强调药性归经。
-
-回答要求：
-- 仅回答与倪海厦学术体系相关的问题
-- 保持学术严谨，引用原文出处
-- 不提供具体医疗诊断、处方或用药建议
-- 遇到超出知识范围的问题，如实告知
-- 用中文回答，排版清晰`;
-
+  // -----------------------------------------------------------------------
+  // 备用线路：CloudBase Agent（ai.bot.sendMessage 流式 API）
+  //
+  // 使用 cloudbase.SYMBOL_DEFAULT_ENV 避免硬编码环境 ID。
+  // 需要 CLOUDBASE_BOT_ID 环境变量，缺少时跳过。
+  // -----------------------------------------------------------------------
   async function tryCloudBase(normalized, requestId, startTime) {
+    const botId = env.CLOUDBASE_BOT_ID;
+    if (!botId) {
+      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'skipped', reason: 'not_configured' }));
+      return null;
+    }
+
     try {
-      const app = _cloudbase.init({ env: 'zeno-d9g0gdvw4a57635c0' });
+      const app = _cloudbase.init({ env: _cloudbase.SYMBOL_DEFAULT_ENV });
       const ai = app.ai();
-      const model = ai.createModel('cloudbase');
 
-      const messages = [
-        { role: 'system', content: NHS_SYSTEM_PROMPT },
-        ...normalized.messages,
-      ];
+      // 使用 session_id 作为稳定 threadId
+      const threadId = `nhs-${normalized.session_id || 'anon'}`;
+      const runId = _uuid();
 
-      const res = await model.generateText({
-        model: 'hy3-preview',
+      // 构建消息（每条需要唯一 id）
+      const messages = normalized.messages.map((m, i) => ({
+        id: `${requestId}-msg-${i}`,
+        role: m.role,
+        content: m.content,
+      }));
+
+      const res = await ai.bot.sendMessage({
+        botId,
+        threadId,
+        runId,
         messages,
-        temperature: 0.7,
-        maxTokens: 2000,
       });
 
-      const elapsed = Date.now() - startTime;
-      const text = res && res.text ? res.text.trim() : '';
+      // 流式聚合（Promise.race 确保 25 秒超时后中断）
+      let text = '';
+      let runError = false;
+      let runFinished = false;
+      let timedOut = false;
 
-      if (text) {
-        console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 200, elapsed }));
-        return buildResponse(200, {
-          reply: text,
-          provider: 'cloudbase',
-          degraded: primaryProvider !== 'cloudbase',
-          request_id: requestId,
-        }, '', allowedOrigins);
+      const streamPromise = (async () => {
+        for await (const event of res.dataStream) {
+          switch (event.type) {
+            case 'TEXT_MESSAGE_CONTENT':
+              if (event.delta) text += event.delta;
+              break;
+            case 'RUN_ERROR':
+              runError = true;
+              break;
+            case 'RUN_FINISHED':
+              runFinished = true;
+              break;
+          }
+        }
+      })();
+
+      const timeoutPromise = new Promise((resolve) => {
+        setTimeout(() => {
+          timedOut = true;
+          resolve();
+        }, 25000);
+      });
+
+      await Promise.race([streamPromise, timeoutPromise]);
+      // 防止 streamPromise 在后台产生未捕获异常
+      streamPromise.catch(() => {});
+
+      const elapsed = Date.now() - startTime;
+
+      // 超时、RUN_ERROR、未收到 RUN_FINISHED 或空答 → 判定失败
+      if (timedOut || runError || !runFinished || !text.trim()) {
+        const failReason = timedOut ? 'timeout' : (runError ? 'run_error' : (!runFinished ? 'no_finish' : 'no_reply'));
+        console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: failReason, elapsed }));
+        return null;
       }
 
-      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'no_reply', elapsed }));
-      return null;
+      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 200, elapsed }));
+      return buildResponse(200, {
+        reply: text.trim(),
+        provider: 'cloudbase',
+        degraded: primaryProvider !== 'cloudbase',
+        request_id: requestId,
+      }, '', allowedOrigins);
     } catch (err) {
       const elapsed = Date.now() - startTime;
-      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'error', reason: err.message, elapsed }));
+      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'error', reason: 'sdk_error', elapsed }));
       return null;
     }
   }
 
+  // -----------------------------------------------------------------------
+  // 主入口
+  // -----------------------------------------------------------------------
   async function main(event) {
     const origin = (event.headers && event.headers.origin) || '';
 
@@ -348,11 +401,8 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     }
 
     // CORS 校验
-    if (!allowedOrigins.includes(origin) && event.httpMethod !== 'GET') {
-      // GET health 也允许无 origin（如 curl 直接调用）
-      if (origin && !allowedOrigins.includes(origin)) {
-        return buildResponse(403, { error: '来源不被允许' }, origin, allowedOrigins);
-      }
+    if (origin && !allowedOrigins.includes(origin) && event.httpMethod !== 'GET') {
+      return buildResponse(403, { error: '来源不被允许' }, origin, allowedOrigins);
     }
 
     // GET 健康检查
@@ -362,7 +412,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         version: VERSION,
         providers: {
           yuanqi: !!(env.YUANQI_APP_ID && env.YUANQI_APP_KEY),
-          cloudbase: true, // 使用 SDK generateText，无需额外配置
+          cloudbase: !!env.CLOUDBASE_BOT_ID,
         },
         primary: primaryProvider,
       }, origin, allowedOrigins);
@@ -419,8 +469,8 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       for (const tryProvider of providers) {
         const result = await tryProvider(normalized, requestId, startTime);
         if (result) {
-          // 将 origin 回填到响应头
-          const allowOrigin = allowedOrigins.includes(origin) ? origin : allowedOrigins[0];
+          // provider 内部用空 origin 构建，这里修正为实际 origin
+          const allowOrigin = allowedOrigins.includes(origin) ? origin : '';
           if (result.headers) {
             result.headers['Access-Control-Allow-Origin'] = allowOrigin;
           }
@@ -448,6 +498,7 @@ const defaultRouter = createRouter({
   env: {
     YUANQI_APP_ID: process.env.YUANQI_APP_ID,
     YUANQI_APP_KEY: process.env.YUANQI_APP_KEY,
+    CLOUDBASE_BOT_ID: process.env.CLOUDBASE_BOT_ID,
     PRIMARY_PROVIDER: process.env.PRIMARY_PROVIDER || 'yuanqi',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765',
   },

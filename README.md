@@ -20,7 +20,7 @@
 | 学习路径 | 按人纪 / 天纪路径进入体系 |
 | 节点卡片 | 快速理解一个概念的定义、上下游、学习边界 |
 | 天纪提示词 | 用八字、紫微、易经、小六壬做结构化自我复盘 |
-| AI 问答 | 腾讯元器主线路 + CloudBase Agent 自动备用，免登录知识库问答 |
+| AI 问答 | 腾讯元器为主线路，CloudBase 知识库备用线路建设中 |
 | 搜索 | 快速定位节点 |
 
 ---
@@ -67,7 +67,7 @@ python3 -m http.server 8765 --directory docs
 本项目仅供学习研究，不构成医疗建议。
 不提供诊断、处方、剂量、服法等可执行用药信息。
 不公开付费课程、医案全文、个人隐私资料和高风险原始材料。
-AI 问答采用双线路架构：腾讯元器为主线路，CloudBase Agent 为自动备用线路。两条线路均基于知识库 RAG 检索，不使用通用模型兜底。站内问答免登录，由统一路由 `nihaixia-qa-router` 自动切换。
+AI 问答采用双线路架构：腾讯元器为当前主线路，CloudBase 知识库 Agent 为备用线路（代码已就绪，Agent 待创建）。代码已切换为 `ai.bot.sendMessage()` 流式 API，不再使用通用模型 `generateText()` 兜底。站内问答免登录，由统一路由 `nihaixia-qa-router` 自动切换。
 
 更完整说明见 [CONTENT_NOTICE.md](./CONTENT_NOTICE.md)。
 

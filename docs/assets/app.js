@@ -137,7 +137,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // 统一路由：主线路 腾讯元器 → 备用线路 CloudBase Agent
     // 两条线路均基于知识库 RAG，不使用通用模型兜底
     const QA_ROUTER_URL = 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router';
-    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/explore';
+    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/webim/#/chat/EUXRpk?appid=2075218483281047808&experience=true';
 
     const messagesEl = document.getElementById('qa-chat-messages');
     const inputEl = document.getElementById('qa-chat-input');

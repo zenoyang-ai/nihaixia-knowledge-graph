@@ -1,0 +1,5 @@
+{
+  "devDependencies": {
+    "miniprogram-ci": "^2.1.31"
+  }
+}

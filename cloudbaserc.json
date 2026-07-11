@@ -1,0 +1,22 @@
+{
+  "envId": "zeno-d9g0gdvw4a57635c0",
+  "functions": [
+    {
+      "name": "nihaixia-qa-router",
+      "timeout": 120,
+      "memorySize": 512,
+      "envVariables": {
+        "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765",
+        "PRIMARY_PROVIDER": "yuanqi",
+        "YUANQI_APP_ID": "2075218483281047808",
+        "YUANQI_APP_KEY": "***REDACTED-APPKEY***",
+        "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
+      }
+    },
+    {
+      "name": "nihaixia-qa-mp",
+      "timeout": 60,
+      "memorySize": 256
+    }
+  ]
+}

@@ -46,3 +46,6 @@ venv/
 
 # Node.js
 node_modules/
+
+# 交接文档（含本机路径）
+HANDOFF_TENCENT_QA.md
