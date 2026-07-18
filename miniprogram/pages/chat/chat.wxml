@@ -3,7 +3,7 @@
 
   <!-- 顶部操作栏 -->
   <view class="chat-topbar" wx:if="{{messages.length > 0}}">
-    <view class="chat-topbar-title">倪海厦知识库问答</view>
+    <view class="chat-topbar-title">经典中医学习问答</view>
     <view class="chat-clear-btn" bindtap="onClearChat">
       <text>清空</text>
     </view>
@@ -20,8 +20,8 @@
   >
     <!-- 欢迎区域 -->
     <view class="welcome-section" wx:if="{{messages.length === 0}}">
-      <view class="welcome-title">倪海厦知识库</view>
-      <view class="welcome-subtitle">智能问答助手 · 经方派中医学习</view>
+      <view class="welcome-title">经典中医学习</view>
+      <view class="welcome-subtitle">学习资料库问答助手 · 仅供学习研究</view>
       <view class="suggested-questions">
         <view
           class="suggested-item"
@@ -48,7 +48,7 @@
       <!-- AI 消息 -->
       <view class="msg-row msg-row-ai" wx:else>
         <view class="msg-avatar">
-          <text class="msg-avatar-text">倪</text>
+          <text class="msg-avatar-text">学</text>
         </view>
         <view class="msg-bubble msg-bubble-ai">
           <block wx:if="{{item.content}}">
@@ -61,7 +61,10 @@
             <view class="typing-dot"></view>
           </view>
           <view class="msg-provider" wx:if="{{item.provider}}">
-            <text>{{item.provider === 'cloudbase' ? '云开发' : item.provider === 'cloudfunction' ? '云函数' : item.provider === 'system' ? '系统' : '元器'}}</text>
+            <text>{{item.provider === 'cloudbase-agent' ? '学习资料库' : item.provider === 'system' ? '系统' : item.provider === 'error' ? '错误' : '学习资料库'}}</text>
+          </view>
+          <view class="msg-retry" wx:if="{{item.provider === 'error'}}" bindtap="onRetry" data-question="{{item.retryQuestion}}">
+            <text>重新发送</text>
           </view>
         </view>
       </view>
@@ -79,11 +82,11 @@
         value="{{inputValue}}"
         bindinput="onInput"
         bindconfirm="onSend"
-        placeholder="请输入关于倪海厦学术体系的问题…"
+        placeholder="输入关于中医经典的学习问题…"
         placeholder-class="chat-input-placeholder"
         confirm-type="send"
         auto-height
-        maxlength="2000"
+        maxlength="1000"
         show-confirm-bar="{{false}}"
         adjust-position="{{true}}"
         cursor-spacing="20"

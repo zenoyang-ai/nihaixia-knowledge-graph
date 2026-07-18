@@ -1,9 +1,9 @@
 {
   "name": "nihaixia-qa-mp",
-  "version": "2.0.0",
-  "description": "倪海厦知识库小程序问答 — 纯转发适配器，调用 nihaixia-qa-router",
+  "version": "3.0.0",
+  "description": "经典中医学习问答小程序云函数 — 直接调用 CloudBase Agent",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "^3.18.3"
+    "@cloudbase/node-sdk": "latest"
   }
 }

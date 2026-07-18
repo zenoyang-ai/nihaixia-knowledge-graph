@@ -186,6 +186,25 @@
   color: #a59684;
 }
 
+/* 重新发送按钮 */
+.msg-retry {
+  margin-top: 12rpx;
+  padding: 10rpx 24rpx;
+  background: #f6f0e6;
+  border: 1rpx solid #c7892b;
+  border-radius: 12rpx;
+  display: inline-block;
+}
+
+.msg-retry text {
+  font-size: 24rpx;
+  color: #c7892b;
+}
+
+.msg-retry:active {
+  background: #e7d8c1;
+}
+
 /* 加载中动画 */
 .msg-loading-bubble {
   min-width: 120rpx;

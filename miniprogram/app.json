@@ -1,12 +1,12 @@
 {
-  "desc": "倪海厦知识库智能问答小程序",
+  "desc": "中医经典学习问答小程序",
   "pages": [
     "pages/chat/chat"
   ],
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "#fffaf1",
-    "navigationBarTitleText": "倪海厦知识库",
+    "navigationBarTitleText": "经典中医学习",
     "navigationBarTextStyle": "black",
     "backgroundColor": "#f6f0e6"
   },

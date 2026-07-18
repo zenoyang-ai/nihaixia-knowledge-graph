@@ -1,14 +1,16 @@
 // pages/chat/chat.js
 
 // ===========================================================================
-// 医疗可执行请求检测 — 客户端拦截
+// 医疗可执行请求检测 — 客户端即时提示（服务端是最终边界）
 // ===========================================================================
 const MEDICAL_PATTERNS = [
-  /(?:诊断|处方|剂量|服法|怎么吃|吃多少|吃几|治疗方案|开(?:什么|个)?药|该吃|服用|用法|用量)/,
-  /(?:治疗|治愈|治好|能治|可以治|会不会好|能好吗|怎么治|治什么)/,
-  /(?:推荐.*药|建议.*药|什么药.*好|哪个药|什么方子|该用.*方|用.*方.*治)/,
+  /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治)/,
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
   /(?:救命|急救|危重|抢救|快不行)/,
+  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析)/,
+  /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
+  /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
 ];
 
 function isMedicalRequest(text) {
@@ -97,13 +99,22 @@ Page({
     inputValue: '',
     loading: false,
     scrollToView: 'chat-bottom',
+    sessionId: '', // 页面生命周期内保持同一个会话 ID
     suggestedQuestions: [
-      '倪海厦对伤寒论的核心理解是什么？',
-      '六经辨证分别对应什么证候和方剂？',
-      '倪海厦推荐的中医学习顺序是什么？',
-      '桂枝汤和麻黄汤有什么区别？',
+      '伤寒论的学习应先理解哪些概念？',
+      '人纪与天纪在知识结构中如何关联？',
+      '经方、针灸、本草在学习路径中分别承担什么作用？',
+      '紫微斗数在天纪资料中主要讨论什么？',
     ],
     msgIdCounter: 0,
+    lastFailedQuestion: '', // 用于重新发送
+  },
+
+  onLoad() {
+    // 生成会话 ID，页面生命周期内保持不变
+    this.setData({
+      sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+    });
   },
 
   // 输入处理
@@ -118,12 +129,20 @@ Page({
     this.onSend();
   },
 
+  // 重新发送失败的问题
+  onRetry(e) {
+    const question = e.currentTarget.dataset.question;
+    if (!question) return;
+    this.setData({ inputValue: question });
+    this.onSend();
+  },
+
   // 发送消息
   async onSend() {
     const text = this.data.inputValue.trim();
     if (!text || this.data.loading) return;
 
-    // 医疗请求拦截
+    // 客户端即时医疗提示（服务端是最终边界）
     if (isMedicalRequest(text)) {
       const warnId = this.data.msgIdCounter + 1;
       this.setData({
@@ -134,8 +153,8 @@ Page({
           {
             id: warnId + 1,
             role: 'assistant',
-            content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议等医疗建议。如有健康问题，请咨询专业中医师。',
-            html: '<p style="margin:8rpx 0;color:#b9362c;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议等医疗建议。如有健康问题，请咨询专业中医师。</p>',
+            content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+            html: '<p style="margin:8rpx 0;color:#b9362c;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
             provider: 'system',
           },
         ],
@@ -148,12 +167,11 @@ Page({
     const userMsgId = this.data.msgIdCounter + 1;
     const aiMsgId = userMsgId + 1;
 
-    // 构建对话历史
+    // 构建对话历史（只传角色和内容，不传其他字段）
     const history = this.data.messages
-      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .filter(m => (m.role === 'user' || m.role === 'assistant') && m.content)
       .slice(-MAX_HISTORY)
       .map(m => ({ role: m.role, content: m.content }));
-    history.push({ role: 'user', content: text });
 
     // 添加用户消息和占位 AI 消息
     this.setData({
@@ -165,23 +183,34 @@ Page({
       ],
       inputValue: '',
       loading: true,
+      lastFailedQuestion: '',
       scrollToView: 'msg-' + aiMsgId,
     });
 
     try {
-      // 调用云函数 nihaixia-qa-mp（纯转发到 nihaixia-qa-router）
-      const result = await this._callCloudFunction(history);
+      // 调用云函数，只传当前问题和会话 ID
+      const result = await this._callCloudFunction(text, history);
 
       // 更新 AI 消息
       const messages = this.data.messages;
       const idx = messages.findIndex(m => m.id === aiMsgId);
       if (idx >= 0) {
-        messages[idx] = {
-          ...messages[idx],
-          content: result.reply,
-          html: formatContent(result.reply),
-          provider: result.provider || 'unknown',
-        };
+        if (result.reply) {
+          messages[idx] = {
+            ...messages[idx],
+            content: result.reply,
+            html: formatContent(result.reply),
+            provider: result.provider || 'cloudbase-agent',
+          };
+        } else if (result.error) {
+          messages[idx] = {
+            ...messages[idx],
+            content: result.error,
+            html: formatContent(result.error),
+            provider: 'error',
+            retryQuestion: text,
+          };
+        }
       }
 
       this.setData({
@@ -195,34 +224,35 @@ Page({
       if (idx >= 0) {
         messages[idx] = {
           ...messages[idx],
-          content: err.message || '服务暂时不可用',
-          html: formatContent(err.message || '服务暂时不可用'),
+          content: err.message || '网络异常，请稍后重试',
+          html: formatContent(err.message || '网络异常，请稍后重试'),
           provider: 'error',
+          retryQuestion: text,
         };
       }
 
       this.setData({
         messages,
         loading: false,
+        lastFailedQuestion: text,
         scrollToView: 'msg-' + aiMsgId,
       });
     }
   },
 
-  // 云函数调用 — 转发给 nihaixia-qa-router
-  _callCloudFunction(messages) {
+  // 云函数调用 — 直接调用 nihaixia-qa-mp（不再转发 router）
+  _callCloudFunction(msg, history) {
     return new Promise((resolve, reject) => {
       wx.cloud.callFunction({
         name: 'nihaixia-qa-mp',
         data: {
-          session_id: 'mp-' + Date.now().toString(36),
-          messages,
+          msg,
+          session_id: this.data.sessionId,
+          history,
         },
         success: (res) => {
-          if (res && res.result && res.result.reply) {
+          if (res && res.result) {
             resolve(res.result);
-          } else if (res && res.result && res.result.error) {
-            reject(new Error(res.result.error));
           } else {
             reject(new Error('云函数返回为空'));
           }
@@ -234,16 +264,19 @@ Page({
     });
   },
 
-  // 清空对话
+  // 清空对话 — 生成新的会话 ID，不引用旧对话
   onClearChat() {
     wx.showModal({
       title: '清空对话',
-      content: '确定清空所有对话记录吗？',
+      content: '确定清空所有对话记录吗？将开始新的会话。',
       success: (res) => {
         if (res.confirm) {
           this.setData({
             messages: [],
             msgIdCounter: 0,
+            inputValue: '',
+            lastFailedQuestion: '',
+            sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
             scrollToView: '',
           });
         }
@@ -254,7 +287,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '经典中医知识问答',
+      title: '经典中医学习问答',
       path: '/pages/chat/chat',
     };
   },
