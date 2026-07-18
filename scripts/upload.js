@@ -7,8 +7,8 @@ const path = require('path');
 
 const PROJECT_PATH = path.resolve(__dirname, '..');
 const APP_ID = 'wx11826bcc1883aa28';
-const VERSION = '1.0.0';
-const DESC = '倪海厦知识库智能问答小程序 — 首次发布';
+const VERSION = '3.1.1';
+const DESC = '数字问渡经典学习问答助手 — direct LLM 迁移体验版';
 
 async function main() {
   const keyPath = process.argv[2];
