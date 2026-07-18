@@ -9,7 +9,7 @@
         "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765",
         "PRIMARY_PROVIDER": "yuanqi",
         "YUANQI_APP_ID": "2075218483281047808",
-        "YUANQI_APP_KEY": "***REDACTED-APPKEY***",
+        "YUANQI_APP_KEY": "<set-via-cloudbase-console>",
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }
     },

@@ -50,6 +50,19 @@ class NihaixiaApp {
         // 6. 再次根据 hash 切换（数据加载完成后，确保视图状态正确）
         this.switchViewFromHash();
 
+        // 直达深链接时，路由可能早于异步数据初始化；补一次当前页面的首次渲染。
+        const currentPath = (window.location.hash || '#/').replace(/^#/, '') || '/';
+        if (currentPath === '/graph' && this.forceGraph) {
+            setTimeout(() => {
+                try { this.forceGraph.render(); } catch (e) { console.error('Initial graph render error:', e); }
+            }, 0);
+        }
+        if (currentPath.startsWith('/note/') && this.noteDetail) {
+            const title = decodeURIComponent(currentPath.slice('/note/'.length));
+            this.noteDetail.render(title);
+            if (this.sidebar) this.sidebar.setActive(title);
+        }
+
         // 7. 监听路由变化更新导航
         window.addEventListener('hashchange', () => {
             this.switchViewFromHash();
@@ -144,6 +157,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('qa-chat-send');
     const statusEl = document.getElementById('qa-chat-status');
     const clearBtn = document.getElementById('qa-chat-clear');
+    const retryBtn = document.getElementById('qa-chat-retry');
 
     // ---- localStorage 会话管理 ----
     const LS_SESSION_KEY = 'nihaixia_qa_session';
@@ -162,7 +176,27 @@ document.addEventListener('DOMContentLoaded', () => {
     function getHistory() {
         try {
             const raw = localStorage.getItem(LS_HISTORY_KEY);
-            return raw ? JSON.parse(raw) : [];
+            const parsed = raw ? JSON.parse(raw) : [];
+            if (!Array.isArray(parsed)) return [];
+
+            // 兼容旧版在请求失败时留下的孤立 user 消息，避免下一次请求角色不交替。
+            const valid = [];
+            for (const item of parsed) {
+                if (!item || !['user', 'assistant'].includes(item.role)) continue;
+                if (typeof item.content !== 'string' || !item.content.trim()) continue;
+                if (valid.length && valid[valid.length - 1].role === item.role) {
+                    if (item.role === 'assistant') valid[valid.length - 1] = item;
+                    continue;
+                }
+                valid.push({ role: item.role, content: item.content.trim() });
+            }
+
+            // 历史必须以完整的一轮结束，不能把未获得回答的 user 留在上下文里。
+            if (valid.at(-1)?.role === 'user') valid.pop();
+            if (valid[0]?.role === 'assistant') valid.shift();
+            const trimmed = valid.slice(-MAX_HISTORY_ROUNDS * 2);
+            if (trimmed.length % 2 === 1) trimmed.shift();
+            return trimmed;
         } catch { return []; }
     }
 
@@ -178,16 +212,19 @@ document.addEventListener('DOMContentLoaded', () => {
         if (messagesEl) {
             messagesEl.innerHTML = `
                 <div class="qa-chat-empty">
-                    <p>基于腾讯元器知识库，围绕倪海厦资料进行学习型提问。</p>
-                    <p class="qa-chat-empty-hint">点击上方推荐问题，或直接在下方输入你想了解的内容。</p>
+                    <p>从一个概念开始，逐步追问它与经典、方法和学习路径的关系。</p>
+                    <p class="qa-chat-empty-hint">回答来自当前接入的知识库；资料不足时会明确说明。</p>
+                <p class="qa-chat-empty-hint" style="margin-top:4px;">如遇到超时，可点击重新尝试按钮。</p>
                 </div>`;
         }
+        if (retryBtn) retryBtn.hidden = true;
         setStatus('对话已清空');
         setTimeout(clearStatus, 2000);
     }
 
     // ---- 状态与消息渲染 ----
     let isSending = false;
+    let lastFailedMessage = '';
 
     function setStatus(text, isError = false) {
         if (!statusEl) return;
@@ -232,6 +269,80 @@ document.addEventListener('DOMContentLoaded', () => {
         `;
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
+    }
+
+    // ---- HTML 消毒 ----
+    // 校验 URL 协议是否在允许列表内；同时拒绝包含控制字符的可疑 URL
+    function isSafeUrl(url, allowedProtocols) {
+        if (!url || typeof url !== 'string') return false;
+        const trimmed = url.trim();
+        if (!trimmed) return false;
+        // 拒绝包含控制字符（可能被用于绕过协议检查，例如嵌入 NUL 或换行）
+        if (/[\x00-\x1f\x7f]/.test(trimmed)) return false;
+        let parsed;
+        try {
+            parsed = new URL(trimmed);
+        } catch {
+            return false;
+        }
+        return allowedProtocols.includes(parsed.protocol.toLowerCase());
+    }
+
+    // 使用 DOM API 解析 HTML 并移除危险标签/属性：
+    // - 移除 <script>/<style>/<iframe>/<object>/<embed> 标签
+    // - 移除所有 on* 事件属性
+    // - 移除 style 属性
+    // - href 仅允许 http:/https:/mailto:，src 仅允许 http:/https:
+    function sanitizeHtml(html) {
+        if (typeof window === 'undefined' || !window.DOMParser) return html;
+        const doc = new DOMParser().parseFromString(html, 'text/html');
+        const FORBIDDEN_TAGS = ['script', 'style', 'iframe', 'object', 'embed'];
+
+        function walk(node) {
+            if (!node || node.nodeType !== 1) return; // 仅处理元素节点
+            const tag = node.tagName.toLowerCase();
+            if (FORBIDDEN_TAGS.includes(tag)) {
+                node.remove();
+                return;
+            }
+            // 先快照属性集合，避免遍历过程中修改导致索引错乱
+            const attrs = Array.from(node.attributes);
+            for (const attr of attrs) {
+                const name = attr.name.toLowerCase();
+                // on* 事件属性（onclick/onerror/onload 等）
+                if (name.startsWith('on')) {
+                    node.removeAttribute(attr.name);
+                    continue;
+                }
+                // style 属性可能携带 CSS 注入
+                if (name === 'style') {
+                    node.removeAttribute(attr.name);
+                    continue;
+                }
+                // href 仅允许 http/https/mailto
+                if (name === 'href') {
+                    if (!isSafeUrl(attr.value, ['http:', 'https:', 'mailto:'])) {
+                        node.removeAttribute(attr.name);
+                    }
+                    continue;
+                }
+                // src 仅允许 http/https
+                if (name === 'src') {
+                    if (!isSafeUrl(attr.value, ['http:', 'https:'])) {
+                        node.removeAttribute(attr.name);
+                    }
+                    continue;
+                }
+            }
+            // 递归处理子节点（快照后遍历，子节点被移除不影响迭代）
+            const children = Array.from(node.children);
+            for (const child of children) {
+                walk(child);
+            }
+        }
+
+        walk(doc.body);
+        return doc.body.innerHTML;
     }
 
     function formatContent(text) {
@@ -331,11 +442,21 @@ document.addEventListener('DOMContentLoaded', () => {
             .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
             // 斜体
             .replace(/\*([^*]+)\*/g, '<em>$1</em>')
-            // 链接 [text](url)
-            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener">$1</a>');
+            // 链接 [text](url) — 仅允许 http/https/mailto，不安全的 URL 只显示文本不加链接
+            .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (match, text, url) => {
+                // URL 此前已被 HTML 转义（& -> &amp;），先解码回原始形态再做协议校验
+                const decodedUrl = url.replace(/&amp;/g, '&');
+                if (isSafeUrl(decodedUrl, ['http:', 'https:', 'mailto:'])) {
+                    return `<a href="${url}" target="_blank" rel="noopener">${text}</a>`;
+                }
+                return text;
+            });
 
         // 清理空段落
         result = result.replace(/<p><\/p>/g, '').replace(/\n\n+/g, '\n');
+
+        // 最终 HTML 消毒：移除任何残留的危险标签/属性，限制 href/src 协议
+        result = sanitizeHtml(result);
 
         return result;
     }
@@ -365,11 +486,8 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.remove();
     }
 
-    function buildErrorReply(errorMsg) {
-        let reply = `抱歉，问答服务暂时不可用。`;
-        if (errorMsg) reply += `\n\n原因：${errorMsg}`;
-        reply += `\n\n你可以：\n- 前往 [腾讯元器平台](${YUANQI_EXPERIENCE_URL}) 搜索「倪海厦知识库」直接提问\n- 或稍后重试，系统会自动恢复`;
-        return reply;
+    function buildErrorReply() {
+        return `抱歉，当前知识库线路暂时没有返回结果。\n\n你可以点击“重新尝试”，或打开备用问答入口继续提问。`;
     }
 
     async function sendMessage(message) {
@@ -384,14 +502,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // 更新历史
         const history = getHistory();
-        history.push({ role: 'user', content: trimmedMsg });
-        saveHistory(history);
+        const requestMessages = [...history, { role: 'user', content: trimmedMsg }];
 
         addTyping();
 
         // 构建请求：发送当前消息 + 历史上下文
         const sessionId = getSessionId();
-        const messages = history.slice(-MAX_HISTORY_ROUNDS * 2).map(m => ({
+        const messages = requestMessages.slice(-MAX_HISTORY_ROUNDS * 2).map(m => ({
             role: m.role,
             content: m.content,
         }));
@@ -411,18 +528,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 const providerInfo = { provider: data.provider, degraded: data.degraded };
                 addMessage('assistant', data.reply, providerInfo);
                 clearStatus();
+                lastFailedMessage = '';
+                if (retryBtn) retryBtn.hidden = true;
                 // 保存助手回复到历史
-                history.push({ role: 'assistant', content: data.reply });
-                saveHistory(history);
+                saveHistory([...requestMessages, { role: 'assistant', content: data.reply }]);
             } else {
-                const errorMsg = data.error || `HTTP ${res.status}`;
-                addMessage('assistant', buildErrorReply(errorMsg));
+                lastFailedMessage = trimmedMsg;
+                addMessage('assistant', buildErrorReply());
+                if (retryBtn) retryBtn.hidden = false;
                 setStatus('问答服务返回错误', true);
             }
         } catch (err) {
             removeTyping();
-            const errorMsg = err.message || '网络错误';
-            addMessage('assistant', buildErrorReply(errorMsg));
+            lastFailedMessage = trimmedMsg;
+            addMessage('assistant', buildErrorReply());
+            if (retryBtn) retryBtn.hidden = false;
             setStatus('网络连接失败，请检查网络后重试', true);
         }
 
@@ -436,7 +556,7 @@ document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.qa-question-card').forEach((card) => {
         card.addEventListener('click', () => {
             const question = card.dataset.question || card.textContent.trim();
-            if (inputEl) inputEl.value = question;
+            if (inputEl) inputEl.value = '';
             sendMessage(question);
         });
     });
@@ -444,6 +564,22 @@ document.addEventListener('DOMContentLoaded', () => {
     // 清空对话按钮
     clearBtn && clearBtn.addEventListener('click', () => {
         clearHistory();
+    });
+
+
+    // Header scroll detection
+    document.addEventListener('scroll', () => {
+        const header = document.querySelector('.header');
+        if (header) {
+            header.classList.toggle('scrolled', window.scrollY > 10);
+        }
+    }, { passive: true });
+
+        retryBtn && retryBtn.addEventListener('click', () => {
+        if (!lastFailedMessage || isSending) return;
+        const retryMessage = lastFailedMessage;
+        if (inputEl) inputEl.value = '';
+        sendMessage(retryMessage);
     });
 
     // 发送按钮
@@ -454,7 +590,18 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // 回车发送（Shift+Enter 换行）
-    inputEl && inputEl.addEventListener('keydown', (e) => {
+
+    // Textarea auto-resize
+    if (inputEl) {
+        const autoResize = () => {
+            inputEl.style.height = 'auto';
+            inputEl.style.height = Math.min(inputEl.scrollHeight, 120) + 'px';
+        };
+        inputEl.addEventListener('input', autoResize);
+        inputEl.addEventListener('focus', autoResize);
+    }
+
+        inputEl && inputEl.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey) {
             e.preventDefault();
             const msg = inputEl.value;

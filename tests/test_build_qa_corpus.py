@@ -192,6 +192,100 @@ class CorpusBuilderTest(unittest.TestCase):
             )
         self.assertNotEqual(exit_code, 0)
 
+    def test_redacts_contextual_patient_names_but_preserves_historical_figures(self):
+        sample = self.input_dir / "05_汉唐方剂讲解.txt"
+        sample.write_text(
+            "# 测试\n\n"
+            "患者：张三来诊，主诉头痛。\n"
+            "倪海厦在讲解中提到张仲景的伤寒论。\n"
+            "姓名：李四五，家属：王五。\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        content = (self.output_dir / "05_汉唐方剂讲解.md").read_text(encoding="utf-8")
+        report = json.loads(
+            (self.output_dir / "privacy-report.json").read_text(encoding="utf-8")
+        )
+
+        # Patient names should be redacted
+        self.assertNotIn("张三", content)
+        self.assertNotIn("李四五", content)
+        self.assertNotIn("王五", content)
+        self.assertIn("[已脱敏姓名]", content)
+        # Historical figures should be preserved
+        self.assertIn("倪海厦", content)
+        self.assertIn("张仲景", content)
+        self.assertIn("伤寒论", content)
+        self.assertGreaterEqual(report["transformations"]["name_label"], 3)
+
+    def test_redacts_medical_record_numbers(self):
+        sample = self.input_dir / "09_中医原始资料.txt"
+        sample.write_text(
+            "# 测试\n\n"
+            "病历号：BL2023123456\n"
+            "住院号: ZY-2023-001\n"
+            "门诊号：MZ001\n"
+            "第1234号方剂不在脱敏范围\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        content = (self.output_dir / "09_中医原始资料.md").read_text(encoding="utf-8")
+
+        self.assertNotIn("BL2023123456", content)
+        self.assertNotIn("ZY-2023-001", content)
+        self.assertIn("[已脱敏病历号]", content)
+        # "第1234号方剂" should not be redacted (no medical record label)
+        self.assertIn("第1234号方剂", content)
+
+    def test_redacts_structured_addresses(self):
+        sample = self.input_dir / "06_补充资料.txt"
+        sample.write_text(
+            "# 测试\n\n"
+            "广东省广州市天河区天河北路123号\n"
+            "北京市海淀区中关村大街1号\n"
+            "地址：上海市浦东新区张江路100号\n"
+            "太阳经主一身之表\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        content = (self.output_dir / "06_补充资料.md").read_text(encoding="utf-8")
+
+        self.assertNotIn("天河北路123号", content)
+        self.assertNotIn("中关村大街1号", content)
+        self.assertNotIn("张江路100号", content)
+        self.assertIn("[已脱敏地址]", content)
+        # Classical TCM content should not be affected
+        self.assertIn("太阳经主一身之表", content)
+
+    def test_scans_medical_institutions_as_medium_risk(self):
+        sample = self.input_dir / "08_补充课程.txt"
+        sample.write_text(
+            "# 测试\n\n"
+            "某患者在广州市中医院就诊。\n"
+            "同仁堂诊所也有记录。\n",
+            encoding="utf-8",
+        )
+
+        result = self.run_builder()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = json.loads(
+            (self.output_dir / "privacy-report.json").read_text(encoding="utf-8")
+        )
+
+        # Medical institutions are medium risk (scan-only, not auto-redacted)
+        self.assertGreaterEqual(report["summary"]["medium_risk"], 2)
+        self.assertEqual(report["summary"]["high_risk"], 0)
+        self.assertEqual(report["summary"]["status"], "pass")
+        self.assertGreaterEqual(
+            report["findings"]["medical_institution"]["count"], 2
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

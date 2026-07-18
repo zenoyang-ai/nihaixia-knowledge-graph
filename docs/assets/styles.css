@@ -32,6 +32,18 @@
     --header-h: 56px;
     --sidebar-w: 260px;
     --sidebar-collapsed: 0px;
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    --radius-sm: 4px;
+    --radius-md: 8px;
+    --radius-lg: 12px;
+    --transition-fast: 0.15s ease;
+    --transition-normal: 0.25s ease;
+    --transition-slow: 0.4s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
 * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -61,6 +73,24 @@ body {
     z-index: 100;
     width: 100%;
     backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: box-shadow var(--transition-normal);
+}
+
+.header.scrolled {
+    box-shadow: 0 2px 16px rgba(73, 43, 20, 0.08);
+    -webkit-backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: box-shadow var(--transition-normal);
+}
+
+.header.scrolled {
+    box-shadow: 0 2px 16px rgba(73, 43, 20, 0.08);
+    transition: box-shadow var(--transition-normal);
+}
+
+.header.scrolled {
+    box-shadow: 0 2px 16px rgba(73, 43, 20, 0.08);
 }
 
 .header-content {
@@ -71,6 +101,8 @@ body {
     align-items: center;
     height: var(--header-h);
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
 }
 
 .sidebar-toggle {
@@ -109,7 +141,7 @@ body {
     font-size: 14px;
     color: #999;
     border-radius: 6px;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     white-space: nowrap;
     text-decoration: none;
     font-family: inherit;
@@ -139,6 +171,8 @@ body {
 
 .header-search input:focus {
     outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
     border-color: #c7892b;
     background: #fffaf1;
 }
@@ -193,7 +227,7 @@ body {
     border-right: 1px solid #e7d8c1;
     z-index: 90;
     overflow-y: auto;
-    transition: transform 0.3s ease;
+    transition: transform var(--transition-slow);
 }
 
 /* 桌面端折叠状态 */
@@ -258,6 +292,8 @@ body {
     height: 6px;
     border-radius: 50%;
     flex-shrink: 0;
+    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast);
     opacity: 0.7;
 }
 
@@ -297,7 +333,7 @@ body {
     text-decoration: none;
     border-radius: 4px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--transition-fast);
     border-left: 2px solid transparent;
     line-height: 1.5;
 }
@@ -399,7 +435,7 @@ body {
     border: 1px solid var(--border);
     border-radius: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     text-align: left;
     background: var(--paper);
     text-decoration: none;
@@ -469,7 +505,7 @@ body {
     font-size: 13px;
     text-decoration: none;
     color: var(--text);
-    transition: all 0.15s;
+    transition: all var(--transition-fast);
 }
 
 .stage-node:hover {
@@ -482,6 +518,8 @@ body {
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
     margin-bottom: 32px;
 }
 
@@ -494,7 +532,7 @@ body {
     background: var(--paper);
     text-decoration: none;
     color: var(--text);
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .route-card-new:hover {
@@ -702,7 +740,7 @@ body {
     background: var(--paper-soft);
     border-radius: 6px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .layer-row:hover { background: #f1e6d4; }
@@ -738,6 +776,8 @@ body {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
     margin-bottom: 24px;
 }
 
@@ -793,7 +833,7 @@ body {
     color: var(--text-light);
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     font-family: inherit;
 }
 
@@ -803,7 +843,9 @@ body {
 .path-content { display: none; }
 .path-content.active { display: block; }
 
-.path-stages { display: flex; flex-direction: column; gap: 16px; }
+.path-stages { display: flex; flex-direction: column; gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow); }
 
 .path-stage {
     border: 1px solid var(--border);
@@ -828,7 +870,7 @@ body {
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     text-decoration: none;
     color: var(--text);
 }
@@ -857,7 +899,8 @@ body {
     gap: 8px;
     padding: 8px 16px;
     background: rgba(255, 250, 241, 0.92);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 999px;
     box-shadow: 0 2px 12px rgba(73, 43, 20, 0.08);
     z-index: 5;
@@ -891,7 +934,8 @@ body {
     bottom: 56px;
     left: 16px;
     background: rgba(255, 250, 241, 0.9);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-radius: 8px;
     padding: 14px 16px;
     box-shadow: 0 2px 12px rgba(73, 43, 20, 0.1);
@@ -922,6 +966,8 @@ body {
     height: 9px;
     border-radius: 50%;
     flex-shrink: 0;
+    transition: transform var(--transition-fast);
+    transition: transform var(--transition-fast);
 }
 
 .graph-legend-divider {
@@ -942,14 +988,14 @@ body {
     right: 0;
     top: 0;
     bottom: 0;
-    width: 320px;
+    width: 340px;
     border-left: 1px solid var(--border);
     padding: 20px;
     overflow-y: auto;
     background: var(--paper);
-    box-shadow: -4px 0 20px rgba(0,0,0,0.08);
+    box-shadow: -6px 0 24px rgba(0,0,0,0.06);
     transform: translateX(100%);
-    transition: transform 0.3s ease;
+    transition: transform var(--transition-slow);
     z-index: 10;
 }
 
@@ -975,7 +1021,7 @@ body {
     color: var(--text);
     margin: 2px;
     cursor: pointer;
-    transition: border-color 0.15s, background 0.15s;
+    transition: border-color var(--transition-fast), background var(--transition-fast);
 }
 
 .detail-link-item:hover {
@@ -983,26 +1029,124 @@ body {
     background: #f3e3ca;
 }
 
-/* 图谱节点样式 */
-.graph-node { cursor: pointer; }
+/* ============================================
+   图谱节点样式 — 分层标签策略
+   ============================================ */
+.graph-node {
+    cursor: pointer;
+    outline: none;
+}
 .graph-node circle {
-    transition: opacity 0.3s;
+    transition: opacity 0.25s, stroke-width 0.18s, fill-opacity 0.18s;
 }
 .graph-node:hover circle {
     opacity: 1;
+    fill-opacity: 0.95;
 }
+
+/* 文本基础（pointer-events:none 让 hover 命中圆点而非文字） */
 .graph-node text {
-    font-size: 10px;
-    fill: #999;
     pointer-events: none;
     font-family: inherit;
-    font-weight: 400;
+    transition: opacity 0.18s ease;
 }
+
+/* —— 核心节点：标签常显 —— */
+.graph-node.tier-core text {
+    font-size: 13px;
+    font-weight: 700;
+    fill: #2d2520;
+    opacity: 1;
+}
+.graph-node.tier-core circle {
+    stroke: #fff;
+    stroke-width: 2;
+    fill-opacity: 0.95;
+}
+
+/* —— 普通节点：标签默认隐藏 —— */
+.graph-node.tier-standard text {
+    font-size: 9px;
+    font-weight: 400;
+    fill: #9a9289;
+    opacity: 0;
+}
+.graph-node.tier-standard circle {
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 0.5;
+    fill-opacity: 0.65;
+}
+
+/* 普通节点标签的触发显示 */
+.graph-node.tier-standard.hovered text,
+.graph-node.tier-standard.selected text,
+.graph-node.tier-standard.search-match text,
+.graph-node.tier-standard.concept-match text {
+    opacity: 1;
+}
+
+/* 放大到阈值后，所有普通节点标签显示 */
+.viewport.zoomed-in .graph-node.tier-standard text {
+    opacity: 1;
+}
+
+/* —— 选中节点视觉 —— */
+.graph-node.selected circle {
+    stroke: var(--accent-gold);
+    stroke-width: 3;
+}
+
+/* —— 键盘焦点状态 —— */
+.graph-node:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+.graph-node:focus-visible circle {
+    stroke: var(--accent-gold);
+    stroke-width: 3;
+}
+/* SVG 元素 outline 在某些浏览器不渲染，补一个等价的视觉环 */
+.graph-node.focused circle {
+    stroke: var(--accent-gold);
+    stroke-width: 3;
+}
+
+/* —— 搜索命中 —— */
+.graph-node.search-match circle {
+    stroke: var(--accent-gold);
+    stroke-width: 2.5;
+}
+.graph-node.search-match text {
+    fill: var(--accent-dark);
+    font-weight: 600;
+}
+
+/* —— 概念筛选：命中 / 暗化 —— */
+.graph-node.concept-match circle {
+    stroke: var(--accent);
+    stroke-width: 2.2;
+    fill-opacity: 0.95;
+}
+.graph-node.concept-dim {
+    opacity: 0.12;
+}
+.graph-link.concept-match {
+    stroke: var(--accent);
+    stroke-opacity: 0.55;
+    stroke-width: 1;
+}
+.graph-link.concept-dim {
+    stroke-opacity: 0.04;
+}
+
+/* 边 */
 .graph-link {
     stroke: #ccc;
     stroke-opacity: 0.25;
     stroke-width: 0.5;
     fill: none;
+    transition: stroke-opacity 0.18s, stroke 0.18s;
 }
 .graph-link.highlighted {
     stroke: var(--accent);
@@ -1013,6 +1157,78 @@ body {
 .graph-link.dimmed { opacity: 0.02; }
 
 /* ============================================
+   顶部大概念框 — 视觉锚点 + 筛选入口
+   ============================================ */
+.graph-concepts {
+    position: absolute;
+    top: 14px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 8px;
+    padding: 6px;
+    background: rgba(255, 250, 241, 0.92);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(73, 43, 20, 0.1);
+    z-index: 6;
+    max-width: calc(100% - 32px);
+    overflow-x: auto;
+    scrollbar-width: thin;
+}
+.graph-concepts::-webkit-scrollbar { height: 4px; }
+.graph-concepts::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+.graph-concept-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-width: 64px;
+    padding: 7px 12px 6px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: var(--paper-soft);
+    cursor: pointer;
+    font-family: inherit;
+    transition: all var(--transition-normal);
+    -webkit-tap-highlight-color: transparent;
+}
+.graph-concept-box:hover {
+    border-color: var(--accent);
+    background: #f3e3ca;
+    transform: translateY(-1px);
+}
+.graph-concept-box.active {
+    border-color: var(--accent);
+    background: var(--accent);
+    box-shadow: 0 4px 12px rgba(185, 54, 44, 0.24);
+}
+.graph-concept-box.active .graph-concept-label,
+.graph-concept-box.active .graph-concept-desc {
+    color: #fff;
+}
+.graph-concept-label {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--ink);
+    line-height: 1.2;
+    letter-spacing: 0.02em;
+}
+.graph-concept-desc {
+    font-size: 10px;
+    color: var(--text-light);
+    margin-top: 2px;
+    line-height: 1.2;
+    white-space: nowrap;
+}
+.graph-concept-box:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+
+/* ============================================
    Note View（概念详情页）
    ============================================ */
 
@@ -1021,9 +1237,10 @@ body {
     margin: 0 auto;
     background: var(--paper);
     border: 1px solid rgba(145, 107, 66, 0.2);
-    border-radius: 8px;
+    border-radius: var(--radius-md);
     box-shadow: var(--shadow);
     padding: 40px 48px;
+    animation: fadeInUp var(--transition-slow);
 }
 
 .note-breadcrumb {
@@ -1186,6 +1403,8 @@ body {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
 }
 
 .note-related-group h4 {
@@ -1213,7 +1432,7 @@ body {
     border-radius: 4px;
     font-size: 13px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--transition-fast);
     text-decoration: none;
     color: var(--text);
     border: 1px solid transparent;
@@ -1344,7 +1563,7 @@ body {
     font-size: 12px;
     font-weight: 500;
     text-decoration: none;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .prompt-skill-link:hover {
@@ -1368,7 +1587,7 @@ body {
     font-size: 13px;
     font-family: inherit;
     color: var(--text-light);
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .prompt-filter:hover {
@@ -1387,6 +1606,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
 }
 
 .prompt-empty {
@@ -1485,7 +1706,7 @@ body {
     color: var(--text-light);
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
     font-family: inherit;
 }
 
@@ -1543,7 +1764,7 @@ body {
     font-size: 12px;
     font-family: inherit;
     font-weight: 500;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .prompt-copy-btn:hover {
@@ -1577,7 +1798,7 @@ body {
     font-size: 14px;
     font-weight: 500;
     text-decoration: none;
-    transition: all 0.2s;
+    transition: all var(--transition-normal);
 }
 
 .path-cta-link:hover {
@@ -1592,7 +1813,7 @@ body {
 .qa-view {
     max-width: 1180px;
     margin: 0 auto;
-    padding: 28px 0 24px;
+    padding: 28px 0 64px;
 }
 
 .qa-hero {
@@ -1744,6 +1965,8 @@ body {
     display: flex;
     flex-direction: column;
     gap: 16px;
+    animation: fadeInUp var(--transition-slow);
+    animation: fadeInUp var(--transition-slow);
     scroll-behavior: smooth;
 }
 
@@ -1877,6 +2100,8 @@ body {
     line-height: 1.5;
     resize: none;
     outline: none;
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
     transition: border-color 0.16s, box-shadow 0.16s;
 }
 
@@ -1936,7 +2161,7 @@ body {
     color: var(--muted);
     font-size: 12px;
     cursor: pointer;
-    transition: all 0.15s;
+    transition: all var(--transition-fast);
 }
 
 .qa-chat-clear:hover {
@@ -2004,7 +2229,8 @@ body {
     font-size: 12px;
     color: #b0a89e;
     background: rgba(255, 250, 241, 0.9);
-    backdrop-filter: blur(8px);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
     border-top: 1px solid rgba(231, 216, 193, 0.5);
     z-index: 80;
 }
@@ -2144,7 +2370,7 @@ body {
     .prompt-meta-item { flex-direction: column; gap: 2px; }
     .prompt-meta-label { min-width: auto; }
 
-    .qa-view { padding: 16px 0 24px; }
+    .qa-view { padding: 16px 0 64px; }
     .qa-hero {
         display: block;
         padding: 18px 16px;
@@ -2208,4 +2434,165 @@ body {
     .prompt-tabs { gap: 0; }
     .prompt-tab { padding: 6px 10px; font-size: 11px; }
     .prompt-content { padding: 10px 12px; }
+}
+
+/* ============================================
+   Final interaction pass
+   ============================================ */
+
+.header-content,
+.nav-btn,
+.header-search input,
+.qa-question-card,
+.qa-chat-send,
+.qa-chat-clear,
+.qa-chat-retry,
+.footer-brand {
+    -webkit-tap-highlight-color: transparent;
+}
+
+.nav-btn:focus-visible,
+.sidebar-toggle:focus-visible,
+.qa-open-link:focus-visible,
+.qa-question-card:focus-visible,
+.qa-chat-input:focus-visible,
+.qa-chat-send:focus-visible,
+.qa-chat-clear:focus-visible,
+.qa-chat-retry:focus-visible,
+.footer-brand:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+
+.qa-chat-empty {
+    min-height: 260px;
+    padding: 24px;
+}
+
+.qa-chat-messages {
+    min-height: 260px;
+    max-height: min(480px, calc(100vh - 420px));
+}
+
+.qa-question-card {
+    display: flex;
+    align-items: center;
+}
+
+.qa-chat-retry {
+    align-self: center;
+    margin: 0 0 8px;
+    padding: 5px 14px;
+    border: 1px solid rgba(185, 54, 44, 0.35);
+    border-radius: 999px;
+    background: rgba(185, 54, 44, 0.06);
+    color: var(--accent);
+    font: inherit;
+    font-size: 12px;
+    cursor: pointer;
+    transition: background 0.16s, border-color 0.16s;
+}
+
+.qa-chat-retry:hover {
+    background: rgba(185, 54, 44, 0.12);
+    border-color: var(--accent);
+}
+
+.qa-chat-retry[hidden] {
+    display: none;
+}
+
+.graph-canvas,
+.graph-canvas svg,
+.graph-node,
+.graph-node circle {
+    user-select: none;
+}
+
+.graph-node circle {
+    transition: opacity 0.18s, stroke-width 0.18s;
+}
+
+@media (max-width: 768px) {
+    :root { --header-h: 90px; }
+
+    .header-content {
+        min-height: var(--header-h);
+        height: auto;
+        padding: 7px 12px 5px;
+        display: flex;
+        flex-wrap: wrap;
+        align-content: center;
+        row-gap: 4px;
+        overflow: hidden;
+    }
+
+    .header-content .sidebar-toggle { order: 1; }
+    .header-content .logo { order: 2; }
+    .header-content .nav {
+        order: 3;
+        flex: 0 0 100%;
+        width: 100%;
+        min-width: 0;
+        overflow-x: auto;
+        scrollbar-width: none;
+        padding: 1px 0 2px;
+    }
+
+    .header-content .nav::-webkit-scrollbar { display: none; }
+    .header-content .nav-btn { padding: 5px 11px; font-size: 12px; }
+    .header-content .header-search,
+    .header-content .node-count { display: none; }
+
+    .qa-chat-messages {
+        min-height: 240px;
+        max-height: 46vh;
+    }
+
+    .qa-chat-empty { min-height: 220px; padding: 18px; }
+    .main { padding-bottom: 62px; }
+    .graph-legend {
+        left: 10px;
+        bottom: 46px;
+        width: 142px;
+        padding: 10px 12px;
+    }
+    .graph-legend-item { font-size: 11px; }
+    .graph-legend-hint { font-size: 10px; }
+
+    /* 顶部大概念框：移动端紧凑可横滑 */
+    .graph-concepts {
+        top: 8px;
+        gap: 5px;
+        padding: 4px;
+        border-radius: 10px;
+        max-width: calc(100% - 16px);
+    }
+    .graph-concept-box {
+        min-width: 52px;
+        padding: 5px 9px 4px;
+    }
+    .graph-concept-label { font-size: 13px; }
+    .graph-concept-desc { font-size: 9px; }
+
+    /* 移动端普通节点标签字号略大，便于触屏阅读 */
+    .graph-node.tier-core text { font-size: 12px; }
+}
+
+/* ============================================
+   Animations
+   ============================================ */
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes messageIn {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes qaTyping {
+    0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+    40% { opacity: 1; transform: scale(1); }
 }

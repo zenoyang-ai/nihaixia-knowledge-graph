@@ -1,6 +1,6 @@
 {
   "name": "nihaixia-qa-router",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "description": "倪海厦知识库 AI 问答统一路由 — 双线路（元器 + CloudBase Agent）",
   "main": "index.js",
   "dependencies": {

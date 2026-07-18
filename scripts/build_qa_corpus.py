@@ -32,11 +32,67 @@ EMAIL_RE = re.compile(
     r"(?<![\w.+-])[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}(?![\w.-])"
 )
 
+# Contextual personal-name redaction: only redact names that follow an explicit
+# label, to avoid stripping legitimate historical figures (倪海厦, 张仲景, etc.).
+# Pattern matches the label plus the following 2-4 Chinese characters.
+NAME_LABEL_RE = re.compile(
+    r"(患者|病人|患名|姓名|名字|家属|联系人|就诊人|主诉人|主诉患者|首诊患者)"
+    r"[：:\s]+"
+    r"([\u4e00-\u9fa5]{2,4})"
+)
+
+# Medical record numbers — only redact when explicit label is present.
+MEDICAL_RECORD_RE = re.compile(
+    r"(病历号|住院号|门诊号|档案号|病案号|就诊号|保健号|医保号|社保号|卡号)"
+    r"[：:\s]*"
+    r"([A-Za-z0-9\-]{4,30})"
+)
+
+# Full structured Chinese addresses (province + city + road + number).
+# Conservative: requires a province-level prefix to avoid false positives in
+# classical TCM texts where words like 路/方 may appear frequently.
+# Combines municipality (直辖市) and province patterns via alternation.
+ADDRESS_FULL_RE = re.compile(
+    r"(?:"
+    r"(?:北京|上海|天津|重庆)(?:市)?"
+    r"[\u4e00-\u9fa5]{0,10}(?:区|县)"
+    r"|"
+    r"[\u4e00-\u9fa5]{2,6}(?:省|自治区|特别行政区)"
+    r"[\u4e00-\u9fa5]{1,10}(?:市|地区|盟|自治州)"
+    r"[\u4e00-\u9fa5]{0,10}(?:区|县|旗|市)?"
+    r")"
+    r"[\u4e00-\u9fa5]{0,30}(?:路|街|巷|弄|村|镇|乡|大道|大街)"
+    r"[\u4e00-\u9fa5\d]{0,20}"
+    r"(?:号|室|楼|栋|单元)?"
+    r"[\d\-]*"
+)
+
+# Contextual address redaction: only when an explicit label precedes the value.
+ADDRESS_LABEL_RE = re.compile(
+    r"(地址|住址|家庭住址|现住址|联系地址|通讯地址|居住地)"
+    r"[：:\s]+"
+    r"([^\n，。；！？,;:!?\u4e00-\u9fa5]{0,5}[\u4e00-\u9fa5\d]{4,80})"
+)
+
+# Modern medical institutions — scan-only (severity medium), since legitimate
+# TCM teaching materials may reference historical/educational institutions.
+MEDICAL_INSTITUTION_RE = re.compile(
+    r"[\u4e00-\u9fa5]{2,15}(?:医院|卫生院|门诊部|诊所|中医馆|国医馆|医馆|疗养院|康复中心)"
+)
+
 HIGH_RISK_PATTERNS = {
     "mobile": MOBILE_RE,
     "id_card": ID_CARD_RE,
     "email": EMAIL_RE,
     "local_path": LOCAL_PATH_RE,
+    "medical_record": MEDICAL_RECORD_RE,
+    "address_full": ADDRESS_FULL_RE,
+    "address_label": ADDRESS_LABEL_RE,
+}
+
+MEDIUM_RISK_PATTERNS = {
+    "name_label": NAME_LABEL_RE,
+    "medical_institution": MEDICAL_INSTITUTION_RE,
 }
 
 
@@ -71,6 +127,10 @@ def sanitize_text(text):
         "mobile": len(MOBILE_RE.findall(text)),
         "id_card": len(ID_CARD_RE.findall(text)),
         "email": len(EMAIL_RE.findall(text)),
+        "name_label": len(NAME_LABEL_RE.findall(text)),
+        "medical_record": len(MEDICAL_RECORD_RE.findall(text)),
+        "address_full": len(ADDRESS_FULL_RE.findall(text)),
+        "address_label": len(ADDRESS_LABEL_RE.findall(text)),
     }
     text = LOCAL_PATH_RE.sub(logical_path, text)
     text = WIKILINK_RE.sub(readable_wikilink, text)
@@ -82,7 +142,18 @@ def sanitize_text(text):
     text = MOBILE_RE.sub("[已脱敏手机号]", text)
     text = ID_CARD_RE.sub("[已脱敏身份证号]", text)
     text = EMAIL_RE.sub("[已脱敏邮箱]", text)
+    # Contextual name redaction: keep the label, redact only the name value.
+    text = NAME_LABEL_RE.sub(r"\1：[已脱敏姓名]", text)
+    # Medical record numbers: keep the label, redact the number.
+    text = MEDICAL_RECORD_RE.sub(r"\1：[已脱敏病历号]", text)
+    # Structured addresses: redact the entire matched address.
+    text = ADDRESS_FULL_RE.sub("[已脱敏地址]", text)
+    # Contextual address redaction: keep the label, redact the value.
+    text = ADDRESS_LABEL_RE.sub(r"\1：[已脱敏地址]", text)
     return text.replace("\r\n", "\n").replace("\r", "\n"), transformations
+
+
+REDACTION_MARKER_RE = re.compile(r"\[已脱敏[^\]]*\]")
 
 
 def scan_generated_files(files):
@@ -90,15 +161,31 @@ def scan_generated_files(files):
         name: {"severity": "high", "count": 0, "files": 0}
         for name in HIGH_RISK_PATTERNS
     }
+    findings.update(
+        {
+            name: {"severity": "medium", "count": 0, "files": 0}
+            for name in MEDIUM_RISK_PATTERNS
+        }
+    )
+    all_patterns = {**HIGH_RISK_PATTERNS, **MEDIUM_RISK_PATTERNS}
     for path in files:
         content = path.read_text(encoding="utf-8")
-        for name, pattern in HIGH_RISK_PATTERNS.items():
-            count = len(pattern.findall(content))
+        # Strip redaction markers before scanning so patterns don't match
+        # their own output (e.g., "地址：[已脱敏地址]" would otherwise
+        # re-trigger the address_label pattern).
+        scan_content = REDACTION_MARKER_RE.sub("", content)
+        for name, pattern in all_patterns.items():
+            count = len(pattern.findall(scan_content))
             if count:
                 findings[name]["count"] += count
                 findings[name]["files"] += 1
-    high_risk = sum(item["count"] for item in findings.values())
-    return findings, high_risk
+    high_risk = sum(
+        item["count"] for item in findings.values() if item["severity"] == "high"
+    )
+    medium_risk = sum(
+        item["count"] for item in findings.values() if item["severity"] == "medium"
+    )
+    return findings, high_risk, medium_risk
 
 
 def frontmatter(group, quality, corpus_version):
@@ -139,6 +226,10 @@ def build_corpus(input_dir, output_dir, corpus_version):
         "mobile": 0,
         "id_card": 0,
         "email": 0,
+        "name_label": 0,
+        "medical_record": 0,
+        "address_full": 0,
+        "address_label": 0,
     }
 
     for input_path in input_files:
@@ -166,12 +257,13 @@ def build_corpus(input_dir, output_dir, corpus_version):
             }
         )
 
-    findings, high_risk = scan_generated_files(generated)
+    findings, high_risk, medium_risk = scan_generated_files(generated)
     privacy_report = {
         "corpus_version": corpus_version,
         "scanned_files": len(generated),
         "summary": {
             "high_risk": high_risk,
+            "medium_risk": medium_risk,
             "status": "pass" if high_risk == 0 else "blocked",
         },
         "findings": findings,

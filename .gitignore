@@ -49,3 +49,12 @@ node_modules/
 
 # 交接文档（含本机路径）
 HANDOFF_TENCENT_QA.md
+
+# 测试截图和缓存（不提交）
+.playwright-cli/
+
+# 临时图标文件（选定一份正式图标后再提交）
+miniprogram-icon*
+
+# 归档的旧路线代码（仅保留参考，不部署）
+archive/

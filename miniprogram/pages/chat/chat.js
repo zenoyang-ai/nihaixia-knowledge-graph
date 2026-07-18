@@ -254,7 +254,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '倪海厦知识库智能问答',
+      title: '经典中医知识问答',
       path: '/pages/chat/chat',
     };
   },

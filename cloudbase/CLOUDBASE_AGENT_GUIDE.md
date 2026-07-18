@@ -4,11 +4,13 @@
 
 利用 CloudBase 内置的 Agent 能力 + 混元大模型免费 Token，搭建独立的倪海厦知识库问答，**完全不依赖腾讯元器**，7月15日后不受影响。
 
+> SDK 注意：当前路由使用 `@cloudbase/ai` 2.x 的 `ai.bot.sendMessage({ botId, msg, history })` 接口，并从返回值的 `textStream` 聚合回答。不要改回 `threadId/runId/messages` 或旧事件流字段。
+
 ## 前置条件
 
 - 已有 CloudBase 环境「zeno」（个人版）
 - 已领取小程序成长计划免费混元 Token（10亿）
-- 知识库文件已备好：`/tmp/nihaixia-yuanqi-upload/`（11个文件）
+- 知识库文件已备好：本地生成的 11 个文件上传包（不要把上传包提交到公开仓库）
 
 ## 步骤一：创建 CloudBase Agent
 
@@ -27,7 +29,7 @@
 
 1. 进入「知识库」标签
 2. 点击「新建知识库」→ 名称：倪海厦知识库
-3. 上传文件：将 `/tmp/nihaixia-yuanqi-upload/` 下的 11 个 .txt 文件全部拖入
+3. 上传文件：将本地上传包中的 11 个 `.md` 文件全部拖入
 4. 等待索引完成（同元器，约几分钟）
 
 ## 步骤三：获取 API Endpoint

@@ -12,17 +12,29 @@
 
 const cloudbase = require('@cloudbase/node-sdk');
 
-const VERSION = '2.0.0';
+const VERSION = '2.0.1';
 
 // ---------------------------------------------------------------------------
-// 医疗可执行请求检测 — 在本地拦截，绝不调用 provider
+// 医疗可执行请求检测 — 仅拦截可执行医疗意图，放行学习问法
+//
+// 拦截标准：处方、剂量、服法、个体化诊疗、医疗程序、急救
+// 放行标准：经典讲什么病、方剂治什么、概念解释、组成与禁忌
 // ---------------------------------------------------------------------------
 const MEDICAL_PATTERNS = [
-  /(?:诊断|处方|剂量|服法|怎么吃|吃多少|吃几|治疗方案|开(?:什么|个)?药|该吃|服用|用法|用量)/,
-  /(?:治疗|治愈|治好|能治|可以治|会不会好|能好吗|怎么治|治什么)/,
-  /(?:推荐.*药|建议.*药|什么药.*好|哪个药|什么方子|该用.*方|用.*方.*治)/,
+  // 1. 剂量/用量/服法 — 请求具体用药信息
+  /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
+  // 2. 处方/开药请求
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治)/,
+  // 3. 医疗程序
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
-  /(?:救命|急救|危重|抢救|快不行)/,
+  // 4. 急救/危重
+  /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
+  // 5. 个体化诊疗：个人代词 + 治疗请求（不含"治什么"等学习问法）
+  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析)/,
+  // 6. 角色扮演绕过 + 可执行医疗请求
+  /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
+  // 7. 指令绕过 + 可执行医疗请求
+  /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
 ];
 
 function isMedicalRequest(text) {
@@ -207,6 +219,13 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
   const primaryProvider = (env && env.PRIMARY_PROVIDER) || 'yuanqi';
   const rateLimiter = new RateLimiter();
 
+  // provider 运行时健康状态：跟踪每个 provider 最近一次成功/失败时间戳。
+  // 与上面 providers 布尔标志（"是否已配置"）配合，区分"已配置"和"最近调用成功"。
+  const providerHealth = {
+    yuanqi: { last_success: null, last_failure: null },
+    cloudbase: { last_success: null, last_failure: null },
+  };
+
   const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 300000);
   if (cleanupInterval.unref) cleanupInterval.unref();
 
@@ -253,6 +272,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
 
         // finish_reason: "sensitive" → 返回安全提示，不切换备用
         if (finishReason === 'sensitive') {
+          providerHealth.yuanqi.last_success = new Date().toISOString();
           console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, reason: 'sensitive', elapsed }));
           return buildResponse(200, {
             reply: '您的问题涉及敏感内容，请调整后重试。',
@@ -263,6 +283,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         }
 
         if (reply) {
+          providerHealth.yuanqi.last_success = new Date().toISOString();
           console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, elapsed }));
           return buildResponse(200, {
             reply,
@@ -276,6 +297,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       // 400 请求格式错误 → 返回受控错误，不切换备用
       if (res.status === 400) {
         const data = await res.json().catch(() => ({}));
+        providerHealth.yuanqi.last_failure = new Date().toISOString();
         console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: 400, reason: 'bad_request', elapsed }));
         return buildResponse(400, {
           error: '请求格式错误，请检查输入后重试',
@@ -284,6 +306,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       }
 
       // 401、403、429、5xx、空答、超时 → 切换备用
+      providerHealth.yuanqi.last_failure = new Date().toISOString();
       if (res.status === 401 || res.status === 403 || res.status === 429 || res.status >= 500) {
         console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: res.status, elapsed }));
       } else {
@@ -293,13 +316,14 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     } catch (err) {
       clearTimeout(timeout);
       const elapsed = Date.now() - startTime;
+      providerHealth.yuanqi.last_failure = new Date().toISOString();
       console.log(JSON.stringify({ request_id: requestId, provider: 'yuanqi', status: 'error', reason: err.name === 'AbortError' ? 'timeout' : 'fetch_error', elapsed }));
       return null;
     }
   }
 
   // -----------------------------------------------------------------------
-  // 备用线路：CloudBase Agent（ai.bot.sendMessage 流式 API）
+  // 备用线路：CloudBase Agent（ai.bot.sendMessage 文本流 API）
   //
   // 使用 cloudbase.SYMBOL_DEFAULT_ENV 避免硬编码环境 ID。
   // 需要 CLOUDBASE_BOT_ID 环境变量，缺少时跳过。
@@ -315,75 +339,63 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       const app = _cloudbase.init({ env: _cloudbase.SYMBOL_DEFAULT_ENV });
       const ai = app.ai();
 
-      // 使用 session_id 作为稳定 threadId
-      const threadId = `nhs-${normalized.session_id || 'anon'}`;
-      const runId = _uuid();
-
-      // 构建消息（每条需要唯一 id）
-      const messages = normalized.messages.map((m, i) => ({
-        id: `${requestId}-msg-${i}`,
-        role: m.role,
-        content: m.content,
-      }));
-
+      // 当前 @cloudbase/ai SDK 接收最新问题 + 历史消息，不接收 threadId/runId。
+      const latestMessage = normalized.messages.at(-1);
+      const history = normalized.messages.slice(0, -1);
       const res = await ai.bot.sendMessage({
         botId,
-        threadId,
-        runId,
-        messages,
+        msg: latestMessage.content,
+        history,
       });
 
-      // 流式聚合（Promise.race 确保 25 秒超时后中断）
+      // SDK 的 textStream 只暴露模型文本片段；流结束即视为完成。
       let text = '';
-      let runError = false;
-      let runFinished = false;
       let timedOut = false;
 
       const streamPromise = (async () => {
-        for await (const event of res.dataStream) {
-          switch (event.type) {
-            case 'TEXT_MESSAGE_CONTENT':
-              if (event.delta) text += event.delta;
-              break;
-            case 'RUN_ERROR':
-              runError = true;
-              break;
-            case 'RUN_FINISHED':
-              runFinished = true;
-              break;
-          }
+        for await (const chunk of res.textStream) {
+          if (typeof chunk === 'string') text += chunk;
         }
       })();
 
+      let timeoutId;
       const timeoutPromise = new Promise((resolve) => {
-        setTimeout(() => {
+        timeoutId = setTimeout(() => {
           timedOut = true;
           resolve();
         }, 25000);
       });
 
-      await Promise.race([streamPromise, timeoutPromise]);
+      try {
+        await Promise.race([streamPromise, timeoutPromise]);
+      } finally {
+        clearTimeout(timeoutId);
+      }
       // 防止 streamPromise 在后台产生未捕获异常
       streamPromise.catch(() => {});
 
       const elapsed = Date.now() - startTime;
+      text = text.trim();
 
-      // 超时、RUN_ERROR、未收到 RUN_FINISHED 或空答 → 判定失败
-      if (timedOut || runError || !runFinished || !text.trim()) {
-        const failReason = timedOut ? 'timeout' : (runError ? 'run_error' : (!runFinished ? 'no_finish' : 'no_reply'));
+      // 超时或空答 → 判定失败
+      if (timedOut || !text) {
+        const failReason = timedOut ? 'timeout' : 'no_reply';
+        providerHealth.cloudbase.last_failure = new Date().toISOString();
         console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: failReason, elapsed }));
         return null;
       }
 
+      providerHealth.cloudbase.last_success = new Date().toISOString();
       console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 200, elapsed }));
       return buildResponse(200, {
-        reply: text.trim(),
+        reply: text,
         provider: 'cloudbase',
         degraded: primaryProvider !== 'cloudbase',
         request_id: requestId,
       }, '', allowedOrigins);
     } catch (err) {
       const elapsed = Date.now() - startTime;
+      providerHealth.cloudbase.last_failure = new Date().toISOString();
       console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'error', reason: 'sdk_error', elapsed }));
       return null;
     }
@@ -413,6 +425,11 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         providers: {
           yuanqi: !!(env.YUANQI_APP_ID && env.YUANQI_APP_KEY),
           cloudbase: !!env.CLOUDBASE_BOT_ID,
+        },
+        // providers.* 仅表示"是否已配置"；last_success 表示"最近一次调用是否成功"，区分二者
+        last_success: {
+          yuanqi: providerHealth.yuanqi.last_success,
+          cloudbase: providerHealth.cloudbase.last_success,
         },
         primary: primaryProvider,
       }, origin, allowedOrigins);
