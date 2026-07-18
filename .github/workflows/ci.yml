@@ -1,0 +1,244 @@
+name: CI
+
+# 经典中医知识图谱项目 — CI 护栏
+# 防止：静态数据格式错误 / 密钥泄露 / JS 语法错误 / Python 测试失败 / 路由测试失败
+#
+# 依赖链：static-data-validation -> router-tests -> secret-scan
+# mobile-smoke-test 独立运行（无 needs），允许失败，不阻断主链。
+# fail-fast: false 对所有 job 生效（无 matrix 时为 no-op，仅作意图声明）。
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  # ===========================================================================
+  # Job 1: 静态数据校验
+  # ===========================================================================
+  static-data-validation:
+    name: Static Data Validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Validate docs/data/graph.json
+        run: node -e "const d=require('./docs/data/graph.json'); if(!d.nodes||d.nodes.length===0) throw new Error('No nodes')"
+
+      - name: Validate docs/data/prompts.json
+        run: node -e "JSON.parse(require('fs').readFileSync('./docs/data/prompts.json','utf8'))"
+
+      - name: Run Python QA corpus tests (if exists)
+        run: |
+          if [ -f "tests/test_build_qa_corpus.py" ]; then
+            python3 tests/test_build_qa_corpus.py
+          else
+            echo "tests/test_build_qa_corpus.py not found, skipping"
+          fi
+
+  # ===========================================================================
+  # Job 2: 路由测试 + JS 语法检查
+  # ===========================================================================
+  router-tests:
+    name: Router & JS Syntax Tests
+    needs: static-data-validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install router function dependencies
+        run: npm ci
+        working-directory: cloudbase/functions/nihaixia-qa-router
+
+      - name: Run QA router tests
+        run: node --test tests/test_qa_router.js
+
+      - name: Syntax check nihaixia-qa-router/index.js
+        run: node --check cloudbase/functions/nihaixia-qa-router/index.js
+
+      - name: Syntax check nihaixia-qa-mp/index.js
+        run: node --check cloudbase/functions/nihaixia-qa-mp/index.js
+
+      - name: Syntax check docs/assets/app.js
+        run: node --check docs/assets/app.js
+
+      - name: Syntax check docs/assets/graph.js
+        run: node --check docs/assets/graph.js
+
+  # ===========================================================================
+  # Job 3: 密钥扫描（内联 Python 脚本）
+  # ===========================================================================
+  secret-scan:
+    name: Secret Scan
+    needs: router-tests
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Scan for leaked secrets
+        run: |
+          python3 - <<'EOF'
+          import os
+          import re
+          import sys
+
+          EXTENSIONS = {'.json', '.js', '.py', '.md', '.html', '.toml'}
+          SKIP_DIRS = {'node_modules', '.git', '.venv', 'venv', '__pycache__'}
+          SKIP_KEYWORDS = ('integrity', 'shasum', 'signature', 'checksum', 'fingerprint')
+
+          PLACEHOLDER_PATTERNS = [
+              r'^<[^>]+>$',
+              r'REDACTED',
+              r'^test[-_]',
+              r'^your[-_]',
+              r'EXAMPLE',
+              r'PLACEHOLDER',
+              r'^xxx+$',
+              r'^https?://',
+              r'^sha\d+-',
+              r'^[A-Z_]+_HERE$',
+              r'^ibot-',
+              r'^zeno-',
+          ]
+
+          SUSPICIOUS_VAR = re.compile(
+              r"([A-Z][A-Z0-9_]*_(?:KEY|SECRET|TOKEN|PASSWORD)|PASSWORD|TOKEN|SECRET)"
+              r"[\"']?\s*[:=]\s*['\"]([^'\"]+)['\"]"
+          )
+
+          LONG_SECRET = re.compile(r"['\"]([A-Za-z0-9][A-Za-z0-9\-_]{31,})['\"]")
+
+          def is_placeholder(value):
+              for pat in PLACEHOLDER_PATTERNS:
+                  if re.search(pat, value, re.IGNORECASE):
+                      return True
+              return False
+
+          def has_mixed_case_and_digit(s):
+              has_upper = any(c.isupper() for c in s)
+              has_lower = any(c.islower() for c in s)
+              has_digit = any(c.isdigit() for c in s)
+              return has_upper and has_lower and has_digit
+
+          def looks_like_plain_identifier(s):
+              has_upper = any(c.isupper() for c in s)
+              has_digit = any(c.isdigit() for c in s)
+              return not has_upper and not has_digit
+
+          violations = []
+          scanned = 0
+          for root, dirs, files in os.walk('.'):
+              dirs[:] = [d for d in dirs if d not in SKIP_DIRS]
+              for fname in files:
+                  ext = os.path.splitext(fname)[1]
+                  if ext not in EXTENSIONS:
+                      continue
+                  fpath = os.path.join(root, fname)
+                  try:
+                      with open(fpath, 'r', encoding='utf-8', errors='ignore') as f:
+                          lines = f.readlines()
+                  except Exception:
+                      continue
+                  scanned += 1
+                  for i, line in enumerate(lines, 1):
+                      lower_line = line.lower()
+                      if any(kw in lower_line for kw in SKIP_KEYWORDS):
+                          continue
+                      for match in SUSPICIOUS_VAR.finditer(line):
+                          var_name, value = match.group(1), match.group(2)
+                          if is_placeholder(value):
+                              continue
+                          if looks_like_plain_identifier(value):
+                              continue
+                          violations.append((fpath, i, f"{var_name} = {value[:50]}"))
+                      for match in LONG_SECRET.finditer(line):
+                          value = match.group(1)
+                          if is_placeholder(value):
+                              continue
+                          if not has_mixed_case_and_digit(value):
+                              continue
+                          violations.append((fpath, i, f"long secret-like value = {value[:50]}..."))
+
+          print(f"Scanned {scanned} files across extensions: {sorted(EXTENSIONS)}")
+          if violations:
+              print("\nPotential secrets found:")
+              for fpath, line, info in violations:
+                  print(f"  {fpath}:{line}: {info}")
+              print(f"\nTotal: {len(violations)} potential secret(s).")
+              print("If these are false positives, add the value or pattern to PLACEHOLDER_PATTERNS in .github/workflows/ci.yml")
+              sys.exit(1)
+          else:
+              print("No secrets detected.")
+          EOF
+
+  # ===========================================================================
+  # Job 4: 小程序冒烟测试（可选，允许失败）
+  # ===========================================================================
+  mobile-smoke-test:
+    name: Mobile Smoke Test (optional)
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Syntax check all miniprogram .js files
+        run: |
+          set -e
+          found=0
+          while IFS= read -r -d '' f; do
+            echo "node --check $f"
+            node --check "$f"
+            found=$((found+1))
+          done < <(find miniprogram -type f -name '*.js' -print0)
+          if [ "$found" -eq 0 ]; then
+            echo "No .js files found under miniprogram/"
+          else
+            echo "Checked $found .js file(s) under miniprogram/."
+          fi
+
