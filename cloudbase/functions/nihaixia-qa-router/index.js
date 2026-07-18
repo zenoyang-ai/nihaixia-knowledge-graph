@@ -2,43 +2,69 @@
  * 倪海厦知识库 AI 问答 — 统一问答路由
  * CloudBase HTTP 函数入口
  *
- * 双线路架构：
- *   主线路：腾讯元器（知识库 RAG）
- *   备用线路：CloudBase Agent（知识库 RAG，ai.bot.sendMessage）
+ * 混合 RAG v2 架构（方案 B）：
+ *   主线路：BM25 检索 knowledge-base.json（4837 个分块，11 组语料）+ generateText() 生成
+ *   备用线路：CloudBase Agent（ai.bot.sendMessage，需切换计费后可用）
+ *   第三线路：腾讯元器（已停用，代码保留供回切）
  *
- * 禁止使用通用模型 generateText() 作为兜底。
- * 两条线路均基于知识库检索，不依赖无上下文的通用大模型。
+ * 改进（v3.1.0）：
+ *   - 语料从 4 部经典扩展到完整 11 组上传包（11.4MB）
+ *   - 检索器使用 BM25 + 最低分阈值，完全无关问题返回零结果
+ *   - knowledge_sources 返回真正达阈值的片段 + 证据片段
+ *   - 上下文按分块（600-2000 字符）而非整篇，总量限制 30000 字符
+ *   - 医疗拦截扩充（覆盖"适合吃吗""能不能用""配个方"等自然问法）
+ *   - 生成结果二次安全检查
  */
 
 const cloudbase = require('@cloudbase/node-sdk');
+const { searchDocuments } = require('./knowledge-search');
 
-const VERSION = '2.0.1';
+const VERSION = '3.1.0';
+const MAX_CONTEXT_CHARS = 30000; // 上下文总量上限
 
 // ---------------------------------------------------------------------------
 // 医疗可执行请求检测 — 仅拦截可执行医疗意图，放行学习问法
 //
-// 拦截标准：处方、剂量、服法、个体化诊疗、医疗程序、急救
+// 拦截标准：处方、剂量、服法、个体化诊疗、医疗程序、急救、疾病用药咨询
 // 放行标准：经典讲什么病、方剂治什么、概念解释、组成与禁忌
 // ---------------------------------------------------------------------------
 const MEDICAL_PATTERNS = [
   // 1. 剂量/用量/服法 — 请求具体用药信息
   /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
-  // 2. 处方/开药请求
-  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治)/,
+  // 2. 处方/开药请求（含简短表达"配个方/开个方/抓个方"）
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:配|开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方))/,
   // 3. 医疗程序
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
   // 4. 急救/危重
   /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
-  // 5. 个体化诊疗：个人代词 + 治疗请求（不含"治什么"等学习问法）
-  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析)/,
+  // 5. 个体化诊疗：个人代词 + 治疗请求（含"适合吃吗""能不能用""可以吗"等）
+  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
   // 6. 角色扮演绕过 + 可执行医疗请求
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
   // 7. 指令绕过 + 可执行医疗请求
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
+  // 8. 疾病用药咨询 — 针对具体疾病的用药建议（非学习问法）
+  /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症).{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐)/,
 ];
 
 function isMedicalRequest(text) {
   return MEDICAL_PATTERNS.some((p) => p.test(text));
+}
+
+// ---------------------------------------------------------------------------
+// 生成结果二次安全检查 — 拦截 LLM 输出中的具体剂量/处方建议
+//
+// 注意：引用原文（如"桂枝三两"）不应被拦截，只拦截明确的处方建议格式
+// ---------------------------------------------------------------------------
+const MEDICAL_OUTPUT_PATTERNS = [
+  /(?:建议(?:服用|用量|剂量)|推荐(?:服用|用量|剂量)|处方[:：]|我的建议是).{0,30}\d/,
+  /(?:每日|每天|每次).{0,5}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
+  /(?:你应该|你需要|你可以服用|建议你).{0,20}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
+];
+
+function isMedicalOutput(text) {
+  if (!text) return false;
+  return MEDICAL_OUTPUT_PATTERNS.some((p) => p.test(text));
 }
 
 // ---------------------------------------------------------------------------
@@ -216,15 +242,19 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
   });
 
   const allowedOrigins = parseAllowedOrigins(env || {});
-  const primaryProvider = (env && env.PRIMARY_PROVIDER) || 'yuanqi';
+  // 默认 cloudbase-hybrid：混合 RAG（关键词检索 + generateText）
+  // 切换计费后可改为 'cloudbase'（sendMessage 直接生成）
+  const primaryProvider = (env && env.PRIMARY_PROVIDER) || 'cloudbase-hybrid';
   const rateLimiter = new RateLimiter();
 
   // provider 运行时健康状态：跟踪每个 provider 最近一次成功/失败时间戳。
-  // 与上面 providers 布尔标志（"是否已配置"）配合，区分"已配置"和"最近调用成功"。
   const providerHealth = {
-    yuanqi: { last_success: null, last_failure: null },
+    hybrid: { last_success: null, last_failure: null },
     cloudbase: { last_success: null, last_failure: null },
+    yuanqi: { last_success: null, last_failure: null },
   };
+
+  let lastCloudBaseError = null;
 
   const cleanupInterval = setInterval(() => rateLimiter.cleanup(), 300000);
   if (cleanupInterval.unref) cleanupInterval.unref();
@@ -323,10 +353,125 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
   }
 
   // -----------------------------------------------------------------------
+  // 主线路：混合 RAG v2（BM25 检索 + generateText 生成）
+  //
+  // 改进（v3.1.0）：
+  //   - 使用 v2 检索器（BM25 + 阈值），无关问题返回零结果
+  //   - 上下文按分块（600-2000 字符）而非整篇，总量限制 30000 字符
+  //   - knowledge_sources 返回带证据片段的结构
+  //   - 生成结果二次安全检查
+  // -----------------------------------------------------------------------
+  async function tryHybridRAG(normalized, requestId, startTime) {
+    try {
+      const query = normalized.messages[normalized.messages.length - 1].content;
+
+      // 1. BM25 检索相关文档（已带阈值过滤）
+      const docs = searchDocuments(query, 5);
+      if (!docs.length) {
+        console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'skipped', reason: 'no_docs', elapsed: Date.now() - startTime }));
+        return null;
+      }
+
+      // 2. 构建上下文（按分块，总量限制 MAX_CONTEXT_CHARS）
+      let usedChars = 0;
+      const contextParts = [];
+      for (let i = 0; i < docs.length; i++) {
+        const d = docs[i];
+        const header = `### 文档${i + 1}：${d.chunk_title}（来源：${d.source_group}）\n\n`;
+        const remaining = MAX_CONTEXT_CHARS - usedChars - header.length;
+        if (remaining <= 0) break;
+        const content = d.content.length > remaining
+          ? d.content.slice(0, remaining) + '\n...(内容过长，已截断)'
+          : d.content;
+        contextParts.push(header + content);
+        usedChars += header.length + content.length;
+      }
+      const context = contextParts.join('\n\n---\n\n');
+
+      // 3. 构建系统提示
+      const systemPrompt = `你是「中医经典研习助手」，专注于回答关于经典中医理论的问题。
+
+请基于以下知识库内容回答用户的问题。引用原文时请注明出处（如《伤寒论》第X章、知识卡片等）。
+如果知识库中没有足够信息回答问题，请诚实告知"知识库中暂无相关内容"。
+回答应保持学术严谨，用通俗语言解释复杂概念。
+本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。
+
+知识库内容：
+${context}`;
+
+      // 4. 构建消息（系统提示 + 历史 + 当前问题）
+      const messages = [
+        { role: 'system', content: systemPrompt },
+        ...normalized.messages,
+      ];
+
+      // 5. 调用 generateText（云函数可使用免费 AI 资源）
+      const envId = process.env.SCF_NAMESPACE || 'zeno-d9g0gdvw4a57635c0';
+      const app = _cloudbase.init({ env: envId });
+      const ai = app.ai();
+      const model = ai.createModel('hunyuan-v3');
+
+      const result = await model.generateText({
+        model: 'hy3-preview',
+        messages,
+        temperature: 0.3,
+      });
+
+      const elapsed = Date.now() - startTime;
+
+      if (!result || !result.text) {
+        providerHealth.hybrid.last_failure = new Date().toISOString();
+        console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'no_reply', elapsed, docs_found: docs.length }));
+        return null;
+      }
+
+      // 6. 生成结果二次安全检查
+      if (isMedicalOutput(result.text)) {
+        providerHealth.hybrid.last_success = new Date().toISOString();
+        console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 200, reason: 'output_blocked', elapsed }));
+        return buildResponse(200, {
+          reply: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+          provider: 'system',
+          blocked: true,
+          knowledge_sources: [],
+          request_id: requestId,
+        }, '', allowedOrigins);
+      }
+
+      providerHealth.hybrid.last_success = new Date().toISOString();
+      console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 200, elapsed, docs_found: docs.length, reply_length: result.text.length, context_chars: usedChars }));
+
+      // 7. 构建知识库来源信息（只返回真正达阈值的文档 + 证据片段）
+      return buildResponse(200, {
+        reply: result.text,
+        provider: 'cloudbase-hybrid',
+        degraded: primaryProvider !== 'cloudbase-hybrid',
+        knowledge_sources: docs.map((d) => ({
+          source_group: d.source_group,
+          source_quality: d.source_quality,
+          chunk_title: d.chunk_title,
+          score: d.score,
+          matched_terms: d.matched_terms,
+          evidence: d.evidence,
+        })),
+        request_id: requestId,
+      }, '', allowedOrigins);
+    } catch (err) {
+      const elapsed = Date.now() - startTime;
+      providerHealth.hybrid.last_failure = new Date().toISOString();
+      const errType = err && err.constructor ? err.constructor.name : 'Error';
+      const errMsg = err && err.message ? err.message.slice(0, 300) : 'no_message';
+      lastCloudBaseError = { reason: 'hybrid_error', error_type: errType, error_message: errMsg, elapsed };
+      console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'error', error_type: errType, error_message: errMsg, elapsed }));
+      return null;
+    }
+  }
+
+  // -----------------------------------------------------------------------
   // 备用线路：CloudBase Agent（ai.bot.sendMessage 文本流 API）
   //
-  // 使用 cloudbase.SYMBOL_DEFAULT_ENV 避免硬编码环境 ID。
   // 需要 CLOUDBASE_BOT_ID 环境变量，缺少时跳过。
+  // 注意：Agent 运行为云托管，免费 AI 资源不可用，需切换计费模式后才能使用。
   // -----------------------------------------------------------------------
   async function tryCloudBase(normalized, requestId, startTime) {
     const botId = env.CLOUDBASE_BOT_ID;
@@ -336,10 +481,10 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     }
 
     try {
-      const app = _cloudbase.init({ env: _cloudbase.SYMBOL_DEFAULT_ENV });
+      const envId = process.env.SCF_NAMESPACE || 'zeno-d9g0gdvw4a57635c0';
+      const app = _cloudbase.init({ env: envId });
       const ai = app.ai();
 
-      // 当前 @cloudbase/ai SDK 接收最新问题 + 历史消息，不接收 threadId/runId。
       const latestMessage = normalized.messages.at(-1);
       const history = normalized.messages.slice(0, -1);
       const res = await ai.bot.sendMessage({
@@ -348,7 +493,6 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         history,
       });
 
-      // SDK 的 textStream 只暴露模型文本片段；流结束即视为完成。
       let text = '';
       let timedOut = false;
 
@@ -371,17 +515,14 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       } finally {
         clearTimeout(timeoutId);
       }
-      // 防止 streamPromise 在后台产生未捕获异常
       streamPromise.catch(() => {});
 
       const elapsed = Date.now() - startTime;
       text = text.trim();
 
-      // 超时或空答 → 判定失败
       if (timedOut || !text) {
-        const failReason = timedOut ? 'timeout' : 'no_reply';
         providerHealth.cloudbase.last_failure = new Date().toISOString();
-        console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: failReason, elapsed }));
+        console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: timedOut ? 'timeout' : 'no_reply', elapsed }));
         return null;
       }
 
@@ -396,7 +537,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
     } catch (err) {
       const elapsed = Date.now() - startTime;
       providerHealth.cloudbase.last_failure = new Date().toISOString();
-      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'error', reason: 'sdk_error', elapsed }));
+      console.log(JSON.stringify({ request_id: requestId, provider: 'cloudbase', status: 'error', error_type: err && err.constructor ? err.constructor.name : 'Error', elapsed }));
       return null;
     }
   }
@@ -423,13 +564,14 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
         status: 'ok',
         version: VERSION,
         providers: {
-          yuanqi: !!(env.YUANQI_APP_ID && env.YUANQI_APP_KEY),
+          hybrid: true,
           cloudbase: !!env.CLOUDBASE_BOT_ID,
+          yuanqi: !!(env.YUANQI_APP_ID && env.YUANQI_APP_KEY),
         },
-        // providers.* 仅表示"是否已配置"；last_success 表示"最近一次调用是否成功"，区分二者
         last_success: {
-          yuanqi: providerHealth.yuanqi.last_success,
+          hybrid: providerHealth.hybrid.last_success,
           cloudbase: providerHealth.cloudbase.last_success,
+          yuanqi: providerHealth.yuanqi.last_success,
         },
         primary: primaryProvider,
       }, origin, allowedOrigins);
@@ -479,9 +621,11 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       const startTime = Date.now();
 
       // 按优先级尝试线路
-      const providers = primaryProvider === 'yuanqi'
-        ? [tryYuanqi, tryCloudBase]
-        : [tryCloudBase, tryYuanqi];
+      const providers = primaryProvider === 'cloudbase'
+        ? [tryCloudBase, tryHybridRAG, tryYuanqi]
+        : primaryProvider === 'yuanqi'
+        ? [tryYuanqi, tryHybridRAG, tryCloudBase]
+        : [tryHybridRAG, tryCloudBase, tryYuanqi];
 
       for (const tryProvider of providers) {
         const result = await tryProvider(normalized, requestId, startTime);
@@ -516,7 +660,7 @@ const defaultRouter = createRouter({
     YUANQI_APP_ID: process.env.YUANQI_APP_ID,
     YUANQI_APP_KEY: process.env.YUANQI_APP_KEY,
     CLOUDBASE_BOT_ID: process.env.CLOUDBASE_BOT_ID,
-    PRIMARY_PROVIDER: process.env.PRIMARY_PROVIDER || 'yuanqi',
+    PRIMARY_PROVIDER: process.env.PRIMARY_PROVIDER || 'cloudbase-hybrid',
     ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765',
   },
 });

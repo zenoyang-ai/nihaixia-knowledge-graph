@@ -8,7 +8,11 @@
       "timeout": 120,
       "runtime": "Nodejs18.15",
       "memorySize": 256,
-      "installDependency": true
+      "installDependency": true,
+      "envVariables": {
+        "PRIMARY_PROVIDER": "cloudbase-hybrid",
+        "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
+      }
     },
     {
       "name": "nihaixia-qa-mp",
@@ -16,7 +20,10 @@
       "timeout": 60,
       "runtime": "Nodejs18.15",
       "memorySize": 256,
-      "installDependency": true
+      "installDependency": true,
+      "envVariables": {
+        "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
+      }
     }
   ]
 }

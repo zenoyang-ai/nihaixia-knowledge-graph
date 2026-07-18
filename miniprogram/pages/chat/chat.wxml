@@ -61,7 +61,7 @@
             <view class="typing-dot"></view>
           </view>
           <view class="msg-provider" wx:if="{{item.provider}}">
-            <text>{{item.provider === 'cloudbase-llm' ? '学习资料库' : item.provider === 'system' ? '系统' : item.provider === 'error' ? '错误' : '学习资料库'}}</text>
+            <text>{{item.provider === 'cloudbase-hybrid' ? '学习资料库' : item.provider === 'cloudbase-llm' ? '学习资料库' : item.provider === 'system' ? '系统' : item.provider === 'error' ? '错误' : '学习资料库'}}</text>
           </view>
           <view class="msg-retry" wx:if="{{item.provider === 'error'}}" bindtap="onRetry" data-question="{{item.retryQuestion}}">
             <text>重新发送</text>

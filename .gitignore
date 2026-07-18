@@ -47,6 +47,9 @@ venv/
 # Node.js
 node_modules/
 
+# 知识库数据文件（从上传包生成，不提交；用 scripts/generate-knowledge-base.js 重新生成）
+cloudbase/functions/*/knowledge-base.json
+
 # 交接文档（含本机路径）
 HANDOFF_TENCENT_QA.md
 

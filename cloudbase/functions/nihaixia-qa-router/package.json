@@ -1,7 +1,7 @@
 {
   "name": "nihaixia-qa-router",
-  "version": "2.0.1",
-  "description": "倪海厦知识库 AI 问答统一路由 — 双线路（元器 + CloudBase Agent）",
+  "version": "3.1.0",
+  "description": "倪海厦知识库 AI 问答统一路由 — 混合 RAG v2（BM25 检索 + generateText）+ 备用 Agent",
   "main": "index.js",
   "dependencies": {
     "@cloudbase/node-sdk": "^3.18.3",

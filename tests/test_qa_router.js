@@ -317,7 +317,10 @@ test('health exposes configuration flags but never values', async () => {
   const response = await router.main({ httpMethod: 'GET', headers: { origin: 'https://zenoyang-ai.github.io' } });
   const body = JSON.parse(response.body);
   assert.equal(response.statusCode, 200);
-  assert.deepEqual(body.providers, { yuanqi: true, cloudbase: true });
+  // v3.1.0: providers 包含 hybrid、cloudbase、yuanqi 三个键
+  assert.equal(body.providers.hybrid, true);
+  assert.equal(body.providers.cloudbase, true);
+  assert.equal(body.providers.yuanqi, true);
   assert.equal(response.body.includes('test-key'), false);
   assert.equal(response.body.includes('bot-456'), false);
 });
