@@ -4,6 +4,6 @@
   "description": "经典中医学习问答小程序云函数 — 直接调用 CloudBase Agent",
   "main": "index.js",
   "dependencies": {
-    "@cloudbase/node-sdk": "latest"
+    "@cloudbase/node-sdk": "^3.18.3"
   }
 }

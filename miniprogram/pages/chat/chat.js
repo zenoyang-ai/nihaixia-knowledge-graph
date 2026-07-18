@@ -200,7 +200,7 @@ Page({
             ...messages[idx],
             content: result.reply,
             html: formatContent(result.reply),
-            provider: result.provider || 'cloudbase-agent',
+            provider: result.provider || 'cloudbase-llm',
           };
         } else if (result.error) {
           messages[idx] = {

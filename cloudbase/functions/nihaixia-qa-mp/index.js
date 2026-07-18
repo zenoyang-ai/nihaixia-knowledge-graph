@@ -1,20 +1,20 @@
 /**
  * 经典中医学习问答 — 小程序专用云函数
  *
- * 直接调用 CloudBase Agent（ai.bot.sendMessage），不转发 nihaixia-qa-router。
+ * 直接调用 CloudBase LLM（ai.createModel("cloudbase").generateText），
+ * 不通过 TCBR Agent（云托管）—— 成长计划赠送的 AI 资源仅限小程序 SDK 与云函数消耗，
+ * 经 Agent 调用会被计费层拒绝。
  *
  * 官方 API 参考：
- *   https://docs.cloudbase.net/ai/sdk-reference/api#sendmessage
+ *   https://docs.cloudbase.net/ai/sdk-reference/api#generatetext
  *
- * 调用形式（经官方文档核实，2026-07-18）：
- *   const res = await ai.bot.sendMessage({ botId, msg, history });
- *   for await (const str of res.textStream) { ... }
- *   for await (const data of res.dataStream) { ... }  // AgentStreamChunk
+ * 调用形式：
+ *   const model = ai.createModel("cloudbase");
+ *   const res = await model.generateText({ model: "hy3-preview", messages });
+ *   // 返回 { text, rawResponses, messages, usage, error }
  *
- * 参数：botId（必填）、msg（必填）、history（必填，Array<{role, content}>）
- * 返回：StreamResult { textStream, dataStream }
- *
- * 不使用 threadId/runId/messages — 这些参数不在官方 SDK 中。
+ * 入参：msg（必填）、history（可选，Array<{role, content}>）、session_id（可选）
+ * 返回：{ reply, provider, request_id, ... } 或 { error, request_id, ... }
  *
  * 安全：
  *   - 微信自动透传 OpenID，通过 context.OPENID 获取
@@ -102,7 +102,7 @@ async function checkRateLimit(db, userHash) {
         minute_requests: [{ ts: nowTimestamp }],
         daily_count: 1,
         created_at: now.toISOString(),
-        ttl: new Date(nowTimestamp + 86400000 * 2).toISOString(), // 2 天后自动过期
+        ttl: new Date(nowTimestamp + 86400000 * 2), // 2 天后自动过期（Date 类型，配合 TTL 索引）
       });
       return { allowed: true, reason: null };
     }
@@ -154,48 +154,95 @@ async function checkRateLimit(db, userHash) {
 }
 
 // ---------------------------------------------------------------------------
-// 调用 CloudBase Agent
-//
-// 官方文档：https://docs.cloudbase.net/ai/sdk-reference/api#sendmessage
-// 参数：{ botId, msg, history }
-// 返回：{ textStream, dataStream }
-//
-// dataStream 中的 AgentStreamChunk 包含：
-//   type: "text" | "thinking" | "search" | "knowledge"
-//   content: 文本内容
-//   knowledge_base: 使用的知识库名称列表
+// 系统提示词 — 中性化、安全化
 // ---------------------------------------------------------------------------
-async function callCloudBaseAgent(ai, botId, msg, history) {
-  const res = await ai.bot.sendMessage({
-    botId,
-    msg,
-    history,
+const SYSTEM_PROMPT = `你是「中医经典研习助手」，专注于回答关于经典中医理论（人纪、天纪）的问题。你的回答应基于经典中医理论，准确、专业地解释相关学术观点和理论体系。
+
+回答规则：
+1. 基于经典中医理论进行回答，准确引用相关学术观点
+2. 如果不确定相关信息，请诚实告知
+3. 不提供具体的医疗诊断、处方或剂量建议，涉及此类问题时引导用户咨询专业医师
+4. 回答时请注明内容来源（如：人纪/天纪/具体课程）
+5. 保持客观中立，不添加个人观点
+6. 回答使用中文，语言简洁明了`;
+
+// ---------------------------------------------------------------------------
+// 直接调用 LLM（不通过 TCBR Agent）
+//
+// 官方文档：https://docs.cloudbase.net/ai/sdk-reference/api#generatetext
+// 参数：{ model, messages }
+// 返回：{ text, rawResponses, messages, usage, error }
+//
+// 使用 ai.createModel("cloudbase").generateText() 直接从云函数调用 LLM，
+// 避免通过 TCBR Agent（云托管）调用导致 AI 资源消耗被拒绝。
+// ---------------------------------------------------------------------------
+async function callLLMDirectly(ai, msg, history) {
+  const model = ai.createModel('cloudbase');
+
+  // 构建 messages 数组：system + history + user
+  const messages = [
+    { role: 'system', content: SYSTEM_PROMPT },
+  ];
+
+  // 添加历史对话（history 已被过滤为最近 6 条）
+  if (Array.isArray(history) && history.length > 0) {
+    for (const h of history) {
+      messages.push({
+        role: h.role === 'bot' ? 'assistant' : h.role,
+        content: h.content,
+      });
+    }
+  }
+
+  // 添加当前用户消息
+  messages.push({ role: 'user', content: msg });
+
+  console.log(JSON.stringify({
+    event: 'llm_call_start',
+    model: 'hy3-preview',
+    message_count: messages.length,
+    history_count: history ? history.length : 0,
+  }));
+
+  const res = await model.generateText({
+    model: 'hy3-preview',
+    messages,
   });
 
-  let text = '';
-  let knowledgeBase = [];
-  let recordId = '';
-
-  // 从 textStream 聚合文本
-  for await (const chunk of res.textStream) {
-    if (typeof chunk === 'string') text += chunk;
-  }
-
-  // 从 dataStream 获取知识库等元数据
-  try {
-    for await (const data of res.dataStream) {
-      if (data && data.type === 'knowledge' && data.knowledge_base) {
-        knowledgeBase = data.knowledge_base;
-      }
-      if (data && data.record_id) {
-        recordId = data.record_id;
-      }
+  // 检查错误
+  let hasError = false;
+  let errorMsg = '';
+  if (res.error) {
+    hasError = true;
+    try {
+      errorMsg = typeof res.error === 'string'
+        ? res.error.slice(0, 500)
+        : JSON.stringify(res.error).slice(0, 500);
+    } catch {
+      errorMsg = String(res.error).slice(0, 500);
     }
-  } catch {
-    // dataStream 读取失败不影响文本结果
+    console.log(JSON.stringify({
+      event: 'llm_error',
+      error: errorMsg,
+    }));
   }
 
-  return { text: text.trim(), knowledgeBase, recordId };
+  const text = res.text || '';
+
+  console.log(JSON.stringify({
+    event: 'llm_call_end',
+    has_text: text.length > 0,
+    text_length: text.length,
+    has_error: hasError,
+  }));
+
+  return {
+    text: text.trim(),
+    knowledgeBase: [],
+    recordId: '',
+    hasError,
+    errorMsg,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +295,9 @@ exports.main = async (event, context) => {
   // 初始化 CloudBase
   let app, ai, db;
   try {
-    app = cloudbase.init({ env: cloudbase.SYMBOL_DEFAULT_ENV });
+    // 云函数环境中，优先用环境变量 SCF_NAMESPACE，否则显式指定
+    const envId = process.env.SCF_NAMESPACE || 'zeno-d9g0gdvw4a57635c0';
+    app = cloudbase.init({ env: envId });
     ai = app.ai();
     db = app.database();
   } catch (err) {
@@ -284,38 +333,38 @@ exports.main = async (event, context) => {
     };
   }
 
-  // 获取 Bot ID
-  const botId = process.env.CLOUDBASE_BOT_ID;
-  if (!botId) {
-    console.log(JSON.stringify({
-      request_id: requestId,
-      status: 500,
-      reason: 'bot_id_not_configured',
-      elapsed: Date.now() - startTime,
-    }));
-    return {
-      error: '问答服务未配置，请联系管理员',
-      request_id: requestId,
-    };
-  }
-
   // 构建 history（从 event.history 传入，或为空）
+  // 直接调用 LLM 时，history 保持原始 role（assistant/user），
+  // callLLMDirectly 会自行处理角色映射。
   let history = [];
   if (Array.isArray(event.history)) {
     // 只保留最近 6 条（3 轮对话），过滤无效项
     history = event.history
       .filter((h) => h && h.role && h.content)
       .slice(-6)
-      .map((h) => ({
-        role: h.role === 'assistant' ? 'bot' : h.role,
-        content: h.content,
-      }));
+      .map((h) => ({ role: h.role, content: h.content }));
   }
 
-  // 调用 Agent
+  // 直接调用 LLM（不经过 TCBR Agent）
   try {
-    const result = await callCloudBaseAgent(ai, botId, trimmedMsg, history);
+    const result = await callLLMDirectly(ai, trimmedMsg, history);
     const elapsed = Date.now() - startTime;
+
+    // LLM 返回错误（如模型不可用、超限等）
+    if (result.hasError && !result.text) {
+      console.log(JSON.stringify({
+        request_id: requestId,
+        status: 502,
+        reason: 'llm_error_chunk',
+        error: result.errorMsg,
+        elapsed,
+      }));
+      return {
+        error: '问答服务暂时不可用，请稍后重试',
+        request_id: requestId,
+        retry: true,
+      };
+    }
 
     if (!result.text) {
       console.log(JSON.stringify({
@@ -334,24 +383,29 @@ exports.main = async (event, context) => {
     console.log(JSON.stringify({
       request_id: requestId,
       status: 200,
-      provider: 'cloudbase-agent',
+      provider: 'cloudbase-llm',
       elapsed,
       has_knowledge: result.knowledgeBase.length > 0,
     }));
 
     return {
       reply: result.text,
-      provider: 'cloudbase-agent',
+      provider: 'cloudbase-llm',
       thread_id: sessionId || requestId,
       request_id: requestId,
       knowledge_sources: result.knowledgeBase,
     };
   } catch (err) {
     const elapsed = Date.now() - startTime;
+    // 记录错误类型和消息（不记录用户问题全文）
+    const errType = err && err.constructor ? err.constructor.name : 'Error';
+    const errMsg = err && err.message ? err.message.slice(0, 200) : 'unknown';
     console.log(JSON.stringify({
       request_id: requestId,
       status: 500,
-      reason: 'agent_error',
+      reason: 'llm_error',
+      error_type: errType,
+      error_message: errMsg,
       elapsed,
     }));
     return {
