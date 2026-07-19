@@ -1,0 +1,63 @@
+<!--pages/history/history.wxml-->
+<view class="history-container">
+
+  <!-- 顶部操作栏 -->
+  <view class="history-toolbar" wx:if="{{!isEmpty}}">
+    <view class="history-toolbar-left">
+      <text class="history-toolbar-text">共 {{sessions.length}} 条对话记录</text>
+    </view>
+    <view class="history-clear-btn" bindtap="onClearAll">
+      <text>清空全部</text>
+    </view>
+  </view>
+
+  <!-- 对话列表 -->
+  <scroll-view class="history-list" scroll-y wx:if="{{!isEmpty}}" enhanced show-scrollbar="{{false}}">
+    <view
+      class="history-card"
+      wx:for="{{sessions}}"
+      wx:key="sessionId"
+    >
+      <view
+        class="history-card-main"
+        bindtap="onContinueSession"
+        data-session-id="{{item.sessionId}}"
+      >
+        <view class="history-card-title">
+          <text>{{item.title || '未命名对话'}}</text>
+        </view>
+        <view class="history-card-preview" wx:if="{{item.preview}}">
+          <text>{{item.preview}}</text>
+        </view>
+        <view class="history-card-meta">
+          <text>{{item.messageCount}} 条消息 · {{item.updatedAtText}}</text>
+        </view>
+      </view>
+      <view
+        class="history-card-delete"
+        bindtap="onDeleteSession"
+        data-session-id="{{item.sessionId}}"
+      >
+        <text>删除</text>
+      </view>
+    </view>
+    <view class="history-bottom-spacer"></view>
+  </scroll-view>
+
+  <!-- 空状态 -->
+  <view class="history-empty" wx:if="{{isEmpty}}">
+    <view class="history-empty-icon">
+      <text>无</text>
+    </view>
+    <view class="history-empty-text">
+      <text>还没有学习对话记录</text>
+    </view>
+    <view class="history-empty-hint">
+      <text>从主页开始第一次对话</text>
+    </view>
+    <view class="history-empty-btn" bindtap="onBackHome">
+      <text>返回主页</text>
+    </view>
+  </view>
+
+</view>

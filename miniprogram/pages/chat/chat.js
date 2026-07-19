@@ -8,9 +8,10 @@ const MEDICAL_PATTERNS = [
   /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治)/,
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
   /(?:救命|急救|危重|抢救|快不行)/,
-  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析)/,
+  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
+  /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症).{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐)/,
 ];
 
 function isMedicalRequest(text) {
@@ -97,9 +98,144 @@ function formatContent(text) {
 }
 
 // ===========================================================================
+// 把一段 markdown 文本拆成"可选择的段落"列表
+// 规则：按双换行（或单换行后是列表/标题/引用）拆段，过滤空段
+// 每段保留原始文本（含 markdown 标记），用于复制
+// ===========================================================================
+function splitParagraphs(text) {
+  if (!text) return [];
+  // 先按双换行拆块
+  const blocks = text.split(/\n\s*\n/);
+  const paragraphs = [];
+  for (const block of blocks) {
+    const trimmed = block.trim();
+    if (!trimmed) continue;
+    // 如果块本身是多行（如列表），保持整块为一段
+    // 如果块是单行，直接加入
+    // 进一步：如果块内部包含多个独立段落（例如引用块 + 普通段），可按单行细分
+    // 这里采用保守策略：把多行块按行拆，连续的非列表/非引用行合并
+    const lines = trimmed.split('\n');
+    let buffer = [];
+    for (const line of lines) {
+      const lt = line.trim();
+      if (!lt) {
+        if (buffer.length > 0) {
+          paragraphs.push(buffer.join('\n'));
+          buffer = [];
+        }
+        continue;
+      }
+      // 列表项、标题、引用作为独立段
+      if (/^(\d+\.|[-*]|>|#{1,6}\s)/.test(lt)) {
+        if (buffer.length > 0) {
+          paragraphs.push(buffer.join('\n'));
+          buffer = [];
+        }
+        paragraphs.push(lt);
+      } else {
+        buffer.push(lt);
+      }
+    }
+    if (buffer.length > 0) {
+      paragraphs.push(buffer.join('\n'));
+    }
+  }
+  return paragraphs;
+}
+
+// ===========================================================================
+// 会话持久化工具
+// 存储结构：
+//   chat_sessions: [{ sessionId, title, messageCount, updatedAt, updatedAtText, preview }]
+//   chat_messages_<sessionId>: [{ id, role, content, html, provider, sources, hasSources, retryQuestion }]
+// ===========================================================================
+const SESSIONS_KEY = 'chat_sessions';
+
+function loadSessions() {
+  try {
+    return wx.getStorageSync(SESSIONS_KEY) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveSessions(sessions) {
+  try {
+    wx.setStorageSync(SESSIONS_KEY, sessions);
+  } catch (e) {
+    console.error('saveSessions failed', e);
+  }
+}
+
+function loadMessages(sessionId) {
+  try {
+    return wx.getStorageSync('chat_messages_' + sessionId) || [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function saveMessages(sessionId, messages) {
+  try {
+    // 只保存必要字段，避免存储过大
+    const slim = messages.map(m => ({
+      id: m.id,
+      role: m.role,
+      content: m.content || '',
+      html: m.html || '',
+      provider: m.provider || '',
+      sources: m.sources || [],
+      hasSources: !!m.hasSources,
+      retryQuestion: m.retryQuestion || '',
+    }));
+    wx.setStorageSync('chat_messages_' + sessionId, slim);
+  } catch (e) {
+    console.error('saveMessages failed', e);
+  }
+}
+
+function updateSessionMeta(sessionId, messages) {
+  const sessions = loadSessions();
+  let session = sessions.find(s => s.sessionId === sessionId);
+  const now = Date.now();
+
+  // 生成标题：取第一条 user 消息的前 30 字
+  const firstUserMsg = messages.find(m => m.role === 'user' && m.content);
+  const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : '未命名对话';
+
+  // 预览：取最后一条 AI 消息的前 50 字
+  const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.content);
+  const preview = lastAiMsg ? lastAiMsg.content.slice(0, 50) : '';
+
+  // 格式化时间
+  const date = new Date(now);
+  const pad = n => n < 10 ? '0' + n : '' + n;
+  const updatedAtText = `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+
+  if (session) {
+    session.title = title;
+    session.messageCount = messages.length;
+    session.updatedAt = now;
+    session.updatedAtText = updatedAtText;
+    session.preview = preview;
+  } else {
+    sessions.push({
+      sessionId,
+      title,
+      messageCount: messages.length,
+      updatedAt: now,
+      updatedAtText,
+      preview,
+    });
+  }
+
+  saveSessions(sessions);
+}
+
+// ===========================================================================
 // 页面逻辑
 // ===========================================================================
-const MAX_HISTORY = 6; // 保留最近 6 条消息（3 轮对话）
+const MAX_HISTORY = 6; // 保留最近 6 条消息（3 轮对话）传给云函数
 
 Page({
   data: {
@@ -117,13 +253,44 @@ Page({
     ],
     msgIdCounter: 0,
     lastFailedQuestion: '', // 用于重新发送
+    // 段落复制弹层
+    copyPanelVisible: false,
+    copyParagraphs: [],
+    copyTitle: '选择段落复制',
   },
 
-  onLoad() {
-    // 生成会话 ID，页面生命周期内保持不变
-    this.setData({
-      sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
-    });
+  onLoad(options) {
+    let sessionId = '';
+    let mode = '';
+
+    if (options && options.sessionId) {
+      // 从历史记录进入：加载已有会话
+      sessionId = options.sessionId;
+      mode = 'resume';
+    } else if (options && options.mode === 'new') {
+      // 从主页"开始学习对话"进入：新会话
+      sessionId = '';
+      mode = 'new';
+    } else {
+      // 默认进入：新会话
+      mode = 'new';
+    }
+
+    if (mode === 'resume' && sessionId) {
+      const messages = loadMessages(sessionId);
+      const maxId = messages.reduce((max, m) => Math.max(max, m.id || 0), 0);
+      this.setData({
+        sessionId,
+        messages,
+        msgIdCounter: maxId,
+        scrollToView: messages.length > 0 ? 'msg-' + maxId : '',
+      });
+    } else {
+      // 新会话
+      this.setData({
+        sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      });
+    }
   },
 
   // 输入处理 — 同步更新 canSend，避免 WXML 调用字符串方法
@@ -163,29 +330,30 @@ Page({
 
   // 实际发送逻辑 — 接收已确认的文本，避免依赖 setData 时序
   async sendQuestion(text) {
-
     // 客户端即时医疗提示（服务端是最终边界）
     if (isMedicalRequest(text)) {
       const warnId = this.data.msgIdCounter + 1;
+      const newMessages = [
+        ...this.data.messages,
+        { id: warnId, role: 'user', content: text },
+        {
+          id: warnId + 1,
+          role: 'assistant',
+          content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+          html: '<p style="margin:8rpx 0;color:#B94736;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
+          provider: 'system',
+          sources: [],
+          hasSources: false,
+        },
+      ];
       this.setData({
-        msgIdCounter: warnId,
-        messages: [
-          ...this.data.messages,
-          { id: warnId, role: 'user', content: text },
-          {
-            id: warnId + 1,
-            role: 'assistant',
-            content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
-            html: '<p style="margin:8rpx 0;color:#B94736;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
-            provider: 'system',
-            sources: [],
-            hasSources: false,
-          },
-        ],
+        msgIdCounter: warnId + 1,
+        messages: newMessages,
         inputValue: '',
         canSend: false,
         scrollToView: 'msg-' + (warnId + 1),
       });
+      this._persist();
       return;
     }
 
@@ -212,6 +380,7 @@ Page({
       lastFailedQuestion: '',
       scrollToView: 'msg-' + aiMsgId,
     });
+    this._persist();
 
     try {
       // 调用云函数，只传当前问题和会话 ID
@@ -256,6 +425,7 @@ Page({
         loading: false,
         scrollToView: 'msg-' + aiMsgId,
       });
+      this._persist();
     } catch (err) {
       const messages = this.data.messages;
       const idx = messages.findIndex(m => m.id === aiMsgId);
@@ -277,7 +447,15 @@ Page({
         lastFailedQuestion: text,
         scrollToView: 'msg-' + aiMsgId,
       });
+      this._persist();
     }
+  },
+
+  // 持久化当前会话
+  _persist() {
+    if (!this.data.sessionId) return;
+    saveMessages(this.data.sessionId, this.data.messages);
+    updateSessionMeta(this.data.sessionId, this.data.messages);
   },
 
   // 云函数调用 — 直接调用 nihaixia-qa-mp（不再转发 router）
@@ -308,9 +486,11 @@ Page({
   onClearChat() {
     wx.showModal({
       title: '新对话',
-      content: '确定开始新的学习对话吗？当前对话记录将被清空。',
+      content: '确定开始新的学习对话吗？当前对话将保存到历史记录。',
+      confirmText: '开始新对话',
       success: (res) => {
         if (res.confirm) {
+          // 保存旧会话（已经保存过了，这里只清理页面状态）
           this.setData({
             messages: [],
             msgIdCounter: 0,
@@ -345,26 +525,84 @@ Page({
     });
   },
 
-  // 长按消息 — 提供复制菜单
+  // 长按消息 — 提供复制菜单（全文 / 选择段落）
   onLongPressMessage(e) {
     const content = e.currentTarget.dataset.content;
     if (!content) return;
+
+    const paragraphs = splitParagraphs(content);
+
     wx.showActionSheet({
-      itemList: ['复制全文'],
+      itemList: paragraphs.length > 1 ? ['复制全文', '选择段落复制'] : ['复制全文'],
       success: (res) => {
         if (res.tapIndex === 0) {
+          // 复制全文
           wx.setClipboardData({
             data: content,
             success: () => {
               wx.showToast({
-                title: '已复制',
+                title: '已复制全文',
                 icon: 'success',
                 duration: 1500,
               });
             },
           });
+        } else if (res.tapIndex === 1 && paragraphs.length > 1) {
+          // 打开段落选择弹层
+          this.setData({
+            copyPanelVisible: true,
+            copyParagraphs: paragraphs,
+            copyTitle: '选择段落复制',
+          });
         }
       },
+    });
+  },
+
+  // 点击某个段落进行复制
+  onCopyParagraph(e) {
+    const idx = e.currentTarget.dataset.index;
+    const paragraphs = this.data.copyParagraphs;
+    if (idx < 0 || idx >= paragraphs.length) return;
+
+    const text = paragraphs[idx];
+    wx.setClipboardData({
+      data: text,
+      success: () => {
+        wx.showToast({
+          title: '已复制该段',
+          icon: 'success',
+          duration: 1500,
+        });
+        this.setData({ copyPanelVisible: false });
+      },
+    });
+  },
+
+  // 关闭段落选择弹层
+  onCloseCopyPanel() {
+    this.setData({ copyPanelVisible: false });
+  },
+
+  // 阻止弹层内部点击事件冒泡
+  onCopyPanelTap() {
+    // 空函数，仅用于 catchtap 阻止冒泡
+  },
+
+  // 返回主页
+  onBackHome() {
+    wx.navigateBack({
+      delta: 1,
+      fail: () => {
+        wx.reLaunch({ url: '/pages/index/index' });
+      },
+    });
+  },
+
+  // 查看历史记录
+  onViewHistory() {
+    wx.navigateTo({
+      url: '/pages/history/history',
     });
   },
 
@@ -372,7 +610,7 @@ Page({
   onShareAppMessage() {
     return {
       title: '经典中医学习问答',
-      path: '/pages/chat/chat',
+      path: '/pages/index/index',
     };
   },
 });

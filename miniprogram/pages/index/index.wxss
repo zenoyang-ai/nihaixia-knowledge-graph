@@ -1,0 +1,205 @@
+/* pages/index/index.wxss
+ *
+ * 主页样式：案头学习索引风格
+ * 底色 #F7F7F4 / 墨色 #263238 / 辅助 #6B767A
+ * 主操作 #B94736 / 资料库状态 #55776C
+ */
+
+.index-container {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background-color: #F7F7F4;
+  padding: 0 40rpx;
+}
+
+/* ===========================
+ * 顶部标题区
+ * =========================== */
+.index-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 80rpx 0 40rpx;
+}
+
+.index-hero-badge {
+  display: inline-block;
+  padding: 8rpx 20rpx;
+  background: rgba(85, 119, 108, 0.08);
+  border: 1rpx solid rgba(85, 119, 108, 0.18);
+  border-radius: 10rpx;
+  margin-bottom: 28rpx;
+}
+
+.index-hero-badge text {
+  font-size: 22rpx;
+  color: #55776C;
+  letter-spacing: 0.06em;
+}
+
+.index-hero-title {
+  margin-bottom: 16rpx;
+}
+
+.index-hero-title text {
+  font-size: 52rpx;
+  font-weight: 600;
+  color: #263238;
+  letter-spacing: 0.02em;
+  line-height: 1.25;
+}
+
+.index-hero-subtitle {
+  margin-bottom: 20rpx;
+}
+
+.index-hero-subtitle text {
+  font-size: 28rpx;
+  color: #6B767A;
+  line-height: 1.6;
+}
+
+.index-hero-warn {
+  padding: 12rpx 20rpx;
+  background: rgba(185, 71, 54, 0.06);
+  border: 1rpx solid rgba(185, 71, 54, 0.14);
+  border-radius: 10rpx;
+}
+
+.index-hero-warn text {
+  font-size: 22rpx;
+  color: #B94736;
+  letter-spacing: 0.02em;
+  line-height: 1.5;
+}
+
+/* ===========================
+ * 主操作按钮
+ * =========================== */
+.index-actions {
+  margin: 20rpx 0 56rpx;
+}
+
+.index-primary-btn {
+  width: 100%;
+  height: 96rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #55776C;
+  border-radius: 14rpx;
+  transition: all 0.18s;
+}
+
+.index-primary-btn:active {
+  background: #3E5A52;
+  transform: scale(0.985);
+}
+
+.index-primary-btn text {
+  color: #FFFFFF;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+}
+
+/* ===========================
+ * 最近对话
+ * =========================== */
+.index-recent {
+  flex: 1;
+}
+
+.index-section-title {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 20rpx;
+}
+
+.index-section-title-text {
+  font-size: 26rpx;
+  font-weight: 600;
+  color: #263238;
+  letter-spacing: 0.06em;
+}
+
+.index-section-title-action {
+  font-size: 22rpx;
+  color: #55776C;
+  letter-spacing: 0.02em;
+}
+
+.index-section-title-action:active {
+  color: #3E5A52;
+}
+
+.index-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 16rpx;
+}
+
+.index-session-card {
+  padding: 22rpx 26rpx;
+  background: #FFFFFF;
+  border: 1rpx solid #DCE2DD;
+  border-radius: 12rpx;
+  transition: all 0.18s;
+}
+
+.index-session-card:active {
+  background: #F4F7F4;
+  border-color: #55776C;
+}
+
+.index-session-card-title {
+  margin-bottom: 8rpx;
+}
+
+.index-session-card-title text {
+  font-size: 28rpx;
+  color: #263238;
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.index-session-card-meta {
+  display: flex;
+  align-items: center;
+}
+
+.index-session-card-meta text {
+  font-size: 22rpx;
+  color: #9AA1A4;
+  letter-spacing: 0.02em;
+}
+
+/* ===========================
+ * 空状态
+ * =========================== */
+.index-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+
+.index-empty-text text {
+  font-size: 28rpx;
+  color: #6B767A;
+  margin-bottom: 12rpx;
+}
+
+.index-empty-hint text {
+  font-size: 22rpx;
+  color: #9AA1A4;
+  letter-spacing: 0.04em;
+}

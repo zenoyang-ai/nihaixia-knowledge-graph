@@ -1,14 +1,16 @@
 {
   "desc": "数字问渡经典学习问答助手",
   "pages": [
-    "pages/chat/chat"
+    "pages/index/index",
+    "pages/chat/chat",
+    "pages/history/history"
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#fffaf1",
+    "navigationBarBackgroundColor": "#F7F7F4",
     "navigationBarTitleText": "经典中医学习",
     "navigationBarTextStyle": "black",
-    "backgroundColor": "#f6f0e6"
+    "backgroundColor": "#F7F7F4"
   },
   "sitemapLocation": "sitemap.json",
   "style": "v2",

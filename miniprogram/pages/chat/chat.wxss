@@ -13,6 +13,65 @@
 }
 
 /* ===========================
+ * 顶部导航栏（返回 + 标题 + 历史）
+ * =========================== */
+.chat-navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 28rpx;
+  background: rgba(247, 247, 244, 0.96);
+  border-bottom: 1rpx solid #DCE2DD;
+  flex-shrink: 0;
+}
+
+.chat-navbar-back {
+  padding: 8rpx 20rpx 8rpx 0;
+  min-width: 120rpx;
+}
+
+.chat-navbar-back text {
+  font-size: 28rpx;
+  color: #55776C;
+  letter-spacing: 0.02em;
+}
+
+.chat-navbar-back:active text {
+  color: #3E5A52;
+}
+
+.chat-navbar-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.chat-navbar-title text {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #263238;
+  letter-spacing: 0.04em;
+}
+
+.chat-navbar-history {
+  padding: 8rpx 0 8rpx 20rpx;
+  min-width: 120rpx;
+  display: flex;
+  justify-content: flex-end;
+}
+
+.chat-navbar-history text {
+  font-size: 26rpx;
+  color: #55776C;
+  letter-spacing: 0.02em;
+}
+
+.chat-navbar-history:active text {
+  color: #3E5A52;
+}
+
+/* ===========================
  * 对话状态栏（对话中显示）
  * =========================== */
 .chat-statusbar {
@@ -481,6 +540,157 @@
 
 .chat-input-hint text {
   font-size: 18rpx;
+  color: #9AA1A4;
+  letter-spacing: 0.04em;
+}
+
+/* ===========================
+ * 段落复制弹层
+ * =========================== */
+.copy-panel-mask {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+
+.copy-panel {
+  width: 100%;
+  max-height: 80vh;
+  background: #FFFFFF;
+  border-radius: 20rpx 20rpx 0 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: copyPanelSlideUp 0.2s ease-out;
+}
+
+@keyframes copyPanelSlideUp {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+.copy-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24rpx 28rpx;
+  border-bottom: 1rpx solid #DCE2DD;
+  flex-shrink: 0;
+}
+
+.copy-panel-title {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #263238;
+  letter-spacing: 0.04em;
+}
+
+.copy-panel-close {
+  width: 56rpx;
+  height: 56rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.copy-panel-close text {
+  font-size: 44rpx;
+  color: #9AA1A4;
+  line-height: 1;
+}
+
+.copy-panel-close:active text {
+  color: #6B767A;
+}
+
+.copy-panel-body {
+  flex: 1;
+  padding: 16rpx 28rpx;
+  max-height: 60vh;
+}
+
+.copy-paragraph-item {
+  display: flex;
+  align-items: flex-start;
+  padding: 20rpx 0;
+  border-bottom: 1rpx solid #EEF1ED;
+}
+
+.copy-paragraph-item:last-child {
+  border-bottom: none;
+}
+
+.copy-paragraph-num {
+  width: 48rpx;
+  height: 48rpx;
+  border-radius: 8rpx;
+  background: rgba(85, 119, 108, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-right: 18rpx;
+}
+
+.copy-paragraph-num text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #55776C;
+}
+
+.copy-paragraph-content {
+  flex: 1;
+  min-width: 0;
+  padding-right: 16rpx;
+}
+
+.copy-paragraph-content text {
+  font-size: 27rpx;
+  color: #263238;
+  line-height: 1.65;
+  word-break: break-word;
+}
+
+.copy-paragraph-action {
+  flex-shrink: 0;
+  padding: 8rpx 18rpx;
+  background: rgba(85, 119, 108, 0.08);
+  border: 1rpx solid rgba(85, 119, 108, 0.18);
+  border-radius: 8rpx;
+  align-self: center;
+}
+
+.copy-paragraph-action text {
+  font-size: 22rpx;
+  color: #55776C;
+  letter-spacing: 0.04em;
+}
+
+.copy-paragraph-item:active .copy-paragraph-action {
+  background: #55776C;
+}
+
+.copy-paragraph-item:active .copy-paragraph-action text {
+  color: #FFFFFF;
+}
+
+.copy-panel-footer {
+  padding: 18rpx 28rpx;
+  background: #F7F7F4;
+  border-top: 1rpx solid #DCE2DD;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+.copy-panel-footer text {
+  font-size: 22rpx;
   color: #9AA1A4;
   letter-spacing: 0.04em;
 }

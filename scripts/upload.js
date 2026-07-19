@@ -7,8 +7,8 @@ const path = require('path');
 
 const PROJECT_PATH = path.resolve(__dirname, '..');
 const APP_ID = 'wx11826bcc1883aa28';
-const VERSION = '3.1.1';
-const DESC = '数字问渡经典学习问答助手 — direct LLM 迁移体验版';
+const VERSION = '5.2.0';
+const DESC = 'v5.2.0 新增主页+历史记录+段落复制+返回导航';
 
 async function main() {
   const keyPath = process.argv[2];

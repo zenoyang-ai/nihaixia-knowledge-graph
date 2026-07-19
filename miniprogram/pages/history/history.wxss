@@ -1,0 +1,202 @@
+/* pages/history/history.wxss */
+
+.history-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  background-color: #F7F7F4;
+}
+
+/* ===========================
+ * 顶部工具栏
+ * =========================== */
+.history-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 32rpx;
+  background: rgba(247, 247, 244, 0.96);
+  border-bottom: 1rpx solid #DCE2DD;
+  flex-shrink: 0;
+}
+
+.history-toolbar-text {
+  font-size: 24rpx;
+  color: #6B767A;
+  letter-spacing: 0.02em;
+}
+
+.history-clear-btn {
+  padding: 8rpx 22rpx;
+  background: transparent;
+  border: 1rpx solid #DCE2DD;
+  border-radius: 10rpx;
+}
+
+.history-clear-btn text {
+  font-size: 22rpx;
+  color: #B94736;
+  letter-spacing: 0.04em;
+}
+
+.history-clear-btn:active {
+  background: rgba(185, 71, 54, 0.06);
+  border-color: #B94736;
+}
+
+/* ===========================
+ * 对话列表
+ * =========================== */
+.history-list {
+  flex: 1;
+  padding: 16rpx 24rpx;
+}
+
+.history-card {
+  display: flex;
+  align-items: stretch;
+  background: #FFFFFF;
+  border: 1rpx solid #DCE2DD;
+  border-radius: 12rpx;
+  margin-bottom: 16rpx;
+  overflow: hidden;
+}
+
+.history-card-main {
+  flex: 1;
+  padding: 22rpx 26rpx;
+  min-width: 0;
+}
+
+.history-card-main:active {
+  background: #F4F7F4;
+}
+
+.history-card-title {
+  margin-bottom: 8rpx;
+}
+
+.history-card-title text {
+  font-size: 28rpx;
+  color: #263238;
+  font-weight: 500;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.history-card-preview {
+  margin-bottom: 10rpx;
+}
+
+.history-card-preview text {
+  font-size: 24rpx;
+  color: #9AA1A4;
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+}
+
+.history-card-meta {
+  display: flex;
+  align-items: center;
+}
+
+.history-card-meta text {
+  font-size: 22rpx;
+  color: #9AA1A4;
+  letter-spacing: 0.02em;
+}
+
+.history-card-delete {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 28rpx;
+  background: rgba(185, 71, 54, 0.04);
+  border-left: 1rpx solid #DCE2DD;
+}
+
+.history-card-delete text {
+  font-size: 24rpx;
+  color: #B94736;
+  letter-spacing: 0.02em;
+}
+
+.history-card-delete:active {
+  background: rgba(185, 71, 54, 0.14);
+}
+
+.history-bottom-spacer {
+  height: 32rpx;
+}
+
+/* ===========================
+ * 空状态
+ * =========================== */
+.history-empty {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 80rpx 0;
+}
+
+.history-empty-icon {
+  width: 120rpx;
+  height: 120rpx;
+  border-radius: 50%;
+  background: #EEF1ED;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 32rpx;
+}
+
+.history-empty-icon text {
+  font-size: 36rpx;
+  color: #9AA1A4;
+  font-weight: 600;
+}
+
+.history-empty-text {
+  margin-bottom: 12rpx;
+}
+
+.history-empty-text text {
+  font-size: 30rpx;
+  color: #6B767A;
+}
+
+.history-empty-hint {
+  margin-bottom: 40rpx;
+}
+
+.history-empty-hint text {
+  font-size: 24rpx;
+  color: #9AA1A4;
+  letter-spacing: 0.04em;
+}
+
+.history-empty-btn {
+  padding: 16rpx 48rpx;
+  background: #55776C;
+  border-radius: 12rpx;
+}
+
+.history-empty-btn text {
+  color: #FFFFFF;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+}
+
+.history-empty-btn:active {
+  background: #3E5A52;
+  transform: scale(0.985);
+}

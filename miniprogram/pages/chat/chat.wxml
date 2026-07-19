@@ -1,6 +1,19 @@
 <!--pages/chat/chat.wxml-->
 <view class="chat-container">
 
+  <!-- 顶部导航栏（返回 + 标题 + 历史） -->
+  <view class="chat-navbar">
+    <view class="chat-navbar-back" bindtap="onBackHome">
+      <text>‹ 返回</text>
+    </view>
+    <view class="chat-navbar-title">
+      <text>学习对话</text>
+    </view>
+    <view class="chat-navbar-history" bindtap="onViewHistory">
+      <text>历史</text>
+    </view>
+  </view>
+
   <!-- 对话状态栏（仅对话中显示） -->
   <view class="chat-statusbar" wx:if="{{messages.length > 0}}">
     <view class="chat-statusbar-left">
@@ -93,8 +106,8 @@
           data-id="{{item.id}}"
         >
           <block wx:if="{{item.content}}">
-            <rich-text nodes="{{item.html}}" wx:if="{{item.html}}"></rich-text>
-            <text wx:else>{{item.content}}</text>
+            <rich-text nodes="{{item.html}}" wx:if="{{item.html}}" user-select="{{true}}"></rich-text>
+            <text wx:else user-select="{{true}}">{{item.content}}</text>
           </block>
           <view wx:else class="typing-dots">
             <view class="typing-dot"></view>
@@ -151,6 +164,40 @@
     </view>
     <view class="chat-input-hint">
       <text>学习资料库 · 不提供诊断、处方或剂量建议</text>
+    </view>
+  </view>
+
+  <!-- 段落复制弹层 -->
+  <view class="copy-panel-mask" wx:if="{{copyPanelVisible}}" bindtap="onCloseCopyPanel">
+    <view class="copy-panel" catchtap="onCopyPanelTap">
+      <view class="copy-panel-header">
+        <text class="copy-panel-title">{{copyTitle}}</text>
+        <view class="copy-panel-close" bindtap="onCloseCopyPanel">
+          <text>×</text>
+        </view>
+      </view>
+      <scroll-view class="copy-panel-body" scroll-y enhanced show-scrollbar="{{false}}">
+        <view
+          class="copy-paragraph-item"
+          wx:for="{{copyParagraphs}}"
+          wx:key="index"
+          bindtap="onCopyParagraph"
+          data-index="{{index}}"
+        >
+          <view class="copy-paragraph-num">
+            <text>{{index + 1}}</text>
+          </view>
+          <view class="copy-paragraph-content">
+            <text user-select="{{true}}">{{item}}</text>
+          </view>
+          <view class="copy-paragraph-action">
+            <text>复制</text>
+          </view>
+        </view>
+      </scroll-view>
+      <view class="copy-panel-footer">
+        <text>共 {{copyParagraphs.length}} 段 · 点击任意段落即复制</text>
+      </view>
     </view>
   </view>
 
