@@ -29,7 +29,7 @@ function escapeHtml(text) {
 
 function formatInline(text) {
   let s = escapeHtml(text);
-  s = s.replace(/`([^`]+)`/g, '<code style="background:#f6f0e6;padding:2rpx 8rpx;border-radius:4rpx;font-size:26rpx;">$1</code>');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#EEF1ED;padding:2rpx 8rpx;border-radius:4rpx;font-size:26rpx;color:#55776C;">$1</code>');
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return s;
@@ -52,7 +52,7 @@ function formatContent(text) {
     let h = trimmed.match(/^(#{1,6})\s+(.*)/);
     if (h) {
       if (inList) { html.push('</' + listType + '>'); inList = false; }
-      html.push('<div style="font-weight:700;font-size:32rpx;margin:16rpx 0 8rpx;color:#7f211c;border-bottom:1rpx solid #e7d8c1;padding-bottom:6rpx;">' + formatInline(h[2]) + '</div>');
+      html.push('<div style="font-weight:600;font-size:30rpx;margin:14rpx 0 6rpx;color:#263238;border-bottom:1rpx solid #DCE2DD;padding-bottom:6rpx;">' + formatInline(h[2]) + '</div>');
       continue;
     }
 
@@ -154,7 +154,7 @@ Page({
             id: warnId + 1,
             role: 'assistant',
             content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
-            html: '<p style="margin:8rpx 0;color:#b9362c;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
+            html: '<p style="margin:8rpx 0;color:#B94736;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
             provider: 'system',
           },
         ],
@@ -196,11 +196,20 @@ Page({
       const idx = messages.findIndex(m => m.id === aiMsgId);
       if (idx >= 0) {
         if (result.reply) {
+          // 注入 knowledge_sources（用于"引用 N 条资料"提示）
+          const sources = Array.isArray(result.knowledge_sources) && result.knowledge_sources.length > 0
+            ? result.knowledge_sources.slice(0, 5).map(s => ({
+                source_group: s.source_group || '',
+                chunk_title: s.chunk_title || '',
+                score: s.score || 0,
+              }))
+            : [];
           messages[idx] = {
             ...messages[idx],
             content: result.reply,
             html: formatContent(result.reply),
             provider: result.provider || 'cloudbase-hybrid',
+            sources,
           };
         } else if (result.error) {
           messages[idx] = {
@@ -267,8 +276,8 @@ Page({
   // 清空对话 — 生成新的会话 ID，不引用旧对话
   onClearChat() {
     wx.showModal({
-      title: '清空对话',
-      content: '确定清空所有对话记录吗？将开始新的会话。',
+      title: '新对话',
+      content: '确定开始新的学习对话吗？当前对话记录将被清空。',
       success: (res) => {
         if (res.confirm) {
           this.setData({
@@ -281,6 +290,26 @@ Page({
           });
         }
       },
+    });
+  },
+
+  // 展示引用来源详情
+  onShowSources(e) {
+    const sources = e.currentTarget.dataset.sources;
+    if (!sources || !sources.length) return;
+
+    const lines = sources.slice(0, 5).map((s, i) => {
+      const group = s.source_group || '未知来源';
+      const title = s.chunk_title ? ` · ${s.chunk_title}` : '';
+      const score = s.score ? `（相关度 ${s.score}）` : '';
+      return `${i + 1}. ${group}${title} ${score}`;
+    });
+
+    wx.showModal({
+      title: '引用资料',
+      content: lines.join('\n'),
+      showCancel: false,
+      confirmText: '知道了',
     });
   },
 

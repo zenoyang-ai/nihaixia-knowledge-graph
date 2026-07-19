@@ -1842,32 +1842,30 @@ body {
     font-size: 14px;
 }
 
-.qa-open-link {
+/* 站内知识库问答状态标签（非点击式） */
+.qa-status-tag {
     flex-shrink: 0;
     display: inline-flex;
     align-items: center;
-    justify-content: center;
-    min-height: 38px;
-    padding: 0 18px;
-    border-radius: 6px;
-    background: var(--accent);
-    color: #fff;
-    text-decoration: none;
-    font-size: 14px;
-    font-weight: 600;
-    box-shadow: 0 6px 16px rgba(185, 54, 44, 0.18);
+    gap: 8px;
+    padding: 0 14px;
+    min-height: 30px;
+    border-radius: 16px;
+    background: rgba(85, 119, 108, 0.08);
+    color: #55776C;
+    font-size: 13px;
+    font-weight: 500;
+    letter-spacing: 0.02em;
+    border: 1rpx solid rgba(85, 119, 108, 0.16);
 }
 
-.qa-open-link:hover {
-    background: #a92f27;
-}
-
-.qa-open-link-disabled,
-.qa-open-link-disabled:hover {
-    cursor: default;
-    background: #cdb99a;
-    color: rgba(255, 255, 255, 0.9);
-    box-shadow: none;
+.qa-status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #55776C;
+    box-shadow: 0 0 0 3px rgba(85, 119, 108, 0.18);
+    flex-shrink: 0;
 }
 
 .qa-notice {
@@ -2459,8 +2457,7 @@ body {
         padding: 18px 16px;
     }
     .qa-hero h2 { font-size: 22px; }
-    .qa-open-link {
-        width: 100%;
+    .qa-status-tag {
         margin-top: 14px;
     }
     .qa-section-heading {
@@ -2536,7 +2533,6 @@ body {
 
 .nav-btn:focus-visible,
 .sidebar-toggle:focus-visible,
-.qa-open-link:focus-visible,
 .qa-question-card:focus-visible,
 .qa-chat-input:focus-visible,
 .qa-chat-send:focus-visible,

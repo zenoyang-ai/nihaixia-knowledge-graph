@@ -145,12 +145,12 @@ document.addEventListener('DOMContentLoaded', () => {
     new NihaixiaApp();
 
     // ============================================
-    // AI 问答 — 统一问答路由（双线路自动切换）
+    // AI 问答 — CloudBase Hybrid RAG（站内知识库语料检索生成）
     // ============================================
-    // 统一路由：主线路 腾讯元器 → 备用线路 CloudBase Agent
-    // 两条线路均基于知识库 RAG，不使用通用模型兜底
+    // 主线路：BM25 检索 knowledge-base.json + generateText() 生成
+    // 备用线路：CloudBase Agent（ai.bot.sendMessage）
+    // 资料不足时会明确说明，不使用无知识库依据的通用模型兜底
     const QA_ROUTER_URL = 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router';
-    const YUANQI_EXPERIENCE_URL = 'https://yuanqi.tencent.com/webim/#/chat/EUXRpk?appid=2075218483281047808&experience=true';
 
     const messagesEl = document.getElementById('qa-chat-messages');
     const inputEl = document.getElementById('qa-chat-input');
@@ -244,11 +244,8 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function getProviderLabel(provider, degraded) {
-        if (provider === 'yuanqi') {
-            return degraded ? '腾讯元器知识库（降级）' : '腾讯元器知识库';
-        }
         if (provider === 'cloudbase') {
-            return degraded ? 'CloudBase 知识库备用线路（降级）' : 'CloudBase 知识库备用线路';
+            return degraded ? '学习资料库（备用线路·降级）' : '学习资料库（备用线路）';
         }
         if (provider === 'cloudbase-hybrid' || provider === 'hybrid') {
             return degraded ? '学习资料库（降级）' : '学习资料库';
@@ -514,7 +511,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function buildErrorReply() {
-        return `抱歉，当前知识库线路暂时没有返回结果。\n\n你可以点击“重新尝试”，或打开备用问答入口继续提问。`;
+        return `抱歉，当前知识库暂时没有返回结果。请检查网络后点击“重新尝试”。`;
     }
 
     async function sendMessage(message) {

@@ -1,15 +1,20 @@
 <!--pages/chat/chat.wxml-->
 <view class="chat-container">
 
-  <!-- 顶部操作栏 -->
-  <view class="chat-topbar" wx:if="{{messages.length > 0}}">
-    <view class="chat-topbar-title">经典中医学习问答</view>
-    <view class="chat-clear-btn" bindtap="onClearChat">
-      <text>清空</text>
+  <!-- 对话状态栏（仅对话中显示） -->
+  <view class="chat-statusbar" wx:if="{{messages.length > 0}}">
+    <view class="chat-statusbar-left">
+      <view class="chat-status-dot"></view>
+      <text class="chat-statusbar-text">学习对话</text>
+    </view>
+    <view class="chat-statusbar-right">
+      <view class="chat-clear-btn" bindtap="onClearChat">
+        <text>新对话</text>
+      </view>
     </view>
   </view>
 
-  <!-- 消息列表 -->
+  <!-- 消息列表 / 欢迎屏 -->
   <scroll-view
     class="chat-messages"
     scroll-y
@@ -18,22 +23,48 @@
     enhanced
     show-scrollbar="{{false}}"
   >
-    <!-- 欢迎区域 -->
+    <!-- 欢迎区 -->
     <view class="welcome-section" wx:if="{{messages.length === 0}}">
-      <view class="welcome-title">经典中医学习</view>
-      <view class="welcome-subtitle">学习资料库问答助手 · 仅供学习研究</view>
-      <view class="suggested-questions">
-        <view
-          class="suggested-item"
-          wx:for="{{suggestedQuestions}}"
-          wx:key="index"
-          bindtap="onSuggestedTap"
-          data-question="{{item}}"
-        >
-          <text class="suggested-icon">问</text>
-          <text class="suggested-text">{{item}}</text>
-        </view>
+      <view class="welcome-status">
+        <view class="welcome-status-dot"></view>
+        <text>学习资料库</text>
       </view>
+      <view class="welcome-title">经典中医学习问答</view>
+      <view class="welcome-subtitle">从经典、概念与学习路径开始提问</view>
+      <view class="welcome-tag">仅供学习研究 · 不提供诊断、处方或剂量建议</view>
+
+      <view class="welcome-section-title">
+        <text>从这里开始</text>
+        <text class="welcome-hint">向左滑动查看更多</text>
+      </view>
+
+      <!-- 横滑问笺 -->
+      <scroll-view
+        class="question-strip"
+        scroll-x
+        show-scrollbar="{{false}}"
+        enhanced
+      >
+        <view class="question-strip-inner">
+          <view
+            class="question-card"
+            wx:for="{{suggestedQuestions}}"
+            wx:key="index"
+            bindtap="onSuggestedTap"
+            data-question="{{item}}"
+          >
+            <view class="question-card-num">
+              <text>{{index + 1}}</text>
+            </view>
+            <view class="question-card-text">
+              <text>{{item}}</text>
+            </view>
+            <view class="question-card-arrow">
+              <text>›</text>
+            </view>
+          </view>
+        </view>
+      </scroll-view>
     </view>
 
     <!-- 消息列表 -->
@@ -60,7 +91,17 @@
             <view class="typing-dot"></view>
             <view class="typing-dot"></view>
           </view>
-          <view class="msg-provider" wx:if="{{item.provider}}">
+          <!-- 来源数量提示 -->
+          <view
+            class="msg-sources"
+            wx:if="{{item.sources && item.sources.length > 0}}"
+            bindtap="onShowSources"
+            data-sources="{{item.sources}}"
+          >
+            <text>学习资料库 · 引用 {{item.sources.length}} 条资料</text>
+          </view>
+          <!-- provider 标签 -->
+          <view class="msg-provider" wx:if="{{item.provider && !item.sources}}">
             <text>{{item.provider === 'cloudbase-hybrid' ? '学习资料库' : item.provider === 'cloudbase-llm' ? '学习资料库' : item.provider === 'system' ? '系统' : item.provider === 'error' ? '错误' : '学习资料库'}}</text>
           </view>
           <view class="msg-retry" wx:if="{{item.provider === 'error'}}" bindtap="onRetry" data-question="{{item.retryQuestion}}">
@@ -74,7 +115,7 @@
     <view class="chat-bottom-spacer" id="chat-bottom"></view>
   </scroll-view>
 
-  <!-- 输入区域 -->
+  <!-- 输入区 -->
   <view class="chat-input-area">
     <view class="chat-input-wrap">
       <textarea
@@ -85,7 +126,6 @@
         placeholder="输入关于中医经典的学习问题…"
         placeholder-class="chat-input-placeholder"
         confirm-type="send"
-        auto-height
         maxlength="1000"
         show-confirm-bar="{{false}}"
         adjust-position="{{true}}"
@@ -96,11 +136,11 @@
         class="chat-send-btn {{(inputValue.trim() && !loading) ? 'chat-send-btn-active' : ''}}"
         bindtap="onSend"
       >
-        <text>{{loading ? '…' : '发送'}}</text>
+        <text>{{loading ? '处理中' : '发送'}}</text>
       </view>
     </view>
     <view class="chat-input-hint">
-      <text>仅供学习研究，不提供医疗诊断或处方建议</text>
+      <text>学习资料库 · 不提供诊断、处方或剂量建议</text>
     </view>
   </view>
 

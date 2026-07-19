@@ -1,8 +1,13 @@
-/* 全局样式 */
+/* 全局样式
+ *
+ * 案头学习索引配色：
+ *   底色 #F7F7F4 / 墨色 #263238 / 辅助 #6B767A
+ *   资料库状态 #55776C / 主操作 #B94736 / 分隔线 #DCE2DD
+ */
 page {
-  background-color: #f6f0e6;
+  background-color: #F7F7F4;
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  color: #342d25;
+  color: #263238;
   font-size: 28rpx;
   line-height: 1.6;
 }
