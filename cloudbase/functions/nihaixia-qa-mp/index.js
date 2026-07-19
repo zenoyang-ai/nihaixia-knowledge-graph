@@ -307,20 +307,46 @@ async function checkRateLimit(db, userHash) {
   try {
     // 原子操作：自增 daily_count + 推送当前时间戳到 minute_requests + 设置 TTL
     // 注意：必须同时写 ttl 字段（匹配数据库 ttl_idx 索引），否则记录不会自动过期
+    //
+    // 兼容性：@cloudbase/node-sdk 不支持 doc().upsert()，
+    // 需要先 get 判断存在性，再用 set（新建）或 update（已存在）+ 原子操作符
     const expireDate = new Date(nowTimestamp + DOC_TTL_SECONDS * 1000);
-    await collection.doc(docId).upsert({
-      _id: docId,
-      user_hash: userHash,
-      date: today,
-      daily_count: _.inc(1),
-      minute_requests: _.push({ ts: nowTimestamp }),
-      last_updated: now.toISOString(),
-      expires_at: expireDate,
-      ttl: expireDate, // 匹配数据库 ttl_idx 索引（expireAfterSeconds=0）
-    });
+    const docRef = collection.doc(docId);
+
+    // 先尝试读取现有记录
+    let existingRecord = null;
+    try {
+      const getResult = await docRef.get();
+      existingRecord = getResult.data && getResult.data[0];
+    } catch (getErr) {
+      // 文档不存在时 node-sdk 会抛错，忽略即可
+    }
+
+    if (existingRecord) {
+      // 已存在记录：用 update + 原子操作符
+      await docRef.update({
+        daily_count: _.inc(1),
+        minute_requests: _.push({ ts: nowTimestamp }),
+        last_updated: now.toISOString(),
+        expires_at: expireDate,
+        ttl: expireDate, // 匹配数据库 ttl_idx 索引（expireAfterSeconds=0）
+      });
+    } else {
+      // 新记录：用 set 创建
+      await docRef.set({
+        _id: docId,
+        user_hash: userHash,
+        date: today,
+        daily_count: 1,
+        minute_requests: [{ ts: nowTimestamp }],
+        last_updated: now.toISOString(),
+        expires_at: expireDate,
+        ttl: expireDate, // 匹配数据库 ttl_idx 索引（expireAfterSeconds=0）
+      });
+    }
 
     // 读取最新记录判断是否超限
-    const result = await collection.doc(docId).get();
+    const result = await docRef.get();
     const record = result.data && result.data[0];
 
     if (!record) {
