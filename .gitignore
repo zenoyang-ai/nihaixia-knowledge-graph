@@ -51,6 +51,9 @@ node_modules/
 cloudbase/functions/*/knowledge-base.json
 cloudbase/functions/*/inverted-index.json
 
+# 从 CloudBase 下载的函数代码（临时目录，不提交）
+/functions/
+
 # 交接文档（含本机路径）
 HANDOFF_TENCENT_QA.md
 

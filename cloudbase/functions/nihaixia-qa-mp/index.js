@@ -228,6 +228,8 @@ async function checkRateLimit(db, userHash) {
 
   try {
     // 原子操作：自增 daily_count + 推送当前时间戳到 minute_requests + 设置 TTL
+    // 注意：必须同时写 ttl 字段（匹配数据库 ttl_idx 索引），否则记录不会自动过期
+    const expireDate = new Date(nowTimestamp + DOC_TTL_SECONDS * 1000);
     await collection.doc(docId).upsert({
       _id: docId,
       user_hash: userHash,
@@ -235,7 +237,8 @@ async function checkRateLimit(db, userHash) {
       daily_count: _.inc(1),
       minute_requests: _.push({ ts: nowTimestamp }),
       last_updated: now.toISOString(),
-      expires_at: new Date(nowTimestamp + DOC_TTL_SECONDS * 1000),
+      expires_at: expireDate,
+      ttl: expireDate, // 匹配数据库 ttl_idx 索引（expireAfterSeconds=0）
     });
 
     // 读取最新记录判断是否超限
@@ -501,6 +504,8 @@ exports.main = async (event, context) => {
         ? `今日提问次数已达上限（${RATE_LIMIT_PER_DAY} 次），${rateLimit.reset_at}重置。`
         : rateLimit.reason === 'circuit_break'
         ? '服务暂时繁忙，请稍后再试。'
+        : rateLimit.reason === 'missing_user_id'
+        ? '无法验证用户身份，请通过小程序重新进入。'
         : `提问过于频繁，请${rateLimit.reset_at || '稍后'}再试。`,
       provider: 'system',
       rate_limited: true,
