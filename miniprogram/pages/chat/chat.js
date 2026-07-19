@@ -97,6 +97,7 @@ Page({
   data: {
     messages: [],
     inputValue: '',
+    canSend: false, // 是否可发送（inputValue.trim().length > 0 且非 loading）
     loading: false,
     scrollToView: 'chat-bottom',
     sessionId: '', // 页面生命周期内保持同一个会话 ID
@@ -117,30 +118,43 @@ Page({
     });
   },
 
-  // 输入处理
+  // 输入处理 — 同步更新 canSend，避免 WXML 调用字符串方法
   onInput(e) {
-    this.setData({ inputValue: e.detail.value });
+    const value = e.detail.value;
+    this.setData({
+      inputValue: value,
+      canSend: value.trim().length > 0,
+    });
   },
 
-  // 推荐问题点击
+  // 推荐问题点击 — 使用 setData 回调确保 inputValue 同步后再发送
   onSuggestedTap(e) {
     const question = e.currentTarget.dataset.question;
-    this.setData({ inputValue: question });
-    this.onSend();
+    if (!question || this.data.loading) return;
+    this.setData({ inputValue: question, canSend: true }, () => {
+      this.sendQuestion(question);
+    });
   },
 
   // 重新发送失败的问题
   onRetry(e) {
     const question = e.currentTarget.dataset.question;
-    if (!question) return;
-    this.setData({ inputValue: question });
-    this.onSend();
+    if (!question || this.data.loading) return;
+    this.setData({ inputValue: question, canSend: true }, () => {
+      this.sendQuestion(question);
+    });
   },
 
-  // 发送消息
+  // 发送消息（入口：点击发送按钮 / 回车）
   async onSend() {
+    if (!this.data.canSend || this.data.loading) return;
     const text = this.data.inputValue.trim();
-    if (!text || this.data.loading) return;
+    if (!text) return;
+    await this.sendQuestion(text);
+  },
+
+  // 实际发送逻辑 — 接收已确认的文本，避免依赖 setData 时序
+  async sendQuestion(text) {
 
     // 客户端即时医疗提示（服务端是最终边界）
     if (isMedicalRequest(text)) {
@@ -156,9 +170,12 @@ Page({
             content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
             html: '<p style="margin:8rpx 0;color:#B94736;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
             provider: 'system',
+            sources: [],
+            hasSources: false,
           },
         ],
         inputValue: '',
+        canSend: false,
         scrollToView: 'msg-' + (warnId + 1),
       });
       return;
@@ -179,9 +196,10 @@ Page({
       messages: [
         ...this.data.messages,
         { id: userMsgId, role: 'user', content: text },
-        { id: aiMsgId, role: 'assistant', content: '', html: '', provider: '' },
+        { id: aiMsgId, role: 'assistant', content: '', html: '', provider: '', sources: [], hasSources: false },
       ],
       inputValue: '',
+      canSend: false,
       loading: true,
       lastFailedQuestion: '',
       scrollToView: 'msg-' + aiMsgId,
@@ -210,6 +228,7 @@ Page({
             html: formatContent(result.reply),
             provider: result.provider || 'cloudbase-hybrid',
             sources,
+            hasSources: sources.length > 0,
           };
         } else if (result.error) {
           messages[idx] = {
@@ -218,6 +237,8 @@ Page({
             html: formatContent(result.error),
             provider: 'error',
             retryQuestion: text,
+            sources: [],
+            hasSources: false,
           };
         }
       }
@@ -237,6 +258,8 @@ Page({
           html: formatContent(err.message || '网络异常，请稍后重试'),
           provider: 'error',
           retryQuestion: text,
+          sources: [],
+          hasSources: false,
         };
       }
 
@@ -284,6 +307,7 @@ Page({
             messages: [],
             msgIdCounter: 0,
             inputValue: '',
+            canSend: false,
             lastFailedQuestion: '',
             sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
             scrollToView: '',

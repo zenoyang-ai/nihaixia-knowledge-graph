@@ -417,8 +417,9 @@
 
 .chat-input {
   flex: 1;
+  height: 76rpx;
   min-height: 76rpx;
-  max-height: 200rpx;
+  max-height: 76rpx;
   padding: 12rpx 22rpx;
   background: #FFFFFF;
   border: 1rpx solid #DCE2DD;
@@ -427,6 +428,7 @@
   color: #263238;
   line-height: 1.5;
   box-sizing: border-box;
+  overflow-y: auto;
 }
 
 .chat-input-placeholder {

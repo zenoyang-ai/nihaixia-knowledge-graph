@@ -91,17 +91,17 @@
             <view class="typing-dot"></view>
             <view class="typing-dot"></view>
           </view>
-          <!-- 来源数量提示 -->
+          <!-- 来源数量提示：仅当 hasSources 为 true 时显示 -->
           <view
             class="msg-sources"
-            wx:if="{{item.sources && item.sources.length > 0}}"
+            wx:if="{{item.hasSources}}"
             bindtap="onShowSources"
             data-sources="{{item.sources}}"
           >
             <text>学习资料库 · 引用 {{item.sources.length}} 条资料</text>
           </view>
-          <!-- provider 标签 -->
-          <view class="msg-provider" wx:if="{{item.provider && !item.sources}}">
+          <!-- provider 标签：无来源时才显示 -->
+          <view class="msg-provider" wx:if="{{!item.hasSources}}">
             <text>{{item.provider === 'cloudbase-hybrid' ? '学习资料库' : item.provider === 'cloudbase-llm' ? '学习资料库' : item.provider === 'system' ? '系统' : item.provider === 'error' ? '错误' : '学习资料库'}}</text>
           </view>
           <view class="msg-retry" wx:if="{{item.provider === 'error'}}" bindtap="onRetry" data-question="{{item.retryQuestion}}">
@@ -133,7 +133,7 @@
         disabled="{{loading}}"
       />
       <view
-        class="chat-send-btn {{(inputValue.trim() && !loading) ? 'chat-send-btn-active' : ''}}"
+        class="chat-send-btn {{(canSend && !loading) ? 'chat-send-btn-active' : ''}}"
         bindtap="onSend"
       >
         <text>{{loading ? '处理中' : '发送'}}</text>
