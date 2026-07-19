@@ -10,6 +10,7 @@
       "memorySize": 1024,
       "installDependency": true,
       "envVariables": {
+        "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765",
         "PRIMARY_PROVIDER": "cloudbase-hybrid",
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }

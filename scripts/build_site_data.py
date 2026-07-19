@@ -224,12 +224,38 @@ def validate(graph):
         if not node.get("sections", {}).get("安全边界"):
             errors.append(f"节点 {node.get('id', '?')} 缺少安全边界")
 
+    # 检查 node_links 是否指向已有 nodes / articles（与 docs/assets/graph.js 解析口径一致）
+    content_items = graph.get("nodes", []) + graph.get("articles", [])
+    id_set = {item.get("id") for item in content_items if item.get("id")}
+    directed_links = 0
+    dangling_links = []
+    undirected = set()
+    for node in content_items:
+        source_id = node.get("id")
+        for link in node.get("node_links") or []:
+            directed_links += 1
+            target_path = link.get("path") if isinstance(link, dict) else None
+            if not target_path or target_path not in id_set or target_path == source_id:
+                dangling_links.append(
+                    f"{node.get('title') or source_id} -> {target_path or '?'}"
+                )
+                continue
+            undirected.add(tuple(sorted((source_id, target_path))))
+
+    if dangling_links:
+        preview = "; ".join(dangling_links[:5])
+        more = "" if len(dangling_links) <= 5 else f" …共 {len(dangling_links)} 条"
+        errors.append(f"悬空 node_links {len(dangling_links)} 条: {preview}{more}")
+
     return {
         "ok": len(errors) == 0,
         "errors": errors,
         "stats": stats,
         "total_public": len(actual_public),
         "readable_public": readable_count,
+        "directed_links": directed_links,
+        "undirected_links": len(undirected),
+        "dangling_links": len(dangling_links),
     }
 
 
@@ -275,6 +301,10 @@ def main():
             print(f"OK topic_articles={result['stats']['topic_articles']}")
             print(f"OK public_sources={result['total_public']} ({result['readable_public']} readable)")
             print(f"OK medical_safety=learning_only")
+            print(
+                f"OK node_links directed={result['directed_links']} "
+                f"undirected={result['undirected_links']} dangling={result['dangling_links']}"
+            )
         else:
             for error in result["errors"]:
                 print(f"ERROR: {error}")

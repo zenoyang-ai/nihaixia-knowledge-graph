@@ -47,6 +47,9 @@ jobs:
       - name: Validate docs/data/graph.json
         run: node -e "const d=require('./docs/data/graph.json'); if(!d.nodes||d.nodes.length===0) throw new Error('No nodes')"
 
+      - name: Validate graph stats, medical_safety and node_links
+        run: python3 scripts/build_site_data.py --validate
+
       - name: Validate docs/data/prompts.json
         run: node -e "JSON.parse(require('fs').readFileSync('./docs/data/prompts.json','utf8'))"
 

@@ -1,99 +1,57 @@
 # QA_REPORT
 
-> Phase 5 网站原型质量报告（第三版）
+> 网站数据与质量口径说明。旧版 Phase 5 原型报告已过时，以本节「当前口径」为准。
 
-## 生成信息
-
-- **生成时间**：2026-06-04
-- **生成工具**：`tools/nihaixia_site/build_site_data.py`
-- **输出文件**：`80_项目输出/倪海厦知识图谱网站/data/graph.json`
-
-## 数据统计
+## 当前口径（2026-07-19）
 
 | 指标 | 数值 |
 |------|------|
-| 节点总数 | 71 |
-| 概念节点 | 35 |
-| 经典/课程节点 | 14 |
-| 案例/方剂节点 | 16 |
-| 主题文章 | 6 |
-| Manifest资料数 | 231 |
+| 图谱节点 `nodes` | 64 |
+| 主题文章 `articles` | 5 |
+| 内容项合计 | 69 |
+| 有向 `node_links` | 338 |
+| 运行时去重后无向边 | 283 |
+| 悬空 `node_links` | 0 |
+| Manifest 资料数 | 231 |
 | 可枚举文件数 | 227 |
+| 公开原文 `public_sources` | 4（其中 3 可读） |
 
-## 校验命令和结果
+校验命令：
 
 ```bash
-python3 tools/nihaixia_site/build_site_data.py --validate
+python3 scripts/build_site_data.py --validate
 ```
 
-**结果**：
-```
-OK nodes_total=71
-OK topic_articles=6
-OK relative=0
-OK missing=0
-OK ambiguous=0
+预期输出包含：
+
+```text
+OK nodes_total=69
+OK topic_articles=5
+OK public_sources=4 (3 readable)
 OK medical_safety=learning_only
+OK node_links directed=338 undirected=283 dangling=0
 ```
 
-## 本地预览
+说明：
 
-```bash
-python3 -m http.server 8765 --directory '80_项目输出/倪海厦知识图谱网站'
-```
-
-访问：http://127.0.0.1:8765/
-
-## 桌面端检查结果 (1440x1000)
-
-- [x] 首页显示：节点 71、主题文章 6、Manifest资料数 231
-- [x] 五层图谱可见
-- [x] 搜索"六经辨证"能找到节点
-- [x] 搜索"附子"能找到节点，且安全边界可见
-- [x] 人纪视图点击"黄帝内经 / 伤寒论 / 金匮要略"能打开详情
-- [x] 主题文章展开后能看到关键节点，点击能跳转详情
-- [x] 资料页显示 Manifest资料数 231 和可枚举文件数 227
-- [x] 页面没有诊断、处方、剂量、服法建议
-
-## 移动端检查结果 (390x900)
-
-- [x] 390px 截图中导航完整可见
-- [x] 统计卡片改为 1 列布局，无裁切
-- [x] 五层架构不被右侧截断
-- [x] 无明显横向滚动
-- [x] 文字不重叠
+- 顶层没有 `links` 数组；图谱边由各节点 `node_links` 在 `docs/assets/graph.js` 运行时派生。
+- `nodes_total=69` = 64 节点 + 5 主题文章。
+- 旧文档中的「71 节点 / 6 主题文章 / 289 关系」均已作废。
 
 ## 医疗安全检查
 
-- [x] 所有节点都有 `medical_safety: learning_only`
-- [x] 所有节点都有"安全边界"章节
+- [x] 所有节点与主题文章均为 `medical_safety: learning_only`
+- [x] 均有「安全边界」章节
 - [x] 方剂/案例节点显示额外免责声明
-- [x] 页面没有诊断、处方、剂量、服法建议
+- [x] 页面不提供诊断、处方、剂量、服法建议
 
-## 修复记录
+## 历史快照（2026-06-04，已过时）
 
-### 第三版修复内容
+以下为早期原型报告，仅作历史参考，**不得作为当前验收依据**：
 
-1. **移动端 390px 裁切**：
-   - 统计卡片改为 1 列布局
-   - 导航允许横向滚动
-   - 添加 `overflow-x: hidden` 兜底
+| 指标 | 当时数值 |
+|------|------|
+| 节点总数 | 71 |
+| 主题文章 | 6 |
 
-2. **主题文章关键节点过滤**：
-   - `nodeNames` 改为使用 `n.title`
-   - 分类链接：关键节点、相关文章、项目资料
-   - 只有真实图谱节点显示为"关键节点"
-
-3. **资料总数口径统一**：
-   - `stats.manifest_total`：231（来自 manifest）
-   - `stats.indexed_sources`：227（可枚举文件）
-   - 前端分别展示，避免误导
-
-## 已知问题
-
-1. 节点详情中的原始出处只显示别名，不显示完整路径
-2. 搜索功能仅支持标题和摘要，不支持全文搜索
-
-## 结论
-
-Phase 5 网站原型完成（第三版），等待 Codex 复核。暂不进入 Phase 6。
+当时校验路径为 `tools/nihaixia_site/build_site_data.py`，输出目录也已迁移到本仓库 `docs/`。

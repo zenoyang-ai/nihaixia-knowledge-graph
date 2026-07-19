@@ -1,10 +1,14 @@
 {
   "envId": "zeno-d9g0gdvw4a57635c0",
+  "functionRoot": "cloudbase/functions",
   "functions": [
     {
       "name": "nihaixia-qa-router",
+      "handler": "index.main",
       "timeout": 120,
+      "runtime": "Nodejs18.15",
       "memorySize": 1024,
+      "installDependency": true,
       "envVariables": {
         "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765",
         "PRIMARY_PROVIDER": "cloudbase-hybrid",
@@ -13,8 +17,11 @@
     },
     {
       "name": "nihaixia-qa-mp",
+      "handler": "index.main",
       "timeout": 60,
+      "runtime": "Nodejs18.15",
       "memorySize": 1024,
+      "installDependency": true,
       "envVariables": {
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }
