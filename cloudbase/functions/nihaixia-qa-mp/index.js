@@ -22,7 +22,8 @@
  * 返回：{ reply, provider, request_id, ... } 或 { error, request_id, ... }
  *
  * 安全：
- *   - 微信自动透传 OpenID，通过 context.OPENID 获取
+ *   - 微信自动透传 OpenID，优先用 wx-server-sdk 的 getWXContext() 获取，
+ *     回退到 context.OPENID（原生云开发环境）
  *   - 以 OpenID 的 SHA-256 哈希为键，在 CloudBase 数据库实现限流
  *   - 服务端执行医疗安全拦截（输入侧 + 输出侧）
  *   - history 严格校验 role/content/长度/交替
@@ -32,6 +33,83 @@
 const cloudbase = require('@cloudbase/node-sdk');
 const crypto = require('crypto');
 const { searchDocuments } = require('./knowledge-search');
+
+// wx-server-sdk 用于获取微信调用上下文（OPENID 等身份信息）
+// 这是微信官方推荐的做法，@cloudbase/node-sdk 不会从 context 注入 OPENID
+let wxCloud = null;
+try {
+  wxCloud = require('wx-server-sdk');
+  // wx-server-sdk 需要初始化才能调用 getWXContext
+  wxCloud.init({ env: process.env.SCF_NAMESPACE || 'zeno-d9g0gdvw4a57635c0' });
+} catch (err) {
+  console.log('Note: wx-server-sdk not available, will fall back to context.OPENID:', err.message);
+}
+
+// 获取微信用户 OPENID — 优先用 wx-server-sdk 的 getWXContext()，
+// 回退到 context.OPENID（兼容原生云开发环境）
+function getOpenId(event, context) {
+  // 优先：wx-server-sdk 的 getWXContext() — 微信官方推荐做法
+  if (wxCloud && typeof wxCloud.getWXContext === 'function') {
+    try {
+      const wxCtx = wxCloud.getWXContext();
+      if (wxCtx && wxCtx.OPENID) {
+        console.log(JSON.stringify({
+          event: 'openid_acquired',
+          source: 'wx-server-sdk',
+          has_openid: true,
+          has_appid: !!(wxCtx && wxCtx.APPID),
+          has_unionid: !!(wxCtx && wxCtx.UNIONID),
+        }));
+        return wxCtx.OPENID;
+      }
+      // 调试：记录 getWXContext 返回但无 OPENID 的情况
+      console.log(JSON.stringify({
+        event: 'openid_missing',
+        source: 'wx-server-sdk',
+        wxctx_keys: wxCtx ? Object.keys(wxCtx) : [],
+        wxctx_values: wxCtx ? {
+          OPENID: wxCtx.OPENID || null,
+          APPID: wxCtx.APPID || null,
+          UNIONID: wxCtx.UNIONID || null,
+        } : null,
+      }));
+    } catch (err) {
+      console.log(JSON.stringify({
+        event: 'getwxcontext_error',
+        error: err.message,
+      }));
+    }
+  } else {
+    console.log(JSON.stringify({
+      event: 'wx-server-sdk-unavailable',
+      has_wxcloud: !!wxCloud,
+    }));
+  }
+  // 回退：原生云开发环境的 context.OPENID
+  if (context && context.OPENID) {
+    console.log(JSON.stringify({
+      event: 'openid_acquired',
+      source: 'context.OPENID',
+    }));
+    return context.OPENID;
+  }
+  // 兜底：某些场景下 OPENID 可能放在 event 上
+  if (event && event.userInfo && event.userInfo.openId) {
+    console.log(JSON.stringify({
+      event: 'openid_acquired',
+      source: 'event.userInfo.openId',
+    }));
+    return event.userInfo.openId;
+  }
+  console.log(JSON.stringify({
+    event: 'openid_totally_missing',
+    has_context: !!context,
+    context_keys: context ? Object.keys(context) : [],
+    has_userInfo: !!(event && event.userInfo),
+    event_keys: event ? Object.keys(event).slice(0, 20) : [],
+  }));
+  return null;
+}
 
 const VERSION = '5.1.0';
 
@@ -429,8 +507,8 @@ exports.main = async (event, context) => {
   const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
   const startTime = Date.now();
 
-  // 获取 OpenID（微信自动透传）
-  const openId = context && context.OPENID;
+  // 获取 OpenID（微信自动透传）— 优先 wx-server-sdk，回退 context.OPENID
+  const openId = getOpenId(event, context);
   const userHash = hashOpenId(openId);
 
   // 解析入参
