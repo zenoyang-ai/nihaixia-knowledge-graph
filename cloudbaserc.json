@@ -4,19 +4,20 @@
     {
       "name": "nihaixia-qa-router",
       "timeout": 120,
-      "memorySize": 512,
+      "memorySize": 1024,
       "envVariables": {
         "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765",
-        "PRIMARY_PROVIDER": "yuanqi",
-        "YUANQI_APP_ID": "2075218483281047808",
-        "YUANQI_APP_KEY": "<set-via-cloudbase-console>",
+        "PRIMARY_PROVIDER": "cloudbase-hybrid",
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }
     },
     {
       "name": "nihaixia-qa-mp",
       "timeout": 60,
-      "memorySize": 256
+      "memorySize": 1024,
+      "envVariables": {
+        "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
+      }
     }
   ]
 }

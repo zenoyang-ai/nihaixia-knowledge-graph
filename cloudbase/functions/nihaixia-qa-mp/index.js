@@ -104,37 +104,47 @@ function isMedicalOutput(text) {
 // ---------------------------------------------------------------------------
 function validateHistory(history, requestId) {
   if (!Array.isArray(history)) return { valid: [], error: null };
+  if (history.length === 0) return { valid: [], error: null };
 
-  // 第一阶段：过滤和校验
+  // 第一阶段：严格校验每条消息（非法即拒绝整段 history，不静默过滤）
   const filtered = [];
   for (const h of history) {
-    if (!h || typeof h !== 'object') continue;
-    if (typeof h.role !== 'string') continue;
-    // 严格限制 role
+    if (!h || typeof h !== 'object') {
+      return { valid: [], error: 'invalid_history_format' };
+    }
+    if (typeof h.role !== 'string') {
+      return { valid: [], error: 'invalid_role' };
+    }
     const role = h.role === 'bot' ? 'assistant' : h.role;
-    if (role !== 'user' && role !== 'assistant') continue;
-    if (typeof h.content !== 'string') continue;
-    if (!h.content.trim()) continue;
-    if (h.content.length > MAX_HISTORY_LENGTH) continue;
+    // 严格限制 role：system/developer 等一律拒绝
+    if (role !== 'user' && role !== 'assistant') {
+      return { valid: [], error: 'illegal_role:' + h.role };
+    }
+    if (typeof h.content !== 'string') {
+      return { valid: [], error: 'invalid_content_type' };
+    }
+    if (!h.content.trim()) {
+      return { valid: [], error: 'empty_content' };
+    }
+    // 超长内容拒绝整段（不裁剪、不保留孤立 assistant）
+    if (h.content.length > MAX_HISTORY_LENGTH) {
+      return { valid: [], error: 'content_too_long' };
+    }
     filtered.push({ role, content: h.content.trim() });
   }
 
   if (filtered.length === 0) return { valid: [], error: null };
 
-  // 第二阶段：角色交替校验
-  // 由于过滤后可能不交替，取最长的交替子序列
-  const alternating = [filtered[0]];
+  // 第二阶段：角色交替校验（非交替也拒绝）
   for (let i = 1; i < filtered.length; i++) {
-    const last = alternating[alternating.length - 1];
-    if (filtered[i].role !== last.role) {
-      alternating.push(filtered[i]);
+    if (filtered[i].role === filtered[i - 1].role) {
+      return { valid: [], error: 'non_alternating' };
     }
-    // 同角色的连续消息跳过
   }
 
   // 第三阶段：确保最后一条是 assistant（因为当前 msg 是 user）
-  // 如果最后一条是 user，移除它（避免 user-user 连续）
-  let result = alternating;
+  // 如果最后一条是 user，移除它（避免 user-user 连续）— 这是合法变换
+  let result = filtered;
   if (result.length > 0 && result[result.length - 1].role === 'user') {
     result = result.slice(0, -1);
   }
@@ -165,30 +175,44 @@ function hashOpenId(openId) {
 // ---------------------------------------------------------------------------
 // 限流检查 — 基于 CloudBase 数据库共享计数器
 //
-// 改进（v5.1.0）：
+// 改进（v5.2.0）：
 //   - 使用原子操作（db.command.inc + push）避免竞态
 //   - 时区改为 UTC+8（北京时间）
 //   - 连续 DB 错误时 fail-closed（熔断）
+//   - TTL 自动过期（文档 7 天后自动删除）
+//   - 缺 OpenID 时拒绝（不绕过限流）
+//   - 熔断后冷却恢复（60 秒后半开探测）
 //
 // 每用户每分钟最多 6 次，每用户每日最多 20 次。
 // 仅保存哈希、日期、计数和 TTL，不保存聊天内容。
 // ---------------------------------------------------------------------------
 let _dbErrorCount = 0;
+let _circuitBreakUntil = 0;
 const DB_ERROR_THRESHOLD = 5; // 连续 5 次 DB 错误后 fail-closed
+const CIRCUIT_BREAK_COOLDOWN_MS = 60000; // 熔断冷却 60 秒
+const DOC_TTL_SECONDS = 7 * 24 * 3600; // 文档 7 天后自动过期
 
 async function checkRateLimit(db, userHash) {
+  // 缺 OpenID 时拒绝（不绕过限流）
   if (!userHash) {
-    // 无法获取 OpenID 时，允许通过（小程序环境必然有 OpenID）
-    return { allowed: true, reason: null };
+    return { allowed: false, reason: 'missing_user_id' };
   }
 
   // 熔断检查：连续 DB 错误后 fail-closed
+  const nowMs = Date.now();
   if (_dbErrorCount >= DB_ERROR_THRESHOLD) {
-    console.log(JSON.stringify({
-      event: 'rate_limit_circuit_break',
-      error_count: _dbErrorCount,
-    }));
-    return { allowed: false, reason: 'circuit_break' };
+    // 冷却期内：直接拒绝
+    if (nowMs < _circuitBreakUntil) {
+      console.log(JSON.stringify({
+        event: 'rate_limit_circuit_break',
+        error_count: _dbErrorCount,
+        cooldown_remaining: Math.round((_circuitBreakUntil - nowMs) / 1000) + 's',
+      }));
+      return { allowed: false, reason: 'circuit_break' };
+    }
+    // 冷却期已过：进入半开探测，允许一次请求试探
+    console.log(JSON.stringify({ event: 'rate_limit_half_open_probe' }));
+    // 不重置计数，如果这次成功，_dbErrorCount 会在 try 块中被重置
   }
 
   // 使用 UTC+8（北京时间）
@@ -203,7 +227,7 @@ async function checkRateLimit(db, userHash) {
   const _ = db.command;
 
   try {
-    // 原子操作：自增 daily_count + 推送当前时间戳到 minute_requests
+    // 原子操作：自增 daily_count + 推送当前时间戳到 minute_requests + 设置 TTL
     await collection.doc(docId).upsert({
       _id: docId,
       user_hash: userHash,
@@ -211,6 +235,7 @@ async function checkRateLimit(db, userHash) {
       daily_count: _.inc(1),
       minute_requests: _.push({ ts: nowTimestamp }),
       last_updated: now.toISOString(),
+      expires_at: new Date(nowTimestamp + DOC_TTL_SECONDS * 1000),
     });
 
     // 读取最新记录判断是否超限
@@ -220,11 +245,15 @@ async function checkRateLimit(db, userHash) {
     if (!record) {
       // upsert 后应该有记录，如果没有说明创建失败
       _dbErrorCount++;
+      if (_dbErrorCount >= DB_ERROR_THRESHOLD) {
+        _circuitBreakUntil = nowMs + CIRCUIT_BREAK_COOLDOWN_MS;
+      }
       return { allowed: false, reason: 'db_create_failed' };
     }
 
-    // 重置错误计数
+    // 重置错误计数和熔断状态（成功恢复）
     _dbErrorCount = 0;
+    _circuitBreakUntil = 0;
 
     // 检查日限额（已自增，所以检查是否超过）
     if (record.daily_count > RATE_LIMIT_PER_DAY) {
@@ -257,6 +286,9 @@ async function checkRateLimit(db, userHash) {
     };
   } catch (err) {
     _dbErrorCount++;
+    if (_dbErrorCount >= DB_ERROR_THRESHOLD) {
+      _circuitBreakUntil = nowMs + CIRCUIT_BREAK_COOLDOWN_MS;
+    }
     console.log(JSON.stringify({
       event: 'rate_limit_db_error',
       error: err.message ? err.message.slice(0, 100) : 'unknown',

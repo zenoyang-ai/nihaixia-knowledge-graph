@@ -1,29 +1,34 @@
 #!/usr/bin/env node
 /**
- * 从 11 个 QA 上传包 MD 文件生成分块知识库
+ * 从 11 个 QA 上传包 MD 文件生成分块知识库 + 倒排索引
  *
  * 用法：
- *   node scripts/generate-knowledge-base.js <qa-upload-dir> [output-path]
+ *   node scripts/generate-knowledge-base.js <qa-upload-dir> [output-dir]
  *
- * 默认输出到 cloudbase/functions/nihaixia-qa-router/knowledge-base.json
- * 和 cloudbase/functions/nihaixia-qa-mp/knowledge-base.json
+ * 默认输出到 cloudbase/functions/nihaixia-qa-router/ 和 nihaixia-qa-mp/：
+ *   - knowledge-base.json：分块语料（chunks + manifest）
+ *   - inverted-index.json：BM25 倒排索引（token → 文档列表）
  *
  * 分块策略：
  *   - 每个 QA MD 文件按 "={80,}" 分隔符切分子文件
  *   - 每个子文件按段落（双换行）进一步切分
  *   - 累积段落直到 1200-2000 字符为一块
- *   - 保留 frontmatter 元数据（source_group、source_quality、learning_use、medical_safety）
- *   - 保留子文件标题作为 chunk_title
+ *
+ * 校验：
+ *   - manifest 的 11 个文件必须全部存在
+ *   - 每个文件的字节数和 SHA-256 必须与 manifest 一致
+ *   - 任一不符非零退出
  */
 
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 
 const QA_DIR = process.argv[2] || process.env.QA_DIR || '';
-const OUTPUT_PATH = process.argv[3] || '';
+const OUTPUT_DIR = process.argv[3] || '';
 
 if (!QA_DIR) {
-  console.error('Usage: node scripts/generate-knowledge-base.js <qa-upload-dir> [output-path]');
+  console.error('Usage: node scripts/generate-knowledge-base.js <qa-upload-dir> [output-dir]');
   console.error('Example: node scripts/generate-knowledge-base.js /path/to/QA上传包');
   process.exit(1);
 }
@@ -33,6 +38,65 @@ const MANIFEST_PATH = path.join(QA_DIR, 'manifest.json');
 const TARGET_CHUNK_MIN = 1200;
 const TARGET_CHUNK_MAX = 2000;
 
+// BM25 参数（与 knowledge-search.js 保持一致）
+const BM25_K1 = 1.5;
+const BM25_B = 0.75;
+
+// ---------------------------------------------------------------------------
+// 校验 manifest 完整性
+// ---------------------------------------------------------------------------
+function validateManifest(manifest) {
+  const errors = [];
+  if (!manifest.files || !Array.isArray(manifest.files)) {
+    errors.push('manifest.files 不是数组');
+    return errors;
+  }
+  if (manifest.files.length !== 11) {
+    errors.push(`manifest.files 期望 11 个文件，实际 ${manifest.files.length}`);
+  }
+  for (const entry of manifest.files) {
+    if (!entry.filename) {
+      errors.push('manifest 条目缺少 filename');
+      continue;
+    }
+    if (!entry.source_group) {
+      errors.push(`${entry.filename}: 缺少 source_group`);
+    }
+    if (!entry.source_quality) {
+      errors.push(`${entry.filename}: 缺少 source_quality`);
+    }
+    if (typeof entry.bytes !== 'number' || entry.bytes <= 0) {
+      errors.push(`${entry.filename}: bytes 无效`);
+    }
+    if (!entry.sha256 || !/^[0-9a-f]{64}$/.test(entry.sha256)) {
+      errors.push(`${entry.filename}: sha256 无效`);
+    }
+  }
+  return errors;
+}
+
+// ---------------------------------------------------------------------------
+// 校验文件存在、字节数、SHA-256
+// ---------------------------------------------------------------------------
+function verifyFile(filePath, entry) {
+  if (!fs.existsSync(filePath)) {
+    return `文件不存在: ${entry.filename}`;
+  }
+  const stat = fs.statSync(filePath);
+  if (stat.size !== entry.bytes) {
+    return `${entry.filename}: 字节数不符（期望 ${entry.bytes}，实际 ${stat.size}）`;
+  }
+  const content = fs.readFileSync(filePath);
+  const hash = crypto.createHash('sha256').update(content).digest('hex');
+  if (hash !== entry.sha256) {
+    return `${entry.filename}: SHA-256 不符（期望 ${entry.sha256.slice(0, 16)}...，实际 ${hash.slice(0, 16)}...）`;
+  }
+  return null;
+}
+
+// ---------------------------------------------------------------------------
+// 解析与分块
+// ---------------------------------------------------------------------------
 function parseFrontmatter(text) {
   const fmMatch = text.match(/^---\n([\s\S]*?)\n---\n/);
   if (!fmMatch) return { frontmatter: {}, body: text };
@@ -54,16 +118,6 @@ function extractKeywords(content) {
       const segs = title.split(/[\s,，。、;；：:？?！!（）()【】\[\]"""''《》<>\/\-—|]+/);
       for (const seg of segs) {
         if (/^[\u4e00-\u9fa5]{2,8}$/.test(seg)) keywords.add(seg);
-      }
-    }
-  }
-  const topicsMatch = content.match(/topics:\s*\n([\s\S]*?)(?=\n\w|\n---|\nsource_refs)/);
-  if (topicsMatch) {
-    for (const line of topicsMatch[1].split('\n')) {
-      const m = line.match(/\s+-\s+(.+)/);
-      if (m) {
-        const t = m[1].trim();
-        if (/^[\u4e00-\u9fa5]{2,8}$/.test(t)) keywords.add(t);
       }
     }
   }
@@ -131,7 +185,7 @@ function processQaFile(filePath, manifestEntry) {
     const trimmed = part.trim();
     if (!trimmed) continue;
 
-    const { frontmatter: subFm, body: subBody } = parseFrontmatter(trimmed);
+    const { body: subBody } = parseFrontmatter(trimmed);
     const subfileTitle = extractSubfileTitle(trimmed) || `子文件${subfileIndex + 1}`;
 
     let subfilePath = '';
@@ -171,21 +225,141 @@ function processQaFile(filePath, manifestEntry) {
   return chunks;
 }
 
+// ---------------------------------------------------------------------------
+// 中文分词（与 knowledge-search.js 保持一致）
+// ---------------------------------------------------------------------------
+function tokenize(text) {
+  const tokens = [];
+  if (!text) return tokens;
+
+  const segments = text.split(/[\s,，。、;；：:？?！!（）()【】\[\]"""''《》<>\/\-—|·•]+/);
+  for (const seg of segments) {
+    if (!seg) continue;
+    if (/^[\u4e00-\u9fa5]{2,4}$/.test(seg)) {
+      tokens.push(seg);
+    }
+    for (let i = 0; i <= seg.length - 2; i++) {
+      const bg = seg.slice(i, i + 2);
+      if (/^[\u4e00-\u9fa5]{2}$/.test(bg)) tokens.push(bg);
+    }
+    for (let i = 0; i <= seg.length - 3; i++) {
+      const tg = seg.slice(i, i + 3);
+      if (/^[\u4e00-\u9fa5]{3}$/.test(tg)) tokens.push(tg);
+    }
+  }
+  return tokens;
+}
+
+// 主题领域关键词 — 用于查询扩展（与 knowledge-search.js 保持一致）
+const TOPIC_KEYWORDS = {
+  '天纪': ['天纪', '天机道', '人间道', '地脉道', '紫微', '斗数', '易经', '六十四卦', '风水'],
+  '针灸': ['针灸', '针法', '灸法', '经络', '穴位', '针灸大成'],
+  '方剂': ['方剂', '经方', '汉唐', '汤方', '桂枝汤', '麻黄汤', '小柴胡', '理中', '四逆'],
+  '课程': ['课程', '讲座', '演讲', '闭门课', '扶阳', '梁冬'],
+  '命理': ['八字', '四柱', '紫微', '斗数', '命理', '十神', '五行'],
+};
+
+// ---------------------------------------------------------------------------
+// 构建倒排索引（紧凑格式）
+// ---------------------------------------------------------------------------
+function buildInvertedIndex(chunks) {
+  // token -> Map<docIndex, tf>
+  const inverted = new Map();
+  const docLengths = [];
+
+  for (let i = 0; i < chunks.length; i++) {
+    const tokens = tokenize(chunks[i].content);
+    docLengths.push(tokens.length);
+
+    // 统计每个 token 在本文档的 tf
+    const tfMap = new Map();
+    for (const t of tokens) {
+      tfMap.set(t, (tfMap.get(t) || 0) + 1);
+    }
+
+    // 写入倒排表
+    for (const [token, tf] of tfMap) {
+      if (!inverted.has(token)) inverted.set(token, []);
+      inverted.get(token).push([i, tf]);
+    }
+  }
+
+  // 过滤低频 token（df < 2）— 大幅减少索引体积，对检索质量影响极小
+  let filteredCount = 0;
+  const filteredInverted = new Map();
+  for (const [token, postings] of inverted) {
+    if (postings.length < 2) {
+      filteredCount++;
+      continue;
+    }
+    filteredInverted.set(token, postings);
+  }
+  console.log(`过滤低频 token: ${filteredCount} 个（df<2），保留 ${filteredInverted.size} 个`);
+
+  // 序列化为扁平格式：token -> [docIdx1, tf1, docIdx2, tf2, ...]
+  // 比嵌套数组 [[docIdx, tf], ...] 节省 ~50% 内存
+  const invertedObj = {};
+  for (const [token, postings] of filteredInverted) {
+    const flat = [];
+    for (const [idx, tf] of postings) {
+      flat.push(idx, tf);
+    }
+    invertedObj[token] = flat;
+  }
+
+  const totalTokens = docLengths.reduce((s, n) => s + n, 0);
+  const avgDocLength = chunks.length > 0 ? totalTokens / chunks.length : 0;
+
+  return {
+    total_docs: chunks.length,
+    avg_doc_length: Math.round(avgDocLength * 100) / 100,
+    doc_lengths: docLengths,
+    inverted_index: invertedObj,
+    topic_keywords: TOPIC_KEYWORDS, // 内嵌以便运行时使用
+  };
+}
+
+// ---------------------------------------------------------------------------
+// 主流程
+// ---------------------------------------------------------------------------
 function main() {
   if (!fs.existsSync(MANIFEST_PATH)) {
     console.error(`Manifest not found: ${MANIFEST_PATH}`);
     process.exit(1);
   }
   const manifest = JSON.parse(fs.readFileSync(MANIFEST_PATH, 'utf-8'));
-  const allChunks = [];
-  const sourceStats = [];
 
+  // 1. 校验 manifest 结构
+  const manifestErrors = validateManifest(manifest);
+  if (manifestErrors.length) {
+    console.error('Manifest 校验失败:');
+    manifestErrors.forEach((e) => console.error(`  - ${e}`));
+    process.exit(1);
+  }
+  console.log('✓ Manifest 结构校验通过');
+
+  // 2. 校验每个文件的存在性、字节数、SHA-256
+  let verifyErrors = 0;
   for (const entry of manifest.files) {
     const filePath = path.join(QA_DIR, entry.filename);
-    if (!fs.existsSync(filePath)) {
-      console.error(`Missing: ${filePath}`);
-      continue;
+    const err = verifyFile(filePath, entry);
+    if (err) {
+      console.error(`✗ ${err}`);
+      verifyErrors++;
+    } else {
+      console.log(`✓ ${entry.filename}: ${entry.bytes} bytes, SHA-256 OK`);
     }
+  }
+  if (verifyErrors > 0) {
+    console.error(`\n${verifyErrors} 个文件校验失败，中止生成`);
+    process.exit(1);
+  }
+
+  // 3. 分块
+  const allChunks = [];
+  const sourceStats = [];
+  for (const entry of manifest.files) {
+    const filePath = path.join(QA_DIR, entry.filename);
     const chunks = processQaFile(filePath, entry);
     console.log(`${entry.filename}: ${chunks.length} chunks, ${chunks.reduce((s, c) => s + c.content_length, 0)} chars`);
     allChunks.push(...chunks);
@@ -197,7 +371,13 @@ function main() {
     });
   }
 
-  const output = {
+  if (allChunks.length === 0) {
+    console.error('生成 0 个分块，中止');
+    process.exit(1);
+  }
+
+  // 4. 构建知识库 JSON
+  const kbOutput = {
     corpus_version: manifest.corpus_version,
     generated_at: new Date().toISOString(),
     source_manifest: {
@@ -214,29 +394,39 @@ function main() {
     chunks: allChunks,
   };
 
-  const jsonStr = JSON.stringify(output, null, 0);
-  const sizeKB = Math.round(jsonStr.length / 1024);
+  // 5. 构建倒排索引
+  console.log('\n构建倒排索引...');
+  const indexOutput = buildInvertedIndex(allChunks);
+  const indexSize = JSON.stringify(indexOutput).length;
+  console.log(`倒排索引: ${Object.keys(indexOutput.inverted_index).length} 个 token, ${Math.round(indexSize / 1024)} KB`);
 
-  if (OUTPUT_PATH) {
-    fs.writeFileSync(OUTPUT_PATH, jsonStr, 'utf-8');
-    console.log(`\nOutput: ${OUTPUT_PATH}`);
-  } else {
-    // 默认写入两个云函数目录
-    const repoRoot = path.resolve(__dirname, '..');
-    const targets = [
-      path.join(repoRoot, 'cloudbase', 'functions', 'nihaixia-qa-router', 'knowledge-base.json'),
-      path.join(repoRoot, 'cloudbase', 'functions', 'nihaixia-qa-mp', 'knowledge-base.json'),
-    ];
-    for (const target of targets) {
-      fs.writeFileSync(target, jsonStr, 'utf-8');
-      console.log(`Output: ${target}`);
-    }
+  // 6. 写入文件
+  const jsonStr = JSON.stringify(kbOutput, null, 0);
+  const indexStr = JSON.stringify(indexOutput, null, 0);
+  const kbSizeKB = Math.round(jsonStr.length / 1024);
+  const indexSizeKB = Math.round(indexStr.length / 1024);
+
+  const targets = OUTPUT_DIR
+    ? [OUTPUT_DIR]
+    : [
+        path.join(__dirname, '..', 'cloudbase', 'functions', 'nihaixia-qa-router'),
+        path.join(__dirname, '..', 'cloudbase', 'functions', 'nihaixia-qa-mp'),
+      ];
+
+  for (const dir of targets) {
+    const kbPath = path.join(dir, 'knowledge-base.json');
+    const idxPath = path.join(dir, 'inverted-index.json');
+    fs.writeFileSync(kbPath, jsonStr, 'utf-8');
+    fs.writeFileSync(idxPath, indexStr, 'utf-8');
+    console.log(`Output: ${kbPath} (${kbSizeKB} KB)`);
+    console.log(`Output: ${idxPath} (${indexSizeKB} KB)`);
   }
 
-  console.log(`Total chunks: ${allChunks.length}`);
-  console.log(`Total chars: ${output.chunk_stats.total_chars}`);
-  console.log(`Avg chunk length: ${output.chunk_stats.avg_chunk_length}`);
-  console.log(`File size: ${sizeKB} KB`);
+  console.log(`\nTotal chunks: ${allChunks.length}`);
+  console.log(`Total chars: ${kbOutput.chunk_stats.total_chars}`);
+  console.log(`Avg chunk length: ${kbOutput.chunk_stats.avg_chunk_length}`);
+  console.log(`Knowledge base: ${kbSizeKB} KB`);
+  console.log(`Inverted index: ${indexSizeKB} KB`);
 }
 
 main();

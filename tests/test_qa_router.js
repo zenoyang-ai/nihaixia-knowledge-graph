@@ -32,7 +32,8 @@ function event(body, origin = 'https://zenoyang-ai.github.io') {
 
 // --- Mock SDK factories ---
 
-function mockSdk({ text, runError, noFinish, emptyStream, expectedMessage } = {}) {
+function mockSdk({ text, runError, noFinish, emptyStream, expectedMessage,
+                    hybridText, hybridError, hybridEmpty } = {}) {
   return {
     SYMBOL_DEFAULT_ENV: '__default_env__',
     init() {
@@ -59,6 +60,21 @@ function mockSdk({ text, runError, noFinish, emptyStream, expectedMessage } = {}
                 };
               },
             },
+            // v3.1.0+: 混合 RAG 使用 createModel().generateText()
+            createModel(modelName) {
+              return {
+                async generateText(params) {
+                  // 模型异常
+                  if (hybridError) throw new Error('hybrid model error');
+                  // 空回答
+                  if (hybridEmpty) return { text: '' };
+                  // 正常回答
+                  if (hybridText) return { text: hybridText };
+                  // 未配置 hybrid mock 时抛错（避免静默通过）
+                  throw new Error('mockSdk: hybrid mock not configured. Set hybridText/hybridError/hybridEmpty.');
+                },
+              };
+            },
           };
         },
       };
@@ -68,6 +84,11 @@ function mockSdk({ text, runError, noFinish, emptyStream, expectedMessage } = {}
 
 function cloudbaseWithText(text) {
   return mockSdk({ text });
+}
+
+// Hybrid RAG 专用 mock：只配置 generateText，不配置 bot.sendMessage
+function hybridSdk({ hybridText, hybridError, hybridEmpty } = {}) {
+  return mockSdk({ hybridText, hybridError, hybridEmpty });
 }
 
 // --- Tests ---
@@ -484,6 +505,127 @@ test('dangerous questions are intercepted with 400 medical advice', async () => 
     const body = JSON.parse(response.body);
     assert.match(body.error, /医疗建议/);
   }
+});
+
+// ---------------------------------------------------------------------------
+// v3.1.0 Hybrid RAG 专项测试
+// 通过依赖注入 searchFn 控制 searchDocuments 返回，真正测试 hybrid 主线路
+// ---------------------------------------------------------------------------
+
+// Mock searchDocuments：返回指定文档
+function mockSearchFn(docs) {
+  return (query, limit) => docs.slice(0, limit);
+}
+
+const MOCK_DOCS = [
+  {
+    source_group: '伤寒论',
+    source_quality: 'primary',
+    subfile: '伤寒论.md',
+    chunk_title: '太阳病篇',
+    content: '太阳病，发热，汗出，恶风，脉缓者，名为中风。',
+    content_length: 100,
+    score: 25.33,
+    matched_terms: 5,
+    evidence: '太阳病，发热，汗出，恶风',
+  },
+];
+
+// 测试 H1：hybrid 成功 — 检索到文档 + generateText 返回文本 → 200
+test('hybrid RAG success: docs found + generateText returns text → 200 with provider cloudbase-hybrid', async () => {
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => { throw new Error('fetch should not be called'); },
+    cloudbaseSdk: hybridSdk({ hybridText: '太阳病是伤寒论中的外感病初起阶段' }),
+    searchFn: mockSearchFn(MOCK_DOCS),
+    randomUUID: () => 'hybrid-success',
+  });
+  const response = await router.main(event({ message: '什么是太阳病' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.provider, 'cloudbase-hybrid');
+  assert.equal(body.reply, '太阳病是伤寒论中的外感病初起阶段');
+  assert.ok(Array.isArray(body.knowledge_sources));
+  assert.equal(body.knowledge_sources.length, 1);
+  assert.equal(body.knowledge_sources[0].source_group, '伤寒论');
+  assert.equal(body.knowledge_sources[0].evidence, '太阳病，发热，汗出，恶风');
+});
+
+// 测试 H2：hybrid 零结果 — 检索无文档 → 200 + "知识库中暂无"
+test('hybrid RAG no results: no docs found → 200 with "知识库中暂无相关内容"', async () => {
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => { throw new Error('fetch should not be called'); },
+    cloudbaseSdk: hybridSdk({ hybridText: 'should not reach here' }),
+    searchFn: mockSearchFn([]), // 空结果
+    randomUUID: () => 'hybrid-empty',
+  });
+  const response = await router.main(event({ message: '法国大革命发生了什么' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.provider, 'hybrid');
+  assert.match(body.reply, /知识库中暂无/);
+  assert.equal(body.knowledge_sources.length, 0);
+});
+
+// 测试 H3：hybrid 空回答 — generateText 返回空文本 → 降级到备用线路
+test('hybrid RAG empty reply: generateText returns empty → falls through to backup', async () => {
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => ({
+      ok: true, status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Yuanqi 备用回答' }, finish_reason: 'stop' }],
+      }),
+    }),
+    cloudbaseSdk: hybridSdk({ hybridEmpty: true }),
+    searchFn: mockSearchFn(MOCK_DOCS),
+    randomUUID: () => 'hybrid-empty-reply',
+  });
+  const response = await router.main(event({ message: '什么是太阳病' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.provider, 'yuanqi');
+  assert.equal(body.reply, 'Yuanqi 备用回答');
+});
+
+// 测试 H4：hybrid 模型异常 — generateText 抛错 → 降级到备用线路
+test('hybrid RAG model error: generateText throws → falls through to backup', async () => {
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => ({
+      ok: true, status: 200,
+      json: async () => ({
+        choices: [{ message: { content: 'Yuanqi 备用回答' }, finish_reason: 'stop' }],
+      }),
+    }),
+    cloudbaseSdk: hybridSdk({ hybridError: true }),
+    searchFn: mockSearchFn(MOCK_DOCS),
+    randomUUID: () => 'hybrid-error',
+  });
+  const response = await router.main(event({ message: '什么是太阳病' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.provider, 'yuanqi');
+  assert.equal(body.reply, 'Yuanqi 备用回答');
+});
+
+// 测试 H5：hybrid 输出安全检查 — generateText 返回处方 → 拦截为 200 安全提示
+test('hybrid RAG output safety: generateText returns dosage → blocked with safety message', async () => {
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => { throw new Error('fetch should not be called'); },
+    cloudbaseSdk: hybridSdk({ hybridText: '建议服用桂枝10克，每日两次' }),
+    searchFn: mockSearchFn(MOCK_DOCS),
+    randomUUID: () => 'hybrid-output-blocked',
+  });
+  const response = await router.main(event({ message: '什么是太阳病' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.equal(body.provider, 'system');
+  assert.equal(body.blocked, true);
+  assert.match(body.reply, /学习研究/);
+  assert.equal(body.knowledge_sources.length, 0);
 });
 
 // 测试 3：绕过问法被拦截 — 角色扮演绕过 + 可执行医疗请求 必须返回 400

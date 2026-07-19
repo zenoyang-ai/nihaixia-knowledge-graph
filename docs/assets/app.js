@@ -250,10 +250,33 @@ document.addEventListener('DOMContentLoaded', () => {
         if (provider === 'cloudbase') {
             return degraded ? 'CloudBase 知识库备用线路（降级）' : 'CloudBase 知识库备用线路';
         }
+        if (provider === 'cloudbase-hybrid' || provider === 'hybrid') {
+            return degraded ? '学习资料库（降级）' : '学习资料库';
+        }
+        if (provider === 'system') {
+            return '系统安全提示';
+        }
         return provider || '未知线路';
     }
 
-    function addMessage(role, content, providerInfo) {
+    function formatKnowledgeSources(sources) {
+        if (!sources || !sources.length) return '';
+        const items = sources.map((s) => {
+            const sourceName = s.source_group || s.chunk_title || '未知来源';
+            const evidence = s.evidence ? `<div class="qa-evidence">${formatContent(s.evidence)}</div>` : '';
+            const scoreInfo = s.score ? ` <span class="qa-source-score">相关度 ${s.score}</span>` : '';
+            return `<div class="qa-source-item">
+                <div class="qa-source-title">📚 ${sourceName}${scoreInfo}</div>
+                ${evidence}
+            </div>`;
+        }).join('');
+        return `<div class="qa-sources">
+            <div class="qa-sources-title">📎 引用资料（${sources.length} 条）</div>
+            ${items}
+        </div>`;
+    }
+
+    function addMessage(role, content, providerInfo, knowledgeSources) {
         if (!messagesEl) return;
         removeEmptyState();
         const div = document.createElement('div');
@@ -263,9 +286,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const degradedClass = providerInfo.degraded ? ' qa-provider-degraded' : '';
             providerTag = `<span class="qa-provider-tag${degradedClass}">${getProviderLabel(providerInfo.provider, providerInfo.degraded)}</span>`;
         }
+        const sourcesHtml = (role === 'assistant' && knowledgeSources && knowledgeSources.length)
+            ? formatKnowledgeSources(knowledgeSources)
+            : '';
         div.innerHTML = `
             <span class="qa-chat-role">${role === 'user' ? '你' : '倪海厦知识库助手'}${providerTag}</span>
             <div class="qa-chat-bubble">${formatContent(content)}</div>
+            ${sourcesHtml}
         `;
         messagesEl.appendChild(div);
         messagesEl.scrollTop = messagesEl.scrollHeight;
@@ -526,7 +553,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (res.ok && data.reply) {
                 const providerInfo = { provider: data.provider, degraded: data.degraded };
-                addMessage('assistant', data.reply, providerInfo);
+                addMessage('assistant', data.reply, providerInfo, data.knowledge_sources);
                 clearStatus();
                 lastFailedMessage = '';
                 if (retryBtn) retryBtn.hidden = true;

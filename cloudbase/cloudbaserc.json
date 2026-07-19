@@ -7,7 +7,7 @@
       "handler": "index.main",
       "timeout": 120,
       "runtime": "Nodejs18.15",
-      "memorySize": 256,
+      "memorySize": 1024,
       "installDependency": true,
       "envVariables": {
         "PRIMARY_PROVIDER": "cloudbase-hybrid",
@@ -19,7 +19,7 @@
       "handler": "index.main",
       "timeout": 60,
       "runtime": "Nodejs18.15",
-      "memorySize": 256,
+      "memorySize": 1024,
       "installDependency": true,
       "envVariables": {
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"

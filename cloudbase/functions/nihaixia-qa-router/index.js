@@ -232,9 +232,10 @@ class RateLimiter {
 // ---------------------------------------------------------------------------
 // 路由工厂函数（支持依赖注入，便于测试）
 // ---------------------------------------------------------------------------
-function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
+function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID, searchFn } = {}) {
   const _fetch = fetchImpl || fetch;
   const _cloudbase = cloudbaseSdk || cloudbase;
+  const _search = searchFn || searchDocuments;
   const _uuid = randomUUID || (() => {
     const ts = Date.now().toString(36);
     const rand = Math.random().toString(36).slice(2, 10);
@@ -366,10 +367,16 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID } = {}) {
       const query = normalized.messages[normalized.messages.length - 1].content;
 
       // 1. BM25 检索相关文档（已带阈值过滤）
-      const docs = searchDocuments(query, 5);
+      const docs = _search(query, 5);
       if (!docs.length) {
-        console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'skipped', reason: 'no_docs', elapsed: Date.now() - startTime }));
-        return null;
+        // 无相关文档时立即返回 HTTP 200，不进入备用线路
+        console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'no_results', elapsed: Date.now() - startTime }));
+        return buildResponse(200, {
+          reply: '知识库中暂无与您问题相关的内容。请尝试更换关键词，或询问关于中医经典理论、天纪、针灸、方剂等方面的问题。',
+          provider: 'hybrid',
+          knowledge_sources: [],
+          request_id: requestId,
+        }, '', []);
       }
 
       // 2. 构建上下文（按分块，总量限制 MAX_CONTEXT_CHARS）
