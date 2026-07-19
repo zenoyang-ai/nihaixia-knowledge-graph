@@ -383,31 +383,51 @@ test('v5.2.0 history：拒绝非字符串 role', () => {
 });
 
 // ===========================================================================
-// v5.1.0 新增：检索器测试（BM25 + 阈值）
+// v5.1.0 新增：检索器测试（BM25 + 阈值 + 去重 + source_group 限额）
 // 使用 tests/fixtures/ 下的固定小型 fixture，CI 必须运行（禁止静默跳过）
+//
+// 关键：fixture 必须真正注入检索模块，而不是"发现 fixture 存在"。
+// 通过 searchMod.setDataDir(fixtureDir) 把数据目录指向 tests/fixtures/，
+// 通过 searchMod.setMinScoreThreshold(2.0) 降低阈值（fixture N=22，分数天然远低于生产 N=4837）。
+//
+// 隔离原则（用户 2026-07-19 明确要求）：
+//   不让测试依赖本机被 .gitignore 排除的完整语料；
+//   本地删除/暂时隐藏完整语料后，测试结果也必须与 CI 一致。
+//   因此检索测试始终使用 tests/fixtures/，不读函数目录的 KB。
 // ===========================================================================
-const kbPath = path.join(__dirname, '..', 'cloudbase', 'functions', 'nihaixia-qa-mp', 'knowledge-base.json');
 const fixtureKbPath = path.join(__dirname, 'fixtures', 'knowledge-base.json');
-const fixtureIdxPath = path.join(__dirname, 'fixtures', 'inverted-index.json');
+const fixtureDir = path.join(__dirname, 'fixtures');
 
-// 优先使用函数目录的 KB，否则使用 fixture
-const useFixture = !fs.existsSync(kbPath) && fs.existsSync(fixtureKbPath);
-if (useFixture) {
-  // 将 fixture 路径注入 searchDocuments 模块
-  // 通过 monkey-patch fs.existsSync 和 fs.readFileSync 不现实
-  // 改为：直接复制 fixture 到函数目录（CI 中由 workflow 负责）
-  console.log('Note: using fixture KB (function dir has no knowledge-base.json)');
+if (!fs.existsSync(fixtureKbPath)) {
+  throw new Error('tests/fixtures/knowledge-base.json not found. CI must provide it.');
 }
 
-if (!fs.existsSync(fixtureKbPath) && !fs.existsSync(kbPath)) {
-  throw new Error('Neither function KB nor fixture KB found. CI must provide tests/fixtures/knowledge-base.json');
+// 真正注入 fixture 到检索模块
+let searchMod = null;
+try {
+  searchMod = require(searchPath);
+} catch (err) {
+  console.log('Note: search module not available:', err.message);
+}
+
+if (searchMod) {
+  // 始终使用 fixture，保证本地与 CI 行为一致
+  searchMod.setDataDir(fixtureDir);
+  // fixture 只有 22 个分块，BM25 分数远低于生产（N=4837, threshold=18.0）
+  // 测试目的是验证检索逻辑（召回相关 + 过滤无关），不是验证生产阈值
+  searchMod.setMinScoreThreshold(2.0);
+  searchMod.setMinMatchedTerms(2);
+  console.log('Note: fixture injected via setDataDir, threshold=2.0 for small fixture (local=CI parity)');
+  // 确保 searchDocuments 引用注入后的模块
+  searchDocuments = searchMod.searchDocuments;
 }
 
 if (searchDocuments) {
   test('v5.1.0 检索：太阳病问题应返回结果', () => {
     const docs = searchDocuments('什么是太阳病', 5);
     assert.ok(docs.length > 0, '应返回相关文档');
-    assert.ok(docs[0].score >= 18, '分数应达阈值');
+    // fixture 阈值 2.0（N=22，远小于生产 N=4837）
+    assert.ok(docs[0].score >= 2.0, `分数应达 fixture 阈值 2.0，实际 ${docs[0].score}`);
   });
 
   test('v5.1.0 检索：天纪紫微斗数应返回结果', () => {
@@ -443,6 +463,20 @@ if (searchDocuments) {
       assert.ok(docs[0].evidence, '应包含 evidence 字段');
       assert.ok(docs[0].source_group, '应包含 source_group 字段');
       assert.ok(docs[0].chunk_title, '应包含 chunk_title 字段');
+    }
+  });
+
+  test('v5.1.0 检索：同一 source_group 最多 2 条结果', () => {
+    const docs = searchDocuments('什么是太阳病', 5);
+    if (docs.length >= 3) {
+      const groupCount = new Map();
+      for (const d of docs) {
+        const g = d.source_group || '__unknown__';
+        groupCount.set(g, (groupCount.get(g) || 0) + 1);
+      }
+      for (const [, count] of groupCount) {
+        assert.ok(count <= 2, `同一 source_group 不应超过 2 条，实际 ${count} 条`);
+      }
     }
   });
 }

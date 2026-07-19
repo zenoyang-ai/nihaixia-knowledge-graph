@@ -123,6 +123,12 @@ test('builds Yuanqi payload with documented content array shape', () => {
   });
 });
 
+// Mock searchFn：返回空结果，hybrid 返回 200 "知识库暂无"（用于测试 hybrid 无结果场景）
+const emptySearch = () => [];
+
+// Mock searchFn：抛异常，hybrid 失败后走 fallback（用于测试 CloudBase/Yuanqi fallback 链路）
+const throwingSearch = () => { throw new Error('search unavailable'); };
+
 // Phase 2 Test 1: Yuanqi fails → CloudBase Agent succeeds with ai.bot.sendMessage()
 test('uses CloudBase Agent as fallback after Yuanqi failure', async () => {
   let fetchCalls = 0;
@@ -133,6 +139,7 @@ test('uses CloudBase Agent as fallback after Yuanqi failure', async () => {
       return { ok: false, status: 503, json: async () => ({}) };
     },
     cloudbaseSdk: mockSdk({ text: '来自 CloudBase 知识库', expectedMessage: '天纪是什么？' }),
+    searchFn: throwingSearch, // hybrid 故障，走 CloudBase fallback
     randomUUID: () => 'request-1',
   });
   const response = await router.main(event({ message: '天纪是什么？' }));
@@ -175,6 +182,7 @@ test('CloudBase mock uses current bot.sendMessage textStream API', async () => {
     env: ENV,
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     cloudbaseSdk: sdk,
+    searchFn: throwingSearch, // hybrid 故障，走 CloudBase fallback
   });
   await router.main(event({ message: '伤寒论' }));
   assert.equal(sendMessageCalled, true);
@@ -186,6 +194,7 @@ test('missing CLOUDBASE_BOT_ID skips CloudBase and health shows false', async ()
     env: ENV_NO_CB,
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     cloudbaseSdk: cloudbaseWithText('should not reach here'),
+    searchFn: throwingSearch, // hybrid 故障，走 fallback；无 CLOUDBASE_BOT_ID → 502
   });
 
   // Health check
@@ -230,6 +239,7 @@ test('Yuanqi finish_reason sensitive returns safe prompt without fallback', asyn
         };
       },
     },
+    searchFn: emptySearch,
   });
   const response = await router.main(event({ message: '某些敏感问题' }));
   const body = JSON.parse(response.body);
@@ -267,6 +277,7 @@ test('Yuanqi 400 returns controlled error without fallback', async () => {
         };
       },
     },
+    searchFn: emptySearch,
   });
   const response = await router.main(event({ message: '伤寒论' }));
   assert.equal(response.statusCode, 400);
@@ -281,6 +292,7 @@ test('CloudBase text stream error causes fallback to fail', async () => {
     env: ENV,
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     cloudbaseSdk: mockSdk({ runError: true }),
+    searchFn: throwingSearch, // hybrid 故障，走 CloudBase fallback
   });
   const response = await router.main(event({ message: '伤寒论' }));
   assert.equal(response.statusCode, 502);
@@ -292,6 +304,7 @@ test('CloudBase empty text stream causes fallback to fail', async () => {
     env: ENV,
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     cloudbaseSdk: mockSdk({ noFinish: true }),
+    searchFn: throwingSearch, // hybrid 故障，走 CloudBase fallback
   });
   const response = await router.main(event({ message: '伤寒论' }));
   assert.equal(response.statusCode, 502);
@@ -303,6 +316,7 @@ test('CloudBase empty stream causes fallback to fail', async () => {
     env: ENV,
     fetchImpl: async () => ({ ok: false, status: 503, json: async () => ({}) }),
     cloudbaseSdk: mockSdk({ emptyStream: true }),
+    searchFn: throwingSearch, // hybrid 故障，走 CloudBase fallback
   });
   const response = await router.main(event({ message: '伤寒论' }));
   assert.equal(response.statusCode, 502);
@@ -327,6 +341,8 @@ test('returns 502 when both RAG providers fail', async () => {
     env: ENV,
     fetchImpl: async () => ({ ok: false, status: 429, json: async () => ({}) }),
     cloudbaseSdk: { SYMBOL_DEFAULT_ENV: '__env__', init() { throw new Error('cloudbase unavailable'); } },
+    // hybrid 抛异常（模拟检索器故障），走 fallback
+    searchFn: () => { throw new Error('search failed'); },
   });
   const response = await router.main(event({ message: '伤寒论重点？' }));
   assert.equal(response.statusCode, 502);
@@ -393,6 +409,7 @@ test('Yuanqi success returns immediately without calling CloudBase', async () =>
         };
       },
     },
+    searchFn: emptySearch,
   });
   const response = await router.main(event({ message: '伤寒论是什么？' }));
   const body = JSON.parse(response.body);
@@ -439,6 +456,7 @@ test('learning questions are not intercepted and reach the provider', async () =
       },
       // 备用线路绝不应被触达：触达即说明学习问法被错误拦截导致主线路失败
       cloudbaseSdk: mockSdk({ text: 'must not reach here' }),
+      searchFn: emptySearch, // 学习问法测试 Yuanqi 主线路，hybrid 模拟无结果
       randomUUID: () => `req-${question.slice(0, 2)}`,
     });
 

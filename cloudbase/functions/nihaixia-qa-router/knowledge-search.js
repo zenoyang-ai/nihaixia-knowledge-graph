@@ -1,15 +1,16 @@
 /**
- * 知识库检索模块 v3 — 倒排索引 + BM25
+ * 知识库检索模块 v4 — 倒排索引 + BM25 + 真哈希去重 + source_group 限额
  *
- * 改进（v3）：
- *   1. 运行时加载构建期生成的 inverted-index.json，不再为每个文档保存 token 数组和 Set
- *   2. 内存大幅下降：从 ~400MB 降到 ~80MB（仅加载倒排索引 + 文档内容）
- *   3. 检索速度提升：只打分包含查询 token 的文档，而非全量扫描
- *   4. 保留 BM25 阈值 + 最低匹配数 + 证据片段
+ * 改进（v4）：
+ *   1. 支持 setDataDir(dir) 注入测试 fixture，不再固定读 __dirname
+ *   2. 支持 setMinScoreThreshold(n) 测试时降低阈值（fixture N 小，分数天然低）
+ *   3. 去重改用 SHA-256(content) 而非 content.slice(0, 200)
+ *   4. 同一 source_group 最多保留 2 个结果，保证多样性
+ *   5. 保留 BM25 阈值 + 最低匹配数 + 证据片段
  *
  * 依赖：
  *   - knowledge-base.json：分块语料（chunks 数组）
- *   - inverted-index.json：倒排索引（token → [[docIndex, tf], ...]）
+ *   - inverted-index.json：倒排索引（token -> [docIdx1, tf1, docIdx2, tf2, ...]）
  *
  * searchDocuments(query, limit) 返回 [{source_group, source_quality, subfile,
  *   chunk_title, content, content_length, score, matched_terms, evidence}]
@@ -17,6 +18,7 @@
 
 const path = require('path');
 const fs = require('fs');
+const crypto = require('crypto');
 
 // 模块级缓存
 let _data = null;          // knowledge-base.json
@@ -25,11 +27,19 @@ let _docLengths = null;    // 数组：每个文档的 token 数
 let _avgDocLength = 0;
 let _totalDocs = 0;
 
+// 数据目录与阈值覆盖（供测试注入）
+let _dataDir = null;             // null = 使用 __dirname
+let _thresholdOverride = null;   // null = 使用 MIN_SCORE_THRESHOLD
+let _matchedTermsOverride = null;
+
 // BM25 参数
 const BM25_K1 = 1.5;
 const BM25_B = 0.75;
 const MIN_SCORE_THRESHOLD = 18.0;
 const MIN_MATCHED_TERMS = 3;
+
+// 同一 source_group 在最终结果中最多占多少条（保证多样性）
+const MAX_PER_SOURCE_GROUP = 2;
 
 // 主题领域关键词（备用，如果 inverted-index.json 未内嵌）
 const TOPIC_KEYWORDS_FALLBACK = {
@@ -41,6 +51,34 @@ const TOPIC_KEYWORDS_FALLBACK = {
 };
 
 let _topicKeywords = TOPIC_KEYWORDS_FALLBACK;
+
+/**
+ * 注入数据目录（用于测试 fixture）。
+ * 调用后重置缓存，下次 loadData 会从新目录读取。
+ */
+function setDataDir(dir) {
+  _dataDir = dir;
+  _data = null;
+  _inverted = null;
+  _docLengths = null;
+  _avgDocLength = 0;
+  _totalDocs = 0;
+}
+
+/**
+ * 覆盖 BM25 最低分阈值（用于测试 fixture，N 较小时分数天然较低）。
+ * 传 null 恢复默认值。
+ */
+function setMinScoreThreshold(t) {
+  _thresholdOverride = (typeof t === 'number' && t >= 0) ? t : null;
+}
+
+/**
+ * 覆盖最低匹配 token 数。传 null 恢复默认值。
+ */
+function setMinMatchedTerms(n) {
+  _matchedTermsOverride = (typeof n === 'number' && n >= 0) ? n : null;
+}
 
 // 中文分词：提取字符 bigram 和 trigram + 标点分割的词
 function tokenize(text) {
@@ -67,8 +105,9 @@ function tokenize(text) {
 
 function loadData() {
   if (_data) return _data;
-  const kbPath = path.join(__dirname, 'knowledge-base.json');
-  const idxPath = path.join(__dirname, 'inverted-index.json');
+  const baseDir = _dataDir || __dirname;
+  const kbPath = path.join(baseDir, 'knowledge-base.json');
+  const idxPath = path.join(baseDir, 'inverted-index.json');
 
   // 容错：文件缺失时返回空数据（CI 环境降级）
   if (!fs.existsSync(kbPath)) {
@@ -174,6 +213,9 @@ function searchDocuments(query, limit = 5) {
   const data = loadData();
   if (!_data.chunks.length || Object.keys(_inverted).length === 0) return [];
 
+  const threshold = _thresholdOverride !== null ? _thresholdOverride : MIN_SCORE_THRESHOLD;
+  const minMatched = _matchedTermsOverride !== null ? _matchedTermsOverride : MIN_MATCHED_TERMS;
+
   // 分词查询
   let queryTokens = tokenize(query);
 
@@ -201,22 +243,30 @@ function searchDocuments(query, limit = 5) {
   for (const docIndex of candidateDocs) {
     const docLength = _docLengths[docIndex] || 0;
     const { score, matchedCount } = bm25ScoreDoc(queryTokens, docIndex, docLength);
-    if (score < MIN_SCORE_THRESHOLD) continue;
-    if (matchedCount < MIN_MATCHED_TERMS) continue;
+    if (score < threshold) continue;
+    if (matchedCount < minMatched) continue;
     scored.push({ doc: _data.chunks[docIndex], score, matchedCount });
   }
 
   // 按分数降序
   scored.sort((a, b) => b.score - a.score);
 
-  // 按内容哈希去重：同一原文不同版本不重复占位
+  // 去重 + source_group 限额：
+  //   - 真正的 SHA-256 哈希，不再用前 200 字符
+  //   - 同一 source_group 最多保留 MAX_PER_SOURCE_GROUP 条，保证多样性
   const seenHashes = new Set();
+  const sourceGroupCount = new Map();
   const deduped = [];
   for (const s of scored) {
-    // 取内容前 200 字符的哈希作为去重键
-    const hashKey = s.doc.content.slice(0, 200);
+    const hashKey = crypto.createHash('sha256').update(s.doc.content).digest('hex');
     if (seenHashes.has(hashKey)) continue;
     seenHashes.add(hashKey);
+
+    const group = s.doc.source_group || '__unknown__';
+    const currentCount = sourceGroupCount.get(group) || 0;
+    if (currentCount >= MAX_PER_SOURCE_GROUP) continue;
+    sourceGroupCount.set(group, currentCount + 1);
+
     deduped.push(s);
     if (deduped.length >= limit) break;
   }
@@ -239,6 +289,10 @@ module.exports = {
   searchDocuments,
   loadData,
   tokenize,
+  setDataDir,
+  setMinScoreThreshold,
+  setMinMatchedTerms,
   MIN_SCORE_THRESHOLD,
   MIN_MATCHED_TERMS,
+  MAX_PER_SOURCE_GROUP,
 };

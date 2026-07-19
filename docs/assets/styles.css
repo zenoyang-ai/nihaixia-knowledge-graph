@@ -2077,6 +2077,89 @@ body {
     margin: 8px 0;
 }
 
+/* ============================================
+   引用资料卡片（hybrid RAG knowledge_sources）
+   ============================================ */
+.qa-sources {
+    margin-top: 12px;
+    padding-top: 10px;
+    border-top: 1px dashed rgba(145, 107, 66, 0.3);
+}
+
+.qa-sources-title {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-light);
+    margin-bottom: 8px;
+    letter-spacing: 0.3px;
+}
+
+.qa-source-item {
+    background: rgba(255, 250, 241, 0.6);
+    border: 1px solid rgba(231, 216, 193, 0.6);
+    border-left: 3px solid var(--accent-gold);
+    border-radius: 6px;
+    padding: 8px 12px;
+    margin-bottom: 6px;
+    font-size: 13px;
+    line-height: 1.5;
+    overflow-wrap: break-word;
+    word-break: break-word;
+}
+
+.qa-source-item:last-child {
+    margin-bottom: 0;
+}
+
+.qa-source-title {
+    font-weight: 600;
+    color: var(--ink);
+    font-size: 13px;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.qa-source-score {
+    font-size: 11px;
+    font-weight: 500;
+    color: var(--accent-green);
+    background: rgba(44, 112, 95, 0.08);
+    padding: 1px 6px;
+    border-radius: 10px;
+    white-space: nowrap;
+}
+
+.qa-evidence {
+    font-size: 12px;
+    color: var(--text-light);
+    line-height: 1.55;
+    padding: 4px 0 0;
+    border-top: 1px dotted rgba(165, 150, 132, 0.25);
+    margin-top: 4px;
+    /* 防止证据摘要过长造成横向溢出 */
+    max-height: 6em;
+    overflow-y: auto;
+    overflow-x: hidden;
+}
+
+/* 移动端适配：证据摘要更紧凑 */
+@media (max-width: 480px) {
+    .qa-source-item {
+        padding: 6px 10px;
+        font-size: 12px;
+    }
+    .qa-source-title {
+        font-size: 12px;
+    }
+    .qa-evidence {
+        font-size: 11px;
+        max-height: 5em;
+    }
+}
+
 .qa-chat-input-row {
     display: flex;
     gap: 10px;

@@ -50,6 +50,40 @@ jobs:
       - name: Validate docs/data/prompts.json
         run: node -e "JSON.parse(require('fs').readFileSync('./docs/data/prompts.json','utf8'))"
 
+      - name: Verify test fixtures exist
+        run: |
+          if [ ! -f "tests/fixtures/knowledge-base.json" ]; then
+            echo "ERROR: tests/fixtures/knowledge-base.json not found"
+            exit 1
+          fi
+          if [ ! -f "tests/fixtures/inverted-index.json" ]; then
+            echo "ERROR: tests/fixtures/inverted-index.json not found"
+            exit 1
+          fi
+          echo "Fixtures verified:"
+          ls -la tests/fixtures/knowledge-base.json tests/fixtures/inverted-index.json
+
+      - name: Validate fixture JSON structure
+        run: |
+          node -e "
+          const kb = require('./tests/fixtures/knowledge-base.json');
+          if (!kb.chunks || !Array.isArray(kb.chunks) || kb.chunks.length === 0) {
+            throw new Error('fixture knowledge-base.json: chunks missing or empty');
+          }
+          console.log('fixture KB chunks:', kb.chunks.length);
+          const idx = require('./tests/fixtures/inverted-index.json');
+          if (!idx.inverted_index || typeof idx.inverted_index !== 'object') {
+            throw new Error('fixture inverted-index.json: inverted_index missing');
+          }
+          if (!Array.isArray(idx.doc_lengths)) {
+            throw new Error('fixture inverted-index.json: doc_lengths missing');
+          }
+          if (idx.total_docs !== kb.chunks.length) {
+            throw new Error('fixture mismatch: total_docs=' + idx.total_docs + ' but chunks=' + kb.chunks.length);
+          }
+          console.log('fixture inverted_index tokens:', Object.keys(idx.inverted_index).length);
+          "
+
       - name: Run Python QA corpus tests (if exists)
         run: |
           if [ -f "tests/test_build_qa_corpus.py" ]; then
@@ -80,14 +114,20 @@ jobs:
         run: npm ci
         working-directory: cloudbase/functions/nihaixia-qa-router
 
-      - name: Run QA router tests
+      - name: Run QA router tests (24 tests)
         run: node --test tests/test_qa_router.js
 
       - name: Syntax check nihaixia-qa-router/index.js
         run: node --check cloudbase/functions/nihaixia-qa-router/index.js
 
+      - name: Syntax check nihaixia-qa-router/knowledge-search.js
+        run: node --check cloudbase/functions/nihaixia-qa-router/knowledge-search.js
+
       - name: Syntax check nihaixia-qa-mp/index.js
         run: node --check cloudbase/functions/nihaixia-qa-mp/index.js
+
+      - name: Syntax check nihaixia-qa-mp/knowledge-search.js
+        run: node --check cloudbase/functions/nihaixia-qa-mp/knowledge-search.js
 
       - name: Syntax check docs/assets/app.js
         run: node --check docs/assets/app.js
@@ -95,8 +135,36 @@ jobs:
       - name: Syntax check docs/assets/graph.js
         run: node --check docs/assets/graph.js
 
+      - name: Git diff check (whitespace errors)
+        run: git diff --check
+
   # ===========================================================================
-  # Job 3: 密钥扫描（内联 Python 脚本）
+  # Job 3: 小程序云函数测试（mp 56 tests）
+  # ===========================================================================
+  mp-tests:
+    name: MP Function Tests
+    needs: static-data-validation
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 18
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install mp function dependencies
+        run: npm ci
+        working-directory: cloudbase/functions/nihaixia-qa-mp
+
+      - name: Run QA mp tests (56 tests)
+        run: node --test tests/test_qa_mp.js
+
+  # ===========================================================================
+  # Job 4: 密钥扫描（内联 Python 脚本）
   # ===========================================================================
   secret-scan:
     name: Secret Scan
@@ -210,7 +278,7 @@ jobs:
           EOF
 
   # ===========================================================================
-  # Job 4: 小程序冒烟测试（可选，允许失败）
+  # Job 5: 小程序冒烟测试（可选，允许失败）
   # ===========================================================================
   mobile-smoke-test:
     name: Mobile Smoke Test (optional)
@@ -241,4 +309,3 @@ jobs:
           else
             echo "Checked $found .js file(s) under miniprogram/."
           fi
-
