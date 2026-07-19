@@ -29,8 +29,8 @@ function escapeHtml(text) {
 
 function formatInline(text) {
   let s = escapeHtml(text);
-  s = s.replace(/`([^`]+)`/g, '<code style="background:#EEF1ED;padding:2rpx 8rpx;border-radius:4rpx;font-size:26rpx;color:#55776C;">$1</code>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#EEF1ED;padding:3rpx 10rpx;border-radius:6rpx;font-size:27rpx;color:#55776C;font-family:Menlo,Monaco,monospace;">$1</code>');
+  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;color:#263238;">$1</strong>');
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return s;
 }
@@ -49,10 +49,18 @@ function formatContent(text) {
       continue;
     }
 
+    // 引用块 (> 开头) — 单独样式，灰底+左竖线
+    let quote = trimmed.match(/^>\s*(.*)/);
+    if (quote) {
+      if (inList) { html.push('</' + listType + '>'); inList = false; }
+      html.push('<div style="margin:14rpx 0;padding:14rpx 18rpx;background:#F4F7F4;border-left:6rpx solid #55776C;border-radius:6rpx;color:#6B767A;font-size:27rpx;line-height:1.7;">' + formatInline(quote[1]) + '</div>');
+      continue;
+    }
+
     let h = trimmed.match(/^(#{1,6})\s+(.*)/);
     if (h) {
       if (inList) { html.push('</' + listType + '>'); inList = false; }
-      html.push('<div style="font-weight:600;font-size:30rpx;margin:14rpx 0 6rpx;color:#263238;border-bottom:1rpx solid #DCE2DD;padding-bottom:6rpx;">' + formatInline(h[2]) + '</div>');
+      html.push('<div style="font-weight:600;font-size:31rpx;margin:20rpx 0 10rpx;color:#263238;letter-spacing:0.02em;">' + formatInline(h[2]) + '</div>');
       continue;
     }
 
@@ -60,11 +68,11 @@ function formatContent(text) {
     if (ol) {
       if (!inList || listType !== 'ol') {
         if (inList) html.push('</' + listType + '>');
-        html.push('<ol style="padding-left:32rpx;margin:8rpx 0;">');
+        html.push('<ol style="padding-left:40rpx;margin:12rpx 0;">');
         inList = true;
         listType = 'ol';
       }
-      html.push('<li style="margin:6rpx 0;">' + formatInline(ol[2]) + '</li>');
+      html.push('<li style="margin:10rpx 0;line-height:1.75;">' + formatInline(ol[2]) + '</li>');
       continue;
     }
 
@@ -72,16 +80,16 @@ function formatContent(text) {
     if (ul) {
       if (!inList || listType !== 'ul') {
         if (inList) html.push('</' + listType + '>');
-        html.push('<ul style="padding-left:32rpx;margin:8rpx 0;">');
+        html.push('<ul style="padding-left:40rpx;margin:12rpx 0;">');
         inList = true;
         listType = 'ul';
       }
-      html.push('<li style="margin:6rpx 0;">' + formatInline(ul[1]) + '</li>');
+      html.push('<li style="margin:10rpx 0;line-height:1.75;">' + formatInline(ul[1]) + '</li>');
       continue;
     }
 
     if (inList) { html.push('</' + listType + '>'); inList = false; }
-    html.push('<p style="margin:8rpx 0;">' + formatInline(trimmed) + '</p>');
+    html.push('<p style="margin:14rpx 0;line-height:1.75;">' + formatInline(trimmed) + '</p>');
   }
 
   if (inList) html.push('</' + listType + '>');
@@ -334,6 +342,29 @@ Page({
       content: lines.join('\n'),
       showCancel: false,
       confirmText: '知道了',
+    });
+  },
+
+  // 长按消息 — 提供复制菜单
+  onLongPressMessage(e) {
+    const content = e.currentTarget.dataset.content;
+    if (!content) return;
+    wx.showActionSheet({
+      itemList: ['复制全文'],
+      success: (res) => {
+        if (res.tapIndex === 0) {
+          wx.setClipboardData({
+            data: content,
+            success: () => {
+              wx.showToast({
+                title: '已复制',
+                icon: 'success',
+                duration: 1500,
+              });
+            },
+          });
+        }
+      },
     });
   },
 

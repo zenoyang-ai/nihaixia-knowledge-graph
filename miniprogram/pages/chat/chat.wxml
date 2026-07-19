@@ -71,8 +71,13 @@
     <view wx:for="{{messages}}" wx:key="id" id="msg-{{item.id}}">
       <!-- 用户消息 -->
       <view class="msg-row msg-row-user" wx:if="{{item.role === 'user'}}">
-        <view class="msg-bubble msg-bubble-user">
-          <text>{{item.content}}</text>
+        <view
+          class="msg-bubble msg-bubble-user"
+          bindlongpress="onLongPressMessage"
+          data-content="{{item.content}}"
+          data-id="{{item.id}}"
+        >
+          <text user-select="{{true}}">{{item.content}}</text>
         </view>
       </view>
 
@@ -81,7 +86,12 @@
         <view class="msg-avatar">
           <text class="msg-avatar-text">学</text>
         </view>
-        <view class="msg-bubble msg-bubble-ai">
+        <view
+          class="msg-bubble msg-bubble-ai"
+          bindlongpress="onLongPressMessage"
+          data-content="{{item.content}}"
+          data-id="{{item.id}}"
+        >
           <block wx:if="{{item.content}}">
             <rich-text nodes="{{item.html}}" wx:if="{{item.html}}"></rich-text>
             <text wx:else>{{item.content}}</text>

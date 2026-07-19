@@ -324,6 +324,7 @@ async function checkRateLimit(db, userHash) {
 
     if (existingRecord) {
       // 已存在记录：用 update + 原子操作符
+      // 注意：update 不能包含 _id 字段（doc(docId) 已隐式指定）
       await docRef.update({
         daily_count: _.inc(1),
         minute_requests: _.push({ ts: nowTimestamp }),
@@ -333,8 +334,8 @@ async function checkRateLimit(db, userHash) {
       });
     } else {
       // 新记录：用 set 创建
+      // 注意：set 不能包含 _id 字段（doc(docId) 已隐式指定，传 _id 会报"不能更新_id的值"）
       await docRef.set({
-        _id: docId,
         user_hash: userHash,
         date: today,
         daily_count: 1,

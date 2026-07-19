@@ -280,18 +280,21 @@
  * 消息气泡
  * =========================== */
 .msg-bubble {
-  max-width: 560rpx;
-  padding: 18rpx 22rpx;
+  max-width: 580rpx;
+  padding: 22rpx 26rpx;
   border-radius: 14rpx;
-  font-size: 28rpx;
-  line-height: 1.65;
+  font-size: 29rpx;
+  line-height: 1.75;
   word-break: break-word;
+  letter-spacing: 0.01em;
 }
 
 .msg-bubble-user {
   background: #B94736;
   color: #FFFFFF;
   border-bottom-right-radius: 4rpx;
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-bubble-ai {
@@ -299,11 +302,17 @@
   color: #263238;
   border: 1rpx solid #DCE2DD;
   border-bottom-left-radius: 4rpx;
+  /* 允许长按复制 */
+  user-select: text;
+  -webkit-user-select: text;
 }
 
 .msg-bubble-ai rich-text {
-  font-size: 28rpx;
-  line-height: 1.65;
+  font-size: 29rpx;
+  line-height: 1.75;
+  letter-spacing: 0.01em;
+  /* rich-text 内部段落间距 */
+  display: block;
 }
 
 /* 来源数量提示 */
