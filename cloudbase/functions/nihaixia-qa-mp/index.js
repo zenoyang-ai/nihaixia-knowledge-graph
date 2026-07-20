@@ -420,7 +420,7 @@ async function checkRateLimit(db, userHash) {
 // ---------------------------------------------------------------------------
 async function callHybridRAG(ai, msg, history) {
   // 1. BM25 检索相关文档（已带阈值过滤）
-  const docs = searchDocuments(msg, 5);
+  const docs = searchDocuments(msg, 12);
 
   console.log(JSON.stringify({
     event: 'hybrid_rag_start',

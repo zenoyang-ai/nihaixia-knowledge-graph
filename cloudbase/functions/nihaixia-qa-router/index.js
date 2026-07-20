@@ -367,7 +367,7 @@ function createRouter({ env, fetchImpl, cloudbaseSdk, randomUUID, searchFn } = {
       const query = normalized.messages[normalized.messages.length - 1].content;
 
       // 1. BM25 检索相关文档（已带阈值过滤）
-      const docs = _search(query, 5);
+      const docs = _search(query, 12);
       if (!docs.length) {
         // 无相关文档时立即返回 HTTP 200，不进入备用线路
         console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 'no_results', elapsed: Date.now() - startTime }));
