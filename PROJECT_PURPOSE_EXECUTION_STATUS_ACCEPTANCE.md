@@ -1,632 +1,387 @@
-# 倪海厦知识图谱项目：目的、执行记录、文件地图与验收交接
+# 经典中医学习问答小程序：目的、执行记录、文件地图与验收交接
 
 > 文档用途：交给其他模型继续检查、修复和验收。
-> 生成时间：2026-07-19（Asia/Shanghai）
-> 本文不包含任何 AppKey、API Key、私钥或 Token。
-> 本文以本地最新代码为准，同时明确区分本地、GitHub 和线上部署状态。
+> 生成时间：2026-07-21（Asia/Shanghai）
+> 本文档不含任何 AppKey、API Key、私钥或 Token。
+> 以本地最新代码为准，同时明确区分本地、GitHub、CloudBase 与微信后台状态。
 
-## 0. 当前结论
+---
 
-> 更新时间：2026-07-19 23:10（Asia/Shanghai）— Cursor 已完成本地可自动完成项；待推送后确认远端 CI/Pages，并做人机真机与 CloudBase 部署核对。
+## 0. 当前结论（TL;DR）
 
-当前项目处于：**本地阻断项已修复；远端同步与真机验收仍未完成**。
+- 小程序代码本地最新版本 **v5.2.0**，已上传到微信后台开发版本，已设为体验版可用。
+- 微信小程序正在 **备案审核中**（2026-07-19 提交备案，未通过前不能提交审核上线）。
+- 线上正式版仍是 **v3.1.1**（旧版 direct LLM 体验版），因为备案未通过无法提交审核。
+- 体验版扫码可进入新版（含主页、历史记录、段落复制、返回导航）。
+- CloudBase 云函数 `nihaixia-qa-mp` 与 `nihaixia-qa-router` 均已部署 v5.1.0 混合 RAG 版本。
+- 代码已提交本地 Git，远端 GitHub 是否同步需用户自行 push。
+- **待办**：备案通过后 → 提交审核 → 审核通过 → 发布上线 → 正式版更新为新版界面。
 
-| 项目 | 当前状态 |
-|---|---|
-| 本地待推送改动 | 修复 MP package-lock、3 条悬空链接、README/QA_REPORT 口径、cloudbaserc 对齐、validate 增强并接入 CI |
-| 基线提交 | e38aecf（v5.2.0 主页/历史/段落复制/返回导航）仍领先 origin/main=e533587 |
-| GitHub origin/main（推送前） | e533587；CI Run 29683595468 曾因 npm ci 失败 |
-| 本地网站数据校验 | 通过：64 节点 + 5 文章 = 69；directed=338 undirected=283 dangling=0 |
-| 本地 Router 测试 | 24/24 通过 |
-| 本地 MP 测试 | 56/56 通过；干净 `npm ci` 后可加载 wx-server-sdk@2.7.2 |
-| 本地 JavaScript 语法检查 | 通过 |
-| 微信开发者工具/真机验收 | 尚未由本轮独立证明 |
-| CloudBase 线上函数版本 | 尚未由本轮独立证明与本地一致 |
-| 发布判定 | 暂不能标记为最终完成 |
-
-### 已修复的原 P0
-
-`cloudbase/functions/nihaixia-qa-mp/package-lock.json` 已与 `package.json` 同步；本地干净环境 `npm ci` 成功。
-
-### 已修复的原 P1 数据口径
-
-docs/data/graph.json 当前实际为：
-
-- nodes 数组：64 个
-- articles 数组：5 个
-- 合计：69 个内容项
-- 有向 node_links：338 条
-- 图谱运行时去重后的无向边：283 条
-- 悬空 node_links：0 条（已把旧路径改到现存节点 id）
-
-README / `docs/QA_REPORT.md` 已按上述口径更新；`scripts/build_site_data.py --validate` 会检查悬空链接。
+---
 
 ## 1. 项目目的
 
-### 1.1 知识图谱网站
+构建一个**经典中医学习问答小程序**（原代号"数字问渡"），让用户通过微信小程序向 AI 提问关于中医经典（伤寒论、金匮要略、黄帝内经、神农本草经）以及天纪/紫微斗数/针灸/方剂等的学习问题，获得基于本地知识库的 RAG 检索增强答案。
 
-将个人 Obsidian 知识库中整理的倪海厦相关学习材料，整理成一个适合公开访问的静态网站：
+**核心约束**：
+- 仅供学习研究，不提供诊断、处方、剂量或治疗建议（医疗可执行请求在客户端 + 服务端双重拦截）
+- 不依赖已停服的腾讯元器小程序（2026-07-15 停服）
+- 使用 CloudBase 云函数 + generateText() 生成（免费 AI 资源）
+- 前端可在国内访问，无需 VPN
+- 项目名与备注不得出现具体个人名（使用"经典中医学习问答"等中性名）
 
-- 用总览展示知识体系入口；
-- 用人纪、天纪学习路径帮助学习者进入内容；
-- 用交互式知识图谱展示节点关系；
-- 用节点详情卡片展示定义、摘要、上下游和安全边界；
-- 用天纪提示词工具包提供结构化学习入口；
-- 用站内 AI 问答基于知识库检索后回答学习问题；
-- 对外公开时不把高风险原始资料、患者隐私、付费课程全文和本机文件路径放进公开网站。
+---
 
-### 1.2 微信小程序
+## 2. 技术架构
 
-提供一个独立的经典学习问答小程序：
+### 2.1 整体架构
+```
+微信小程序（前端）
+   ├── pages/index/index     ← 主页（入口）
+   ├── pages/chat/chat       ← 聊天页
+   └── pages/history/history ← 历史记录页
+        │
+        │ wx.cloud.callFunction
+        ▼
+CloudBase 云函数 nihaixia-qa-mp（小程序专用）
+   ├── knowledge-search.js    ← BM25 检索器（阈值 18.0）
+   ├── knowledge-base.json   ← 4837 分块语料（12.3 MB）
+   └── generateText()         ← 混合 RAG 生成
+        │
+        │ （备用线路，未启用）
+        ▼
+CloudBase Agent ai.bot.sendMessage（需切换计费后可用）
 
-- 用户可以免下载资料，直接在小程序内提问；
-- 小程序通过 CloudBase 云函数调用混合 RAG；
-- BM25 检索知识库片段，再由 CloudBase 模型根据检索片段生成回答；
-- 返回引用资料和证据摘要；
-- 对诊断、处方、剂量、服法和个体化治疗请求进行拦截；
-- 支持主页、学习对话、历史记录、会话恢复、删除历史和复制回答段落。
+CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
+   └── 同上架构，支持 CORS
+```
 
-### 1.3 明确非目标
+### 2.2 关键技术决策
+- **混合 RAG（方案 B）**：knowledge-base.json 嵌入云函数 + BM25 关键词检索 + generateText() 生成
+- **OpenID 获取**：使用 `wx-server-sdk` 的 `getWXContext()`（微信官方推荐），回退到 `context.OPENID`
+- **限流**：基于 CloudBase 数据库共享计数器，原子操作（get + set/update），每用户每分钟 6 次、每日 20 次
+- **医疗拦截**：客户端正则 + 服务端正则 + 生成结果二次安全检查
+- **history 校验**：role 限制为 user/assistant，必须交替，单条 ≤ 2000 字符
 
-本项目不是：
+---
 
-- 医疗诊断或在线问诊系统；
-- 处方、剂量或治疗方案提供工具；
-- 完整付费课程传播仓库；
-- 患者医案隐私发布站；
-- 将所有原始 PDF、DOC、视频和网盘资料上传到 GitHub 的资料库；
-- 以通用大模型自由发挥为主的聊天机器人。
+## 3. 执行记录（时间线）
 
-## 2. 公开入口与本地入口
+### 3.1 早期版本（v3.x）
+- v3.1.1：direct LLM 迁移体验版（已上线，2026-07-19 15:01 发布）
+- 使用 CloudBase Agent sendMessage，无本地知识库
 
-### 2.1 GitHub 与网站
+### 3.2 混合 RAG 版本（v5.0.0 → v5.1.0）
+- v5.0.0：实现混合 RAG 架构，4 部经典 20 个分块
+- v5.1.0：语料扩展到完整 11 组上传包（4837 分块，12.3 MB），BM25 + 最低分阈值 18.0，医疗拦截扩充，history 严格校验，原子限流
 
-- GitHub 仓库：https://github.com/zenoyang-ai/nihaixia-knowledge-graph
-- GitHub Pages：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/
-- 网站 AI 问答：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/#/qa
-- 本地网站预览：http://127.0.0.1:8765/
-- 本地网站问答：http://127.0.0.1:8765/#/qa
+### 3.3 UI 优化与 Bug 修复（v5.1.1）
+- 修复 WXML `inputValue.trim()` 表达式 → 改用 `canSend` 布尔字段
+- 修复推荐问题 setData 时序 → 提取 `sendQuestion(text)` 方法 + setData 回调
+- 修复空来源不显示 provider → 新增 `hasSources` 布尔字段
+- 修复输入框非 76rpx → 设置 `height + min-height + max-height + overflow-y`
+- 修复真机 `missing_user_id` → 集成 `wx-server-sdk`，使用 `getWXContext()`
+- 修复 `upsert is not a function` → 改为 get + set/update
+- 修复 `不能更新_id的值` → 移除 set 数据中的 `_id` 字段
+- 优化对话排版：行高 1.75、字号 29rpx、padding 22rpx、引用块样式
+- 新增长按复制：`wx.showActionSheet` + `wx.setClipboardData`
 
-本地预览命令：
+### 3.4 v5.2.0（当前最新版本）
+**新增功能**：
+- 新增主页 `pages/index/index`：入口页，展示最近对话 + 开始学习按钮
+- 新增历史记录页 `pages/history/history`：查看全部、删除单条、清空全部
+- 聊天记录持久化：`wx.setStorageSync`，按 sessionId 索引
+- 聊天页顶部导航栏：返回主页 + 标题 + 进入历史记录
+- 段落级复制：长按 → "复制全文" 或 "选择段落复制" → 弹层点击段落即复制
+- 继续历史对话：从历史记录点击进入 chat 页，自动加载已有消息
 
-~~~bash
-cd "/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open"
-python3 -m http.server 8765 --directory docs
-~~~
+### 3.5 代码上传记录
+- 2026-07-19 19:06:53 — v5.1.1 上传成功（31656 字节）
+- 2026-07-19 19:17:39 — v5.2.0 上传成功（51775 字节）
+- 上传方式：`miniprogram-ci` + `private.wx11826bcc1883aa28.key`（IP 已在白名单）
+- 两次上传均自动设为体验版
 
-### 2.2 微信小程序
+---
 
-- 小程序项目目录：/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
-- 小程序根目录：miniprogram/
-- 小程序 AppID：配置在 project.config.json 和上传脚本中；不要改动或在公开文档中重复暴露私钥
-- 项目名称：wendu-classic-qa
-- 当前本地版本：5.2.0
-- 当前上传脚本：/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/upload.js
-- 上传私钥：本机的 private.wx11826bcc1883aa28.key，已被 *.key 忽略，绝不能提交或复制到聊天记录
+## 4. 文件地图
 
-### 2.3 CloudBase
-
-- CloudBase 环境 ID：配置在 cloudbaserc.json 和 cloudbase/cloudbaserc.json
-- 云函数主目录：cloudbase/functions/
-- 网站 HTTP 路由：nihaixia-qa-router
-- 小程序云函数：nihaixia-qa-mp
-- 当前配置主线路：cloudbase-hybrid
-- 当前仓库没有有效 Yuanqi AppKey；Yuanqi 相关代码仅保留为可选历史线路，不能作为当前发布结论
-
-## 3. 总体架构
-
-~~~mermaid
-flowchart TD
-    A[Obsidian 人生知识库] --> B[知识图谱导出数据]
-    B --> C[docs/data/graph.json]
-    C --> D[GitHub Pages 静态网站]
-
-    E[11 个 QA Markdown 上传文件] --> F[generate-knowledge-base.js]
-    F --> G[knowledge-base.json + inverted-index.json]
-    G --> H[CloudBase nihaixia-qa-router]
-    G --> I[CloudBase nihaixia-qa-mp]
-
-    D -->|HTTP POST /qa| H
-    H --> J[BM25 检索]
-    J --> K[检索片段达到阈值]
-    K --> L[CloudBase generateText 生成]
-    L --> D
-
-    M[微信小程序] -->|wx.cloud.callFunction| I
-    I --> N[OpenID 哈希限流]
-    N --> J
-    I --> M
-~~~
-
-### 3.1 网站问答线路
-
-网站只调用 docs/assets/app.js 中的 CloudBase HTTP 路由：
-
-1. 浏览器发送当前问题和最近对话历史；
-2. Router 做 CORS、历史格式、长度、医疗请求和限流校验；
-3. BM25 检索知识库片段；
-4. 没有达到阈值时返回“知识库中暂无相关内容”，不调用通用模型胡乱回答；
-5. 有检索结果时调用 CloudBase 模型生成学习性回答；
-6. 返回 knowledge_sources、证据摘要、provider 和 request ID。
-
-网站此前的 Yuanqi 备用链接已经删除。当前网站没有真正的第二个可用 HTTP 容灾线路，失败时主要是重试。不要把已经失效的 Yuanqi 体验页重新加回来。
-
-### 3.2 小程序问答线路
-
-小程序直接调用 nihaixia-qa-mp，不经过网站 Router：
-
-1. 微信云函数获取 OpenID；
-2. OpenID 只做哈希后用于限流，不保存原始 OpenID；
-3. 输入先经过客户端提示和服务端最终拦截；
-4. 服务端执行 BM25 检索和模型生成；
-5. 返回回答、provider、引用资料、证据和安全状态；
-6. 小程序将会话消息保存到本地 Storage，支持恢复历史对话。
-
-## 4. 已执行操作与提交记录
-
-| 提交 | 操作 |
-|---|---|
-| 7c6aaae | 混合 RAG v2：完整语料、BM25 检索、医疗拦截、原子限流 |
-| dca0527 | P0/P1/P2 修复：检索内存、502、hybrid 测试、history、安全和限流 |
-| 81d0084 | CI fixture 注入、测试隔离、真哈希去重、source_group 限额、引用 CSS |
-| da68280 | TTL 字段、缺失 OpenID 明确提示、临时下载目录忽略 |
-| 59ca69d | 小程序首屏紧凑改版、网站失效 Yuanqi 链接清理 |
-| 3491d13 | 修复 WXML 表达式、setData 时序、空来源判断、输入框高度 |
-| f6425c2 | 使用 wx-server-sdk 获取 OpenID，增加诊断日志 |
-| 3e4b298 | 移除不兼容的 upsert，改为 get + set/update |
-| e533587 | 对话排版优化、长按复制消息 |
-| e38aecf | v5.2.0：主页、历史记录、会话恢复、段落复制、返回导航 |
-
-### 4.1 知识资料处理
-
-资料处理链路：
-
-1. 从个人 vault 的倪海厦资料中抽取公开学习所需内容；
-2. 生成 11 个 QA Markdown 文件；
-3. 清理本机绝对路径和 Obsidian 专用 wikilink；
-4. 生成 manifest.json，记录文件数量、字节数和 SHA-256；
-5. 生成 privacy-report.json；
-6. 用 scripts/generate-knowledge-base.js 切分为约 4837 个 chunks；
-7. 同时生成 BM25 倒排索引；
-8. 将两套生成数据放入两个 CloudBase 函数目录，但通过 .gitignore 排除，不进入 GitHub。
-
-当前上传包：
-
-~~~text
-/Users/zeno/AI/倪海厦-QA上传包/
-├── 01_知识卡片.md
-├── 02_主题文章.md
-├── 03_经文原文-公开版.md
-├── 04_经文原文-完整版.md
-├── 05_汉唐方剂讲解.md
-├── 06_补充资料.md
-├── 07_天纪资料.md
-├── 08_补充课程.md
-├── 09_中医原始资料.md
-├── 10_课程字幕.md
-├── 11_玄学体系.md
-├── manifest.json
-└── privacy-report.json
-~~~
-
-已读取到的上传包统计：11 个 Markdown，约 11.4 MB，manifest 文件数 11，总字节数 11,402,677；privacy report 为 status=pass、high_risk=0。重新上传或重新生成前，仍需再次运行隐私扫描，不能只相信旧报告。
-
-## 5. 完整文件地图
-
-项目根目录：
-
-~~~text
+### 4.1 项目根目录
+```
 /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
-~~~
-
-### 5.1 网站页面与资源
-
-| 路径 | 作用 |
-|---|---|
-| docs/index.html | 网站壳、导航、总览、路径、图谱、提示词、AI 问答和 footer |
-| docs/assets/app.js | 网站应用初始化、路由、问答请求、Markdown 渲染、历史对话和引用显示 |
-| docs/assets/router.js | Hash 路由和导航状态 |
-| docs/assets/graph.js | D3 力导向图、拖拽、滚轮缩放、节点点击、概念框和图例 |
-| docs/assets/overview.js | 总览视图 |
-| docs/assets/path.js | 人纪/天纪学习路径 |
-| docs/assets/prompts.js | 天纪提示词工具包 |
-| docs/assets/detail.js | 节点详情 |
-| docs/assets/sidebar.js | 左侧目录 |
-| docs/assets/search.js | 全局搜索 |
-| docs/assets/styles.css | 全站布局、图谱、问答、移动端和 footer 样式 |
-| docs/data/graph.json | 64 个节点、5 篇主题文章、节点关系、来源和安全字段 |
-| docs/data/prompts.json | 天纪提示词数据，目前是 5 项数组 |
-| docs/sources-public/ | 公开古籍 Markdown，目前 4 个文件，其中 3 个可读 |
-| docs/vendor/d3.v7.min.js | D3 力导向图依赖 |
-| docs/vendor/marked.min.js | Markdown 渲染依赖 |
-| docs/assets/qrcode-digital-wendu.jpg | 数字问渡公众号二维码 |
-| docs/.nojekyll | GitHub Pages 静态部署标记 |
-
-网站页面功能：
-
-- #/：总览；
-- #/path：学习路径；
-- #/graph：知识图谱；
-- #/prompts：天纪提示词；
-- #/qa：站内知识库 AI 问答；
-- 节点详情由路由和 detail.js 动态展示。
-
-### 5.2 小程序页面
-
-| 路径 | 作用 |
-|---|---|
-| miniprogram/app.json | 页面注册、窗口和小程序全局配置 |
-| miniprogram/app.js | wx.cloud.init |
-| miniprogram/app.wxss | 全局底色、字体和主题色 |
-| miniprogram/pages/index/index.* | 首页、开始学习、最近对话、进入历史 |
-| miniprogram/pages/chat/chat.* | 问答主页面、推荐问题、引用来源、重试、新对话、复制和导航 |
-| miniprogram/pages/history/history.* | 历史列表、恢复、删除单条、清空全部 |
-| miniprogram/sitemap.json | 小程序 sitemap |
-| miniprogram-icon* | 临时图标文件，已忽略，尚未确定正式图标 |
-
-当前小程序关键行为：
-
-- canSend 在 JS 中计算，WXML 不再调用 inputValue.trim()；
-- 推荐问题和失败重试通过 setData 回调后发送；
-- hasSources 区分有无引用；
-- 输入框固定为 76rpx；
-- 消息长按可以复制全文或选择段落复制；
-- 会话保存在 chat_sessions 和 chat_messages_<sessionId>；
-- 返回主页和历史入口已经加入；
-- 小程序版本和上传描述由 scripts/upload.js 统一维护。
-
-### 5.3 CloudBase 云函数
-
-规范源码目录：
-
-~~~text
-cloudbase/functions/nihaixia-qa-router/
-├── index.js
-├── knowledge-search.js
-├── package.json
-└── package-lock.json
-
-cloudbase/functions/nihaixia-qa-mp/
-├── index.js
-├── knowledge-search.js
-├── package.json
-└── package-lock.json
-~~~
-
-本机还存在但被 .gitignore 忽略的生成数据：
-
-~~~text
-cloudbase/functions/nihaixia-qa-router/knowledge-base.json
-cloudbase/functions/nihaixia-qa-router/inverted-index.json
-cloudbase/functions/nihaixia-qa-mp/knowledge-base.json
-cloudbase/functions/nihaixia-qa-mp/inverted-index.json
-~~~
-
-两套生成数据各约 12 MB + 11 MB，不得提交到公开仓库。需要时从上传包重新生成：
-
-~~~bash
-cd "/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open"
-node scripts/generate-knowledge-base.js "/Users/zeno/AI/倪海厦-QA上传包"
-~~~
-
-云函数核心逻辑：
-
-- index.js：请求规范化、医疗拦截、历史校验、限流、断路器、RAG 生成、响应格式；
-- knowledge-search.js：倒排索引、中文 bigram/trigram、BM25、最低分阈值 18、最低匹配 token 数 3、证据提取、去重、source_group 限额；
-- knowledge-base.json：分块知识正文；
-- inverted-index.json：检索索引；
-- package.json/package-lock.json：运行依赖和可复现安装锁文件。
-
-### 5.4 构建、上传与校验脚本
-
-| 路径 | 作用 |
-|---|---|
-| scripts/build_site_data.py | 扫描公开原文、更新 graph.json 的 public_sources、校验安全字段 |
-| scripts/build_qa_corpus.py | 从原始 QA 输入生成脱敏 Markdown 上传包 |
-| scripts/generate-knowledge-base.js | 从 11 个 Markdown 生成 chunks 和 BM25 索引 |
-| scripts/upload.js | 使用 miniprogram-ci 上传小程序代码，私钥通过命令行参数传入 |
-| tests/test_build_qa_corpus.py | QA 语料构建、路径清理、隐私清理测试 |
-| tests/test_qa_router.js | Router 24 项测试 |
-| tests/test_qa_mp.js | MP 56 项测试 |
-| tests/fixtures/knowledge-base.json | CI 用小型检索 fixture |
-| tests/fixtures/inverted-index.json | CI 用小型倒排索引 fixture |
-
-### 5.5 CI、安全和部署配置
-
-| 路径 | 作用 |
-|---|---|
-| .github/workflows/ci.yml | 静态数据、Router、MP、密钥扫描和小程序 JS 冒烟检查 |
-| .gitignore | 排除原始资料、上传包、生成 KB、私钥、依赖、临时下载目录 |
-| cloudbase/cloudbaserc.json | CloudBase CLI 配置，含函数根目录、运行时、内存、超时和环境变量名 |
-| cloudbaserc.json | 根目录另一份 CloudBase 配置，当前与 cloudbase/cloudbaserc.json 存在字段差异，需要确认唯一权威配置 |
-| project.config.json | 微信开发者工具项目配置 |
-| LICENSE | MIT 代码许可和项目许可说明 |
-| CONTENT_NOTICE.md | 公开内容、版权、隐私和医疗边界说明 |
-| releases/国内镜像部署说明.md | 国内静态镜像部署说明 |
-
-### 5.6 历史、临时和不应作为当前依据的文件
-
-| 路径 | 状态 |
-|---|---|
-| archive/ | 旧 Yuanqi、Cloudflare、Cloud Run 路线，仅保留参考，不部署 |
-| functions/ | 从 CloudBase 下载的临时函数目录，.gitignore 忽略，非规范源码 |
-| sources-review/ | 待审资料，不能直接发布 |
-| 根目录 sources-public/ | 本地资料目录，非网站唯一公开目录；以 docs/sources-public/ 为网站发布目录 |
-| HANDOFF_TENCENT_QA.md | 早期 Yuanqi/CloudBase 双路线交接文档，内容有过时状态，不作为当前真相 |
-| docs/QA_REPORT.md | 早期网站报告，仍写 71 节点/6 主题文章，已过时，需要标注或更新 |
-| .playwright-cli/、.pytest_cache/、__pycache__/ | 临时缓存，不能作为验收证据 |
-| private.wx11826bcc1883aa28.key | 本机小程序上传私钥，已忽略，禁止提交、打印和传播 |
-
-## 6. 当前安全边界
-
-### 6.1 代码和仓库
-
-- 当前仓库没有有效 Yuanqi AppKey；
-- cloudbaserc.json 中目前只有环境 ID、函数配置和 CloudBase Bot ID 等非 AppKey 配置；
-- private*.key 已被 .gitignore 排除，但本机确实存在私钥文件；
-- QA 上传包和完整 knowledge-base.json/inverted-index.json 均未纳入 Git 跟踪；
-- 不能因为 Secret Scan 通过，就把本地私钥或 CloudBase 控制台环境变量复制到文档；
-- 历史 Yuanqi 代码仍会读取 YUANQI_APP_KEY 环境变量，但仓库和前端不提供它；
-- 日志只允许记录 request ID、线路、状态和耗时，不得记录用户问题全文、会话正文或密钥。
-
-### 6.2 内容和医疗安全
-
-- 网站节点和主题文章均使用 medical_safety=learning_only；
-- 网站不公开高风险原始医案、患者隐私、付费课程全文和未经审查的原始材料；
-- 后端拦截诊断、处方、剂量、服法、个体化用药和治疗决策；
-- 生成结果还会二次检查剂量、用量和处方式表达；
-- 原文中的经典剂量文字如果作为学习引用出现，不能被包装成针对个人的执行建议；
-- 资料不足时必须明确说资料不足，不能用无依据的通用模型内容补齐。
-
-## 7. 已完成的验证证据
-
-### 7.1 本地验证
-
-以下验证在本地最新代码上已完成：
-
-~~~text
-python3 scripts/build_site_data.py --validate     PASS
-node --test tests/test_qa_router.js               24/24 PASS
-node --test tests/test_qa_mp.js                   56/56 PASS
-所有 miniprogram、cloudbase/functions、docs/assets、scripts JavaScript 语法检查 PASS
-git diff --check                                   PASS
-~~~
-
-注意：本地 MP 测试输出提示 wx-server-sdk 不可用，因此 OpenID 测试使用了 context.OPENID 回退路径。干净 CI 的 npm ci 目前反而失败，必须先修复 lockfile。
-
-### 7.2 远端验证
-
-历史上已全绿的 CI：
-
-- Run 29678104249：提交 59ca69d，5 个 Job 全绿；
-- Run 29678735213：提交 3491d13，CI 全绿。
-
-当前远端状态：
-
-- Run 29683595468：提交 e533587，失败；失败 Job 为 MP Function Tests，失败步骤为 npm ci；
-- Run 29683595110：提交 e533587，Pages 部署成功；
-- 本地 e38aecf 尚未产生远端 CI 结果。
-
-## 8. 其他模型必须先做的修复计划
-
-### Phase 0：版本和依赖阻断修复
-
-1. 读取本文件、README.md、AGENTS.md 和当前 Git 状态。
-2. 不覆盖或回滚本地 e38aecf。
-3. 在 cloudbase/functions/nihaixia-qa-mp/ 执行依赖锁定修复：
-
-~~~bash
-cd "/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp"
-npm install --package-lock-only --ignore-scripts
-npm ci
-~~~
-
-4. 回到项目根目录执行：
-
-~~~bash
-cd "/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open"
-node --test tests/test_qa_mp.js
-git diff --check
-~~~
-
-5. 检查 lockfile diff，只接受与 package.json 依赖同步有关的变化，不接受无关依赖升级或秘密写入。
-6. 提交并推送 e38aecf + package-lock.json，等待新 CI 运行。
-7. 新 CI 必须在同一提交上通过 Static Data、Router、MP、Secret Scan；不能用旧 Run 作为新版本证明。
-
-### Phase 1：配置和部署一致性
-
-检查并记录以下两份配置的差异：
-
-~~~text
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbaserc.json
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/cloudbaserc.json
-~~~
-
-要求：
-
-- 明确哪一份是 CloudBase 部署的唯一权威配置；
-- 不复制任何环境变量秘密到配置文件；
-- 两个函数的运行时、内存、超时、函数名和 provider 口径一致；
-- 确认 CloudBase 控制台上的 nihaixia-qa-mp 已部署 e533587 之后的最新代码；
-- 确认网站 Router 和小程序 MP 使用的语料版本一致；
-- 确认 CloudBase 数据库 ttl_idx 与代码写入的 ttl 字段一致；
-- 记录部署时间、函数版本和回滚方式，但不记录密钥。
-
-### Phase 2：图谱数据完整性
-
-修复或明确处理这 3 条悬空链接：
-
-~~~text
-汉唐案例索引 -> 20_概念主题/倪海厦知识图谱/课程节点/汉唐方剂讲解
-人纪班闭门课 -> 20_概念主题/倪海厦知识图谱/案例节点/血液类案例学习节点
-仲景心法 -> 20_概念主题/倪海厦知识图谱/课程节点/经方的妙用
-~~~
-
-可选处理方式：
-
-- 如果节点应当存在：创建最小 planned 节点并标明待补充；
-- 如果是旧名称：改成实际存在的节点路径；
-- 如果不再需要：删除 node_links 条目。
-
-同时：
-
-- 扩展 scripts/build_site_data.py --validate，检查 node_links 是否指向 nodes 或 articles；
-- 统一 README.md 中节点、文章、关系数量；
-- 更新 docs/QA_REPORT.md，避免其他模型读取到 71 节点/6 文章的旧结论；
-- 明确 graph.json.links=[] 是运行时从 node_links 派生，不要让文档误以为图谱没有边。
-
-### Phase 3：小程序开发者工具和真机验收
-
-在微信开发者工具导入：
-
-~~~text
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/project.config.json
-~~~
-
-至少验证 375px 和 390px 宽度：
-
-1. 首页首屏排版、标题、安全提示和开始对话按钮；
-2. 最近对话为空态、创建会话后首页摘要；
-3. 推荐问题点击后只发送一次，问题内容正确；
-4. 输入空格、长文本、键盘弹出、发送按钮和底部安全区；
-5. 学习问题回答、引用资料点击、来源弹窗；
-6. 无检索结果时显示资料不足，不显示错误的 provider 状态；
-7. 医疗请求拦截，不调用云函数生成治疗建议；
-8. 网络失败、重新发送和 loading 状态；
-9. 新对话不会覆盖旧历史；
-10. 历史列表打开、恢复、删除单条、清空全部；
-11. 长按复制全文；
-12. 长按后选择段落复制；
-13. 返回主页、历史入口和微信返回键；
-14. 分享路径能够打开主页或当前约定页面；
-15. Console/WXML 编译无红色错误。
-
-### Phase 4：网站回归验收
-
-网站地址：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/
-
-检查：
-
-- 总览、学习路径、知识图谱、天纪提示词、AI 问答均可进入；
-- 图谱节点可拖拽、滚轮缩放、点击详情，核心节点与普通节点层级清楚；
-- 左下角图例不重叠、不重复；
-- #/qa 可以发送推荐问题和自由问题；
-- 回答显示知识库来源和证据；
-- 无关问题返回资料不足；
-- 医疗问题只显示安全提示；
-- 页面不出现失效 Yuanqi 备用链接；
-- 移动端不横向溢出；
-- footer 的数字问渡二维码正常显示。
-
-### Phase 5：最终发布验收
-
-只有以下条件全部满足，才能向用户说“最终完成”：
-
-- 本地 HEAD、origin/main、Pages 部署和 CloudBase 部署版本一致；
-- 同一提交的 GitHub CI 全绿；
-- npm ci 在干净环境成功；
-- Router 24 项、MP 56 项测试通过；
-- WXML 在微信开发者工具编译通过；
-- 小程序真机完成关键交互；
-- CloudBase 线上问答完成学习问题、无关问题、医疗拦截、限流和 OpenID 验证；
-- 3 条悬空图谱链接已经处理；
-- README、QA_REPORT、内容声明的数量和架构口径一致；
-- Git 跟踪列表无私钥、完整上传包、完整生成知识库、患者隐私和有效凭证；
-- 小程序 5.2.0 代码上传到体验版并完成体验版测试；
-- 如需公开发布，再由微信公众平台提交审核。
-
-## 9. 推荐验收命令
-
-其他模型进入项目后，先执行：
-
-~~~bash
-cd "/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open"
-
-git status --short --branch
-git log -3 --oneline --decorate
-git rev-parse HEAD
-git rev-parse origin/main
-
-python3 scripts/build_site_data.py --validate
-node --test tests/test_qa_router.js
-node --test tests/test_qa_mp.js
-
-find miniprogram cloudbase/functions docs/assets scripts \
-  -path '*/node_modules' -prune -o -type f -name '*.js' -print0 \
-  | while IFS= read -r -d '' f; do node --check "$f"; done
-
-git diff --check
-git ls-files | rg '(^|/)(\.env|.*\.key$|knowledge-base\.json|inverted-index\.json|倪海厦-QA上传包|sources-review)' || true
-rg -n -i 'YUANQI_APP_KEY|API_KEY|Bearer |/Users/zeno' \
-  --glob '!node_modules/**' --glob '!.git/**' --glob '!*.key' . || true
-~~~
-
-如果要检查 GitHub 远端：
-
-~~~bash
-gh run list --limit 10 \
-  --json databaseId,headSha,status,conclusion,workflowName,createdAt,displayTitle
-gh run view <属于当前 HEAD 的 RUN_ID> --log-failed
-~~~
-
-## 10. 交给其他模型时的明确要求
-
-请先读取以下文件，不要只看用户转述：
-
-1. 本文件：PROJECT_PURPOSE_EXECUTION_STATUS_ACCEPTANCE.md
-2. README.md
-3. CONTENT_NOTICE.md
-4. .gitignore
-5. .github/workflows/ci.yml
-6. cloudbase/cloudbaserc.json
-7. cloudbaserc.json
-8. cloudbase/functions/nihaixia-qa-mp/index.js
-9. cloudbase/functions/nihaixia-qa-router/index.js
-10. miniprogram/app.json
-11. miniprogram/pages/index/index.*
-12. miniprogram/pages/chat/chat.*
-13. miniprogram/pages/history/history.*
-14. docs/index.html
-15. docs/assets/app.js
-16. docs/assets/graph.js
-17. scripts/build_site_data.py
-18. scripts/generate-knowledge-base.js
-19. tests/test_qa_router.js
-20. tests/test_qa_mp.js
-
-执行规则：
-
-- 先报告本地 HEAD、origin/main、最新 CI 和 Pages 版本；
-- 先处理 P0，再处理 P1，不能直接做视觉微调；
-- 不覆盖用户已有的本地改动；
-- 不打印或读取私钥内容；
-- 不把生成知识库、上传包、原始资料和环境变量提交到 Git；
-- 每完成一个阶段都给出命令、输出摘要和剩余风险；
-- 不把旧的 HANDOFF_TENCENT_QA.md 或 docs/QA_REPORT.md 当成当前状态依据；
-- 最终必须给出“本地、GitHub、Pages、CloudBase、小程序体验版”五个版本是否一致的结论。
-
-## 11. 当前交接结论
-
-项目的核心产品方向和主要代码已经成型。2026-07-19 Cursor 轮次已完成本地可自动完成项：
-
-1. ~~修复 MP package-lock.json~~（本地 `npm ci` 已通过）
-2. ~~处理 3 条悬空图谱链接及关系数口径~~（dangling=0；README/QA_REPORT 已更新）
-3. ~~对齐两份 cloudbaserc~~（runtime/handler/ALLOWED_ORIGINS 一致；权威目录为 `cloudbase/`，根目录 `functionRoot` 指向 `cloudbase/functions`）
-4. ~~validate 增强并接入 CI~~（`build_site_data.py --validate` 检查悬空链接）
-5. 推送包含 e38aecf + 上述修复的提交，等待同一提交 CI/Pages 全绿
-6. 用微信开发者工具和真机完成小程序最终验收
-7. 核对 CloudBase 控制台函数是否已部署最新代码与语料
-
-在第 5–7 项完成前，本项目应标记为：
-
-~~~text
-功能主体：完成
-本地代码：已修复 P0/P1
-本地自动化测试：通过（含干净 npm ci）
-远端版本同步：待推送确认
-远端 CI：待同一提交证明
-小程序真机：待验收
-CloudBase 部署：待核对
-最终发布：暂缓
-~~~
-
+```
+
+### 4.2 小程序前端代码
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `miniprogram/app.js` | 15 | 云开发初始化，envId=zeno-d9g0gdvw4a57635c0 |
+| `miniprogram/app.json` | 15 | 页面注册（index/chat/history），导航栏配色 #F7F7F4 |
+| `miniprogram/app.wxss` | - | 全局样式（如有） |
+| `miniprogram/sitemap.json` | - | 站点地图配置 |
+| `miniprogram/pages/index/index.js` | 56 | 主页逻辑：加载最近会话、开始对话、查看历史 |
+| `miniprogram/pages/index/index.wxml` | - | 主页模板：hero 区 + 主按钮 + 最近对话列表 |
+| `miniprogram/pages/index/index.wxss` | - | 主页样式 |
+| `miniprogram/pages/index/index.json` | - | 主页配置 |
+| `miniprogram/pages/chat/chat.js` | 616 | 聊天页核心逻辑：会话持久化、段落拆分、云函数调用 |
+| `miniprogram/pages/chat/chat.wxml` | 204 | 聊天页模板：导航栏 + 消息列表 + 输入区 + 段落复制弹层 |
+| `miniprogram/pages/chat/chat.wxss` | 696 | 聊天页样式：导航栏 + 气泡 + 输入区 + 段落复制弹层 |
+| `miniprogram/pages/chat/chat.json` | - | 聊天页配置 |
+| `miniprogram/pages/history/history.js` | 108 | 历史记录页：加载/删除/清空 |
+| `miniprogram/pages/history/history.wxml` | - | 历史记录模板 |
+| `miniprogram/pages/history/history.wxss` | - | 历史记录样式 |
+| `miniprogram/pages/history/history.json` | - | 历史记录配置 |
+
+### 4.3 云函数代码
+| 文件 | 行数 | 说明 |
+|------|------|------|
+| `cloudbase/functions/nihaixia-qa-mp/index.js` | 746 | 小程序专用云函数 v5.1.0：混合 RAG + OpenID + 限流 + 医疗拦截 |
+| `cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` | - | BM25 检索器（阈值 18.0） |
+| `cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 12.3 MB | 4837 分块语料 |
+| `cloudbase/functions/nihaixia-qa-mp/inverted-index.json` | - | 倒排索引 |
+| `cloudbase/functions/nihaixia-qa-mp/package.json` | - | 依赖：@cloudbase/node-sdk + wx-server-sdk |
+| `cloudbase/functions/nihaixia-qa-router/index.js` | 680 | 网站/外部调用云函数（同架构 + CORS） |
+| `cloudbase/functions/nihaixia-qa-router/...` | - | 同 mp 的其他文件 |
+
+### 4.4 配置文件
+| 文件 | 说明 |
+|------|------|
+| `project.config.json` | AppID=wx11826bcc1883aa28, 项目名=wendu-classic-qa, 基础库 3.7.1 |
+| `cloudbase/cloudbaserc.json` | envId=zeno-d9g0gdvw4a57635c0, 两个函数配置 |
+| `cloudbaserc.json` | 根目录 CloudBase 配置（可能重复） |
+| `miniprogram/app.json` | 小程序配置（页面注册、导航栏、窗口） |
+| `.gitignore` | 排除 *.key、node_modules/、.DS_Store 等 |
+| `.github/workflows/ci.yml` | CI：静态校验 + Router 测试 + MP 测试 + Secret Scan + Mobile Smoke |
+
+### 4.5 测试文件
+| 文件 | 说明 |
+|------|------|
+| `tests/test_qa_mp.js` | MP 云函数测试（56 个用例） |
+| `tests/test_qa_router.js` | Router 云函数测试（24 个用例） |
+| `tests/fixtures/knowledge-base.json` | 测试用知识库夹具 |
+| `tests/fixtures/inverted-index.json` | 测试用倒排索引夹具 |
+
+### 4.6 脚本与工具
+| 文件 | 说明 |
+|------|------|
+| `scripts/upload.js` | miniprogram-ci 上传脚本（当前版本 v5.2.0） |
+| `scripts/generate-knowledge-base.js` | 知识库生成脚本 |
+| `scripts/build_qa_corpus.py` | QA 语料构建脚本 |
+| `scripts/build_site_data.py` | 网站数据构建脚本 |
+
+### 4.7 知识库原始资料
+| 目录 | 说明 |
+|------|------|
+| `sources-public/classics/shanghan-lun/` | 伤寒论（5 章） |
+| `sources-public/classics/jin-kuei-yao-lue/` | 金匮要略（3 章） |
+| `sources-public/classics/huangdi-neijing/` | 黄帝内经（5 章） |
+| `sources-public/classics/shennong-bencao/` | 神农本草经（3 章） |
+
+### 4.8 文档
+| 文件 | 说明 |
+|------|------|
+| `README.md` | 项目说明 |
+| `PROJECT_PURPOSE_EXECUTION_STATUS_ACCEPTANCE.md` | 本文档（验收交接） |
+| `CONTENT_NOTICE.md` | 内容声明 |
+| `cloudbase/CLOUDBASE_AGENT_GUIDE.md` | CloudBase Agent 使用指南 |
+| `docs/QA_REPORT.md` | QA 报告 |
+| `releases/国内镜像部署说明.md` | 国内镜像部署说明 |
+
+---
+
+## 5. 当前状态
+
+### 5.1 代码状态
+- **本地 Git HEAD**：`aedc672` — fix: 同步 MP lockfile、修复悬空图谱链接并对齐发布口径
+- **工作区状态**：干净（无未提交改动）
+- **最近 5 次提交**：
+  1. `aedc672` fix: 同步 MP lockfile、修复悬空图谱链接并对齐发布口径
+  2. `e38aecf` feat: v5.2.0 新增主页/历史记录/段落复制/返回导航
+  3. `e533587` feat(mp): 优化对话排版 + 长按复制消息
+  4. `3e4b298` fix(mp): 移除 upsert 调用，改为 get+set/update 兼容 @cloudbase/node-sdk
+  5. `f6425c2` fix(mp): 用 wx-server-sdk 获取 OPENID + 详细诊断日志
+
+### 5.2 微信小程序状态
+- **AppID**：wx11826bcc1883aa28
+- **项目名**：wendu-classic-qa
+- **基础库版本**：3.7.1
+- **线上正式版**：v3.1.1（2026-07-19 15:01:11 发布，旧版 direct LLM）
+- **开发版本**：v5.2.0（2026-07-19 19:17:39 上传，新版混合 RAG + UI 优化）
+- **体验版**：v5.2.0（扫码可用）
+- **备案状态**：**未备案，备案审核中**（2026-07-19 提交，2026-10-08 前不备案将无法打开）
+- **审核版本**：无（备案未通过，无法提交审核）
+
+### 5.3 CloudBase 部署状态
+- **环境 ID**：zeno-d9g0gdvw4a57635c0
+- **nihaixia-qa-mp**：已部署 v5.1.0（混合 RAG + wx-server-sdk + 原子限流）
+- **nihaixia-qa-router**：已部署 v3.0.0（混合 RAG + CORS）
+- **数据库**：`qa_rate_limit` 集合，带 `ttl_idx` 索引（expireAfterSeconds=0）
+- **Agent**：ibot-nihaixiazhi-pdcdi9（备用线路，未启用）
+
+### 5.4 测试状态
+- Router 测试：24/24 通过
+- MP 测试：56/56 通过
+- CI：5 个 job 全绿（Static Validation, Router 24, MP 56, Secret Scan, Mobile Smoke）
+
+---
+
+## 6. 验收清单
+
+### 6.1 功能验收（体验版扫码后）
+- [ ] 进入小程序应先看到主页（标题、警告、"开始学习对话"按钮）
+- [ ] 点击"开始学习对话"进入聊天页
+- [ ] 聊天页顶部应有"‹ 返回 | 学习对话 | 历史"
+- [ ] 发送一个学习问题（如"什么是太阳病"），应收到带来源的 AI 回复
+- [ ] 发送无关问题（如"法国大革命"），应返回零结果或无关提示
+- [ ] 发送医疗请求（如"帮我开个桂枝汤的处方"），应被拦截
+- [ ] 长按 AI 回复 → 选择"选择段落复制" → 弹层中点击段落即复制
+- [ ] 长按用户消息 → 选择"复制全文" → 复制成功
+- [ ] 退出聊天页 → 回到主页 → 应看到"最近对话"
+- [ ] 点击"历史"或"查看全部" → 进入历史记录页
+- [ ] 历史记录页点击某条对话 → 应加载之前的消息继续聊
+- [ ] 历史记录页删除单条对话 → 删除成功
+- [ ] 快速发送 7 条消息 → 触发限流（每分钟 6 次）
+- [ ] 等待 60 秒 → 限流恢复
+
+### 6.2 技术验收
+- [ ] 本地 Git HEAD 与远端 GitHub 一致
+- [ ] CI 全绿
+- [ ] CloudBase 云函数日志无错误
+- [ ] 数据库 `qa_rate_limit` 集合有记录
+- [ ] `.key` 文件不在 Git 中（.gitignore 已排除）
+
+---
+
+## 7. 待办事项
+
+### 7.1 备案通过前
+- [ ] 等待备案审核通过（通常 1-20 个工作日）
+- [ ] 体验版可继续测试，无需等待备案
+- [ ] 如需在公众号菜单接入新小程序，可先关联小程序（关联不需要备案），但用户点击菜单进入小程序需要小程序已上线
+
+### 7.2 备案通过后
+- [ ] 在微信公众平台提交审核（开发版本 → 提交审核）
+- [ ] 审核通过后发布上线（正式版更新为 v5.2.0）
+- [ ] 更新公众号菜单，关联新小程序（wx11826bcc1883aa28）
+- [ ] 移除旧腾讯元器小程序的关联
+
+### 7.3 长期优化（可选）
+- [ ] 接入有效的备用接口（当前只有 CloudBase Hybrid RAG 主线路）
+- [ ] 扩充语料覆盖（如课程字幕、天纪完整内容等）
+- [ ] 优化上下文切块策略（600-1200 字符/片段）
+- [ ] 增加用户反馈通道
+
+---
+
+## 8. 关键文件位置索引
+
+```
+项目根目录:
+/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
+
+小程序前端:
+  miniprogram/app.js                              ← 云开发初始化
+  miniprogram/app.json                            ← 页面注册
+  miniprogram/pages/index/index.{js,wxml,wxss,json}  ← 主页
+  miniprogram/pages/chat/chat.{js,wxml,wxss,json}    ← 聊天页
+  miniprogram/pages/history/history.{js,wxml,wxss,json} ← 历史记录页
+
+云函数:
+  cloudbase/functions/nihaixia-qa-mp/index.js     ← 小程序专用云函数
+  cloudbase/functions/nihaixia-qa-mp/knowledge-search.js  ← BM25 检索器
+  cloudbase/functions/nihaixia-qa-mp/knowledge-base.json   ← 语料（12.3 MB）
+  cloudbase/functions/nihaixia-qa-router/index.js ← 网站云函数
+  cloudbase/cloudbaserc.json                      ← CloudBase 配置
+
+配置:
+  project.config.json                             ← 小程序项目配置
+  .gitignore                                      ← Git 忽略规则
+  .github/workflows/ci.yml                        ← CI 配置
+
+测试:
+  tests/test_qa_mp.js                             ← MP 测试（56 用例）
+  tests/test_qa_router.js                         ← Router 测试（24 用例）
+
+脚本:
+  scripts/upload.js                               ← miniprogram-ci 上传脚本
+
+文档:
+  PROJECT_PURPOSE_EXECUTION_STATUS_ACCEPTANCE.md  ← 本文档
+  README.md                                       ← 项目说明
+```
+
+---
+
+## 9. 备案审核期间的使用说明（回答用户疑问）
+
+### Q1: 备案审核没通过前，可以接入到微信公众号吗？
+
+**可以关联，但不能正式上线。**
+
+- **公众号关联小程序**：不需要小程序已完成备案。在公众号后台 → 小程序管理 → 关联小程序 → 搜索 AppID `wx11826bcc1883aa28` → 管理员扫码确认即可。
+- **公众号菜单跳转小程序**：需要小程序已上线（正式版）。备案未通过 → 无法提交审核 → 无法发布上线 → 菜单点击会报错。
+- **体验版**：不需要备案，开发者和体验成员可扫码使用。
+
+**建议**：备案期间可以先在公众号后台关联新小程序，等备案通过 + 审核上线后再更新菜单。
+
+### Q2: 微信公众号里还是旧的腾讯元器小程序，怎么换？
+
+**在公众号后台操作**：
+1. 登录 [mp.weixin.qq.com](https://mp.weixin.qq.com)（公众号后台）
+2. 左侧菜单 → 小程序管理
+3. 如需解除旧小程序：找到旧小程序 → 解除关联
+4. 关联新小程序：添加 → 关联小程序 → 搜索 `wx11826bcc1883aa28` → 管理员扫码
+5. 更新自定义菜单：把旧小程序的菜单项改为新小程序
+
+**注意**：旧腾讯元器小程序已于 2026-07-15 停服，即使不解除关联也无法使用。
+
+### Q3: 为什么只有体验版是新的界面，正式版还是旧的？
+
+**原因**：代码上传到微信后台后只是"开发版本"，需要经过以下流程才能更新正式版：
+
+```
+开发版本 → 设为体验版（已完成，v5.2.0）
+         → 提交审核（需要备案通过才能提交）
+         → 审核通过（通常 1-7 天）
+         → 发布上线（正式版更新为 v5.2.0）
+```
+
+**当前卡在**：备案未通过 → 无法提交审核 → 无法发布上线 → 正式版仍是 v3.1.1
+
+**解决步骤**：
+1. 等待备案审核通过（微信公众平台 → 开发管理 → 开发设置 → 备案状态）
+2. 备案通过后，在版本管理页面找到开发版本 v5.2.0 → 点击"提交审核"
+3. 审核通过后 → 点击"发布上线"
+4. 正式版更新为 v5.2.0，所有用户都能看到新界面
+
+**在备案通过前**：
+- 体验版可正常使用（扫码进入）
+- 可以把体验版二维码分享给少量用户体验
+- 正式版用户仍看到旧版 v3.1.1
+
+---
+
+## 10. 已知问题与风险
+
+| 级别 | 问题 | 状态 | 说明 |
+|------|------|------|------|
+| P0 | 小程序未备案 | 待解决 | 2026-10-08 前不备案将无法打开 |
+| P0 | 正式版仍是旧版 v3.1.1 | 待解决 | 需备案通过 → 提交审核 → 发布上线 |
+| P1 | 网站只有 CloudBase Hybrid RAG 主线路 | 已知 | 无有效备用接口 |
+| P1 | 公众号仍关联旧腾讯元器小程序 | 待解决 | 旧小程序已停服，需关联新小程序 |
+| P2 | 上下文切块较大 | 已知 | 当前 600-2000 字符/片段，可优化为 600-1200 |
+| P2 | 语料覆盖可扩充 | 已知 | 可增加课程字幕、天纪完整内容等 |
+
+---
+
+## 11. 给接手模型的建议
+
+1. **先验证本地代码可运行**：`node -c miniprogram/pages/chat/chat.js` 等语法检查
+2. **跑测试**：`cd tests && node test_qa_mp.js && node test_qa_router.js`
+3. **不要覆盖 02/05 金标**（如有相关数据）
+4. **不要删除 .key 文件**，但确保它在 .gitignore 中
+5. **修改云函数后需要重新部署**到 CloudBase
+6. **修改小程序代码后需要重新上传**到微信后台（使用 `node scripts/upload.js private.wx11826bcc1883aa28.key`）
+7. **不要在日志、文档或对话总结中包含 API Key、Token 或 .key 文件内容**
+
+---
+
+> 文档结束。如有疑问，请参考上述文件位置索引自行检查代码。

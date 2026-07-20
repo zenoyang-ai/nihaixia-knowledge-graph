@@ -258,13 +258,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
     function formatKnowledgeSources(sources) {
         if (!sources || !sources.length) return '';
+        // 只显示来源文件名，不显示内容摘要（evidence），避免暴露内部细节
         const items = sources.map((s) => {
             const sourceName = s.source_group || s.chunk_title || '未知来源';
-            const evidence = s.evidence ? `<div class="qa-evidence">${formatContent(s.evidence)}</div>` : '';
             const scoreInfo = s.score ? ` <span class="qa-source-score">相关度 ${s.score}</span>` : '';
             return `<div class="qa-source-item">
                 <div class="qa-source-title">📚 ${sourceName}${scoreInfo}</div>
-                ${evidence}
             </div>`;
         }).join('');
         return `<div class="qa-sources">
