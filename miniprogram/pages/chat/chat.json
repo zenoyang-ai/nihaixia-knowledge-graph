@@ -1,7 +1,7 @@
 {
   "usingComponents": {},
   "navigationBarTitleText": "经典中医学习问答",
-  "navigationBarBackgroundColor": "#fffaf1",
+  "navigationBarBackgroundColor": "#F7F7F4",
   "navigationBarTextStyle": "black",
   "enablePullDownRefresh": false
 }

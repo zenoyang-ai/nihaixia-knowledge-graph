@@ -30,7 +30,7 @@ function escapeHtml(text) {
 
 function formatInline(text) {
   let s = escapeHtml(text);
-  s = s.replace(/`([^`]+)`/g, '<code style="background:#EEF1ED;padding:3rpx 10rpx;border-radius:6rpx;font-size:27rpx;color:#55776C;font-family:Menlo,Monaco,monospace;">$1</code>');
+  s = s.replace(/`([^`]+)`/g, '<code style="background:#F0ECE4;padding:3rpx 10rpx;border-radius:6rpx;font-size:27rpx;color:#B94736;font-family:Menlo,Monaco,monospace;">$1</code>');
   s = s.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;color:#263238;">$1</strong>');
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return s;
@@ -54,7 +54,7 @@ function formatContent(text) {
     let quote = trimmed.match(/^>\s*(.*)/);
     if (quote) {
       if (inList) { html.push('</' + listType + '>'); inList = false; }
-      html.push('<div style="margin:14rpx 0;padding:14rpx 18rpx;background:#F4F7F4;border-left:6rpx solid #55776C;border-radius:6rpx;color:#6B767A;font-size:27rpx;line-height:1.7;">' + formatInline(quote[1]) + '</div>');
+      html.push('<div style="margin:14rpx 0;padding:14rpx 18rpx;background:#F6F2EA;border-left:6rpx solid #B94736;border-radius:6rpx;color:#6B767A;font-size:27rpx;line-height:1.7;">' + formatInline(quote[1]) + '</div>');
       continue;
     }
 
@@ -253,6 +253,7 @@ Page({
     ],
     msgIdCounter: 0,
     lastFailedQuestion: '', // 用于重新发送
+    loadingStage: '', // 分阶段等待提示（检索 → 组织 → 完成）
     // 段落复制弹层
     copyPanelVisible: false,
     copyParagraphs: [],
@@ -277,7 +278,8 @@ Page({
     }
 
     if (mode === 'resume' && sessionId) {
-      const messages = loadMessages(sessionId);
+      // 过滤掉中途退出留下的空 AI 占位消息（否则会一直显示打字动画）
+      const messages = loadMessages(sessionId).filter(m => m.role !== 'assistant' || m.content);
       const maxId = messages.reduce((max, m) => Math.max(max, m.id || 0), 0);
       this.setData({
         sessionId,
@@ -325,7 +327,13 @@ Page({
     if (!this.data.canSend || this.data.loading) return;
     const text = this.data.inputValue.trim();
     if (!text) return;
+    wx.vibrateShort({ type: 'light', fail: () => {} });
     await this.sendQuestion(text);
+  },
+
+  onUnload() {
+    this._stopLoadingStage();
+    this._clearTypeTimer();
   },
 
   // 实际发送逻辑 — 接收已确认的文本，避免依赖 setData 时序
@@ -333,26 +341,25 @@ Page({
     // 客户端即时医疗提示（服务端是最终边界）
     if (isMedicalRequest(text)) {
       const warnId = this.data.msgIdCounter + 1;
-      const newMessages = [
-        ...this.data.messages,
-        { id: warnId, role: 'user', content: text },
-        {
-          id: warnId + 1,
-          role: 'assistant',
-          content: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
-          html: '<p style="margin:8rpx 0;color:#B94736;">本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。</p>',
-          provider: 'system',
-          sources: [],
-          hasSources: false,
-        },
-      ];
-      this.setData({
+      const base = this.data.messages.length;
+      const warnText = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。';
+      const update = {
         msgIdCounter: warnId + 1,
-        messages: newMessages,
         inputValue: '',
         canSend: false,
         scrollToView: 'msg-' + (warnId + 1),
-      });
+      };
+      update[`messages[${base}]`] = { id: warnId, role: 'user', content: text };
+      update[`messages[${base + 1}]`] = {
+        id: warnId + 1,
+        role: 'assistant',
+        content: warnText,
+        html: `<p style="margin:8rpx 0;color:#B94736;">${warnText}</p>`,
+        provider: 'system',
+        sources: [],
+        hasSources: false,
+      };
+      this.setData(update);
       this._persist();
       return;
     }
@@ -366,88 +373,130 @@ Page({
       .slice(-MAX_HISTORY)
       .map(m => ({ role: m.role, content: m.content }));
 
-    // 添加用户消息和占位 AI 消息
-    this.setData({
+    // 添加用户消息和占位 AI 消息（路径化 setData，避免全量替换）
+    const base = this.data.messages.length;
+    const append = {
       msgIdCounter: aiMsgId,
-      messages: [
-        ...this.data.messages,
-        { id: userMsgId, role: 'user', content: text },
-        { id: aiMsgId, role: 'assistant', content: '', html: '', provider: '', sources: [], hasSources: false },
-      ],
       inputValue: '',
       canSend: false,
       loading: true,
       lastFailedQuestion: '',
       scrollToView: 'msg-' + aiMsgId,
-    });
+    };
+    append[`messages[${base}]`] = { id: userMsgId, role: 'user', content: text };
+    append[`messages[${base + 1}]`] = { id: aiMsgId, role: 'assistant', content: '', html: '', provider: '', sources: [], hasSources: false };
+    this.setData(append);
+    this._startLoadingStage();
     this._persist();
 
     try {
       // 调用云函数，只传当前问题和会话 ID
       const result = await this._callCloudFunction(text, history);
+      this._stopLoadingStage();
 
-      // 更新 AI 消息
-      const messages = this.data.messages;
-      const idx = messages.findIndex(m => m.id === aiMsgId);
-      if (idx >= 0) {
-        if (result.reply) {
-          // 注入 knowledge_sources（用于"引用 N 条资料"提示）
-          const sources = Array.isArray(result.knowledge_sources) && result.knowledge_sources.length > 0
-            ? result.knowledge_sources.slice(0, 5).map(s => ({
-                source_group: s.source_group || '',
-                chunk_title: s.chunk_title || '',
-                score: s.score || 0,
-              }))
-            : [];
-          messages[idx] = {
-            ...messages[idx],
-            content: result.reply,
-            html: formatContent(result.reply),
-            provider: result.provider || 'cloudbase-hybrid',
-            sources,
-            hasSources: sources.length > 0,
-          };
-        } else if (result.error) {
-          messages[idx] = {
-            ...messages[idx],
-            content: result.error,
-            html: formatContent(result.error),
-            provider: 'error',
-            retryQuestion: text,
-            sources: [],
-            hasSources: false,
-          };
-        }
+      const idx = this.data.messages.findIndex(m => m.id === aiMsgId);
+      if (idx < 0) {
+        this.setData({ loading: false });
+        return;
       }
 
-      this.setData({
-        messages,
-        loading: false,
-        scrollToView: 'msg-' + aiMsgId,
-      });
-      this._persist();
+      if (result.reply) {
+        // 注入 knowledge_sources（用于"引用 N 条资料"提示）
+        const sources = Array.isArray(result.knowledge_sources) && result.knowledge_sources.length > 0
+          ? result.knowledge_sources.slice(0, 5).map(s => ({
+              source_group: s.source_group || '',
+              chunk_title: s.chunk_title || '',
+              score: s.score || 0,
+            }))
+          : [];
+        // 打字机逐字显现纯文本，完成后切换富文本渲染
+        this._typewriter(idx, result.reply, formatContent(result.reply), result.provider || 'cloudbase-hybrid', sources);
+      } else {
+        const errText = result.error || '网络异常，请稍后重试';
+        const update = { loading: false, lastFailedQuestion: text, scrollToView: 'msg-' + aiMsgId };
+        update[`messages[${idx}].content`] = errText;
+        update[`messages[${idx}].html`] = formatContent(errText);
+        update[`messages[${idx}].provider`] = 'error';
+        update[`messages[${idx}].retryQuestion`] = text;
+        this.setData(update);
+        this._persist();
+      }
     } catch (err) {
-      const messages = this.data.messages;
-      const idx = messages.findIndex(m => m.id === aiMsgId);
+      this._stopLoadingStage();
+      const idx = this.data.messages.findIndex(m => m.id === aiMsgId);
+      const errText = err.message || '网络异常，请稍后重试';
+      const update = { loading: false, lastFailedQuestion: text, scrollToView: 'msg-' + aiMsgId };
       if (idx >= 0) {
-        messages[idx] = {
-          ...messages[idx],
-          content: err.message || '网络异常，请稍后重试',
-          html: formatContent(err.message || '网络异常，请稍后重试'),
-          provider: 'error',
-          retryQuestion: text,
-          sources: [],
-          hasSources: false,
-        };
+        update[`messages[${idx}].content`] = errText;
+        update[`messages[${idx}].html`] = formatContent(errText);
+        update[`messages[${idx}].provider`] = 'error';
+        update[`messages[${idx}].retryQuestion`] = text;
       }
-
-      this.setData({
-        messages,
-        loading: false,
-        lastFailedQuestion: text,
-        scrollToView: 'msg-' + aiMsgId,
-      });
+      this.setData(update);
       this._persist();
+    }
+  },
+
+  // 分阶段等待提示：检索 → 组织 → 即将完成
+  _startLoadingStage() {
+    this._stopLoadingStage();
+    const stages = ['正在检索学习资料…', '正在组织回答…', '即将完成…'];
+    let i = 0;
+    this.setData({ loadingStage: stages[0] });
+    this._stageTimer = setInterval(() => {
+      i = Math.min(i + 1, stages.length - 1);
+      this.setData({ loadingStage: stages[i] });
+    }, 2400);
+  },
+
+  _stopLoadingStage() {
+    if (this._stageTimer) {
+      clearInterval(this._stageTimer);
+      this._stageTimer = null;
+    }
+  },
+
+  // 打字机逐字显现：先纯文本流式出现，完成后替换为富文本渲染
+  _typewriter(idx, fullText, html, provider, sources) {
+    this._clearTypeTimer();
+    const msgId = this.data.messages[idx] && this.data.messages[idx].id;
+    const total = fullText.length;
+    const duration = Math.min(2600, Math.max(800, total * 10));
+    const TICK = 30;
+    const step = Math.max(1, Math.ceil(total / (duration / TICK)));
+    let pos = 0;
+    let ticks = 0;
+    this._scrollFlip = false;
+
+    this._typeTimer = setInterval(() => {
+      pos = Math.min(total, pos + step);
+      ticks += 1;
+      const update = {};
+      update[`messages[${idx}].content`] = fullText.slice(0, pos);
+      // 打字过程中跟随滚动（交替目标强制 scroll-into-view 重复触发）
+      if (ticks % 5 === 0) {
+        this._scrollFlip = !this._scrollFlip;
+        update.scrollToView = this._scrollFlip ? 'chat-bottom' : 'msg-' + msgId;
+      }
+      this.setData(update);
+
+      if (pos >= total) {
+        this._clearTypeTimer();
+        const done = { loading: false, scrollToView: 'chat-bottom' };
+        done[`messages[${idx}].html`] = html;
+        done[`messages[${idx}].provider`] = provider;
+        done[`messages[${idx}].sources`] = sources;
+        done[`messages[${idx}].hasSources`] = sources.length > 0;
+        this.setData(done);
+        this._persist();
+      }
+    }, TICK);
+  },
+
+  _clearTypeTimer() {
+    if (this._typeTimer) {
+      clearInterval(this._typeTimer);
+      this._typeTimer = null;
     }
   },
 
@@ -490,12 +539,16 @@ Page({
       confirmText: '开始新对话',
       success: (res) => {
         if (res.confirm) {
+          // 先停掉进行中的等待/打字动画，避免向已清空的列表写入
+          this._stopLoadingStage();
+          this._clearTypeTimer();
           // 保存旧会话（已经保存过了，这里只清理页面状态）
           this.setData({
             messages: [],
             msgIdCounter: 0,
             inputValue: '',
             canSend: false,
+            loading: false,
             lastFailedQuestion: '',
             sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
             scrollToView: '',
@@ -587,16 +640,6 @@ Page({
   // 阻止弹层内部点击事件冒泡
   onCopyPanelTap() {
     // 空函数，仅用于 catchtap 阻止冒泡
-  },
-
-  // 返回主页
-  onBackHome() {
-    wx.navigateBack({
-      delta: 1,
-      fail: () => {
-        wx.reLaunch({ url: '/pages/index/index' });
-      },
-    });
   },
 
   // 查看历史记录

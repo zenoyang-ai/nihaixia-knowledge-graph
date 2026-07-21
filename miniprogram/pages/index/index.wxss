@@ -1,8 +1,8 @@
 /* pages/index/index.wxss
  *
- * 主页样式：案头学习索引风格
+ * 主页样式：案头学习索引风格（与网站品牌统一：纸色 + 朱砂）
  * 底色 #F7F7F4 / 墨色 #263238 / 辅助 #6B767A
- * 主操作 #B94736 / 资料库状态 #55776C
+ * 品牌主色 #B94736
  */
 
 .index-container {
@@ -26,15 +26,15 @@
 .index-hero-badge {
   display: inline-block;
   padding: 8rpx 20rpx;
-  background: rgba(85, 119, 108, 0.08);
-  border: 1rpx solid rgba(85, 119, 108, 0.18);
+  background: rgba(185, 71, 54, 0.07);
+  border: 1rpx solid rgba(185, 71, 54, 0.16);
   border-radius: 10rpx;
   margin-bottom: 28rpx;
 }
 
 .index-hero-badge text {
   font-size: 22rpx;
-  color: #55776C;
+  color: #B94736;
   letter-spacing: 0.06em;
 }
 
@@ -48,6 +48,7 @@
   color: #263238;
   letter-spacing: 0.02em;
   line-height: 1.25;
+  font-family: "Songti SC", "STSong", "SimSun", serif;
 }
 
 .index-hero-subtitle {
@@ -87,13 +88,13 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: #55776C;
+  background: #B94736;
   border-radius: 14rpx;
   transition: all 0.18s;
 }
 
 .index-primary-btn:active {
-  background: #3E5A52;
+  background: #9C3A2C;
   transform: scale(0.985);
 }
 
@@ -127,12 +128,12 @@
 
 .index-section-title-action {
   font-size: 22rpx;
-  color: #55776C;
+  color: #B94736;
   letter-spacing: 0.02em;
 }
 
 .index-section-title-action:active {
-  color: #3E5A52;
+  color: #9C3A2C;
 }
 
 .index-session-list {
@@ -144,14 +145,14 @@
 .index-session-card {
   padding: 22rpx 26rpx;
   background: #FFFFFF;
-  border: 1rpx solid #DCE2DD;
+  border: 1rpx solid #E5DED2;
   border-radius: 12rpx;
   transition: all 0.18s;
 }
 
 .index-session-card:active {
-  background: #F4F7F4;
-  border-color: #55776C;
+  background: #F6F2EA;
+  border-color: #B94736;
 }
 
 .index-session-card-title {

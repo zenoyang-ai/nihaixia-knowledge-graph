@@ -1,27 +1,17 @@
 <!--pages/chat/chat.wxml-->
 <view class="chat-container">
 
-  <!-- 顶部导航栏（返回 + 标题 + 历史） -->
-  <view class="chat-navbar">
-    <view class="chat-navbar-back" bindtap="onBackHome">
-      <text>‹ 返回</text>
-    </view>
-    <view class="chat-navbar-title">
-      <text>学习对话</text>
-    </view>
-    <view class="chat-navbar-history" bindtap="onViewHistory">
-      <text>历史</text>
-    </view>
-  </view>
-
-  <!-- 对话状态栏（仅对话中显示） -->
-  <view class="chat-statusbar" wx:if="{{messages.length > 0}}">
+  <!-- 对话状态栏（状态 + 历史入口 + 新对话） -->
+  <view class="chat-statusbar">
     <view class="chat-statusbar-left">
       <view class="chat-status-dot"></view>
       <text class="chat-statusbar-text">学习对话</text>
     </view>
     <view class="chat-statusbar-right">
-      <view class="chat-clear-btn" bindtap="onClearChat">
+      <view class="chat-history-btn" bindtap="onViewHistory">
+        <text>历史</text>
+      </view>
+      <view class="chat-clear-btn" wx:if="{{messages.length > 0}}" bindtap="onClearChat">
         <text>新对话</text>
       </view>
     </view>
@@ -109,10 +99,13 @@
             <rich-text nodes="{{item.html}}" wx:if="{{item.html}}" user-select="{{true}}"></rich-text>
             <text wx:else user-select="{{true}}">{{item.content}}</text>
           </block>
-          <view wx:else class="typing-dots">
-            <view class="typing-dot"></view>
-            <view class="typing-dot"></view>
-            <view class="typing-dot"></view>
+          <view wx:else class="typing-wrap">
+            <view class="typing-dots">
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
+              <view class="typing-dot"></view>
+            </view>
+            <text class="typing-stage">{{loadingStage}}</text>
           </view>
           <!-- 来源数量提示：仅当 hasSources 为 true 时显示 -->
           <view
@@ -154,6 +147,7 @@
         adjust-position="{{true}}"
         cursor-spacing="20"
         disabled="{{loading}}"
+        auto-height
       />
       <view
         class="chat-send-btn {{(canSend && !loading) ? 'chat-send-btn-active' : ''}}"
