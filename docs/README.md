@@ -1,7 +1,8 @@
 # 倪海厦知识图谱网站
 
-> 这是 GitHub Pages 网站源码目录，不是公开访问入口。
-> 公开网站请访问：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/
+> 本目录是网站源码与部署根（`docs/`）。
+> 国内主站（推荐）：https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com
+> 海外备份：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/
 
 倪海厦公开教学资料的结构化知识图谱网站，包含交互式力导向图、知识卡片和学习路径。
 

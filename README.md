@@ -2,11 +2,13 @@
 
 #### 把倪海厦公开教学资料整理成一张能走进去的知识地图
 
-[在线访问](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/) · [内容声明](./CONTENT_NOTICE.md)
+🌐 **国内主站（推荐）**：[https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com](https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com)
+🌏 **海外备份**：[https://zenoyang-ai.github.io/nihaixia-knowledge-graph/](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/) · [内容声明](./CONTENT_NOTICE.md)
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Nodes](https://img.shields.io/badge/nodes-69-purple)
-![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-brightgreen)
+![CloudBase](https://img.shields.io/badge/CloudBase-国内主站-blue)
+![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-海外备份-brightgreen)
 
 这不是原文资料仓库，而是一个面向学习者的知识入口：用图谱、学习路径和知识卡片，把倪海厦的人纪、天纪、经方、针灸、本草、案例研读串起来。
 
@@ -50,9 +52,18 @@
 
 ---
 
-## 国内镜像
+## 访问入口与部署架构
 
-国内访问 GitHub Pages 可能不稳定。可将 `docs/` 目录部署到阿里云 OSS 等国内静态托管服务。部署说明见 [releases/国内镜像部署说明.md](releases/国内镜像部署说明.md)。
+本项目采用**双线部署**，一份代码、两处托管：
+
+| 角色 | 地址 | 说明 |
+|---|---|---|
+| 国内主站 | https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com | 腾讯云 CloudBase 静态托管，国内访问稳定，推荐 |
+| 海外备份 | https://zenoyang-ai.github.io/nihaixia-knowledge-graph/ | GitHub Pages，海外与开发者友好 |
+
+- **静态站点**（`docs/`）：推送 `main` 分支后，GitHub Action（`.github/workflows/deploy.yml`）自动部署到 CloudBase；同时 GitHub Pages 自动从 `docs/` 发布。
+- **云端函数**（AI 问答 RAG）：由 `cloudbaserc.json` 定义，单独部署。
+- 部署凭证以 GitHub Secrets（`CLOUDBASE_SECRET_ID` / `CLOUDBASE_SECRET_KEY`）保存，为腾讯云 API 密钥（CAM）。
 
 ## 本地预览
 
