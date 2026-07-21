@@ -1,0 +1,690 @@
+/* ============================================
+   主题系统 — Demo 覆盖层（不改原 styles.css）
+   策略：
+   1. :root 语义变量重定义浅色（与原值一致，零视觉变化）
+   2. [data-theme="dark"] 覆盖为「灯烛夜读」暖棕深色调
+   3. 少量结构选择器覆盖硬编码颜色（#999/#bbb/#ccc/#f6f0e6 等）
+   ============================================ */
+
+:root {
+    /* ---- 语义层（浅色 = 现有值） ---- */
+    --surface-page: #f6f0e6;
+    --surface-card: #fffaf1;
+    --surface-soft: #fbf5ea;
+    --surface-hover: #f3e3ca;
+    --surface-input: #fbf5ea;
+    --surface-glass: rgba(255, 250, 241, 0.92);
+    --surface-glass-strong: rgba(255, 250, 241, 0.96);
+
+    --on-surface: #342d25;          /* 主文字 */
+    --on-surface-strong: #241f1a;   /* 标题/强调 */
+    --on-surface-muted: #776b5f;    /* 次要文字 */
+    --on-surface-faint: #a59684;    /* 弱化文字（原 #999/#bbb 的语义替代） */
+
+    --border-color: #e7d8c1;
+    --border-strong: #c9b797;
+    --divider-warm: rgba(145, 107, 66, 0.2);
+
+    /* 主题化品牌色（默认 = 原色） */
+    --accent: #b9362c;
+    --accent-strong: #7f211c;
+    --accent-hover: #a92f27;
+    --accent-gold: #c7892b;
+    --accent-gold-soft: rgba(199, 137, 43, 0.12);
+
+    /* 阴影（按主题调整强度） */
+    --shadow-color: rgba(73, 43, 20, 0.09);
+    --shadow: 0 18px 45px var(--shadow-color);
+    --small-shadow: 0 8px 24px var(--shadow-color);
+    --shadow-scrolled: 0 2px 16px rgba(73, 43, 20, 0.08);
+    --shadow-graph-card: 0 2px 12px rgba(73, 43, 20, 0.1);
+    --shadow-concept-active: 0 4px 12px rgba(185, 54, 44, 0.24);
+
+    /* 背景网格纹理 */
+    --grid-line: rgba(185, 54, 44, 0.035);
+
+    /* 图谱画布与节点（浅色 = 原样） */
+    --graph-canvas-bg: #f6f0e6;
+    --graph-link: #cccccc;
+    --graph-link-opacity: 0.25;
+    --graph-node-stroke: #ffffff;
+    --graph-label-core: #2d2520;
+    --graph-label-standard: #9a9289;
+    --graph-label-halo: rgba(246, 240, 230, 0.85);
+
+    /* 图谱五色（浅色 = 原样） */
+    --layer-cosmology: #b9362c;
+    --layer-diagnosis: #315d82;
+    --layer-treatment: #2c705f;
+    --layer-cases: #c7892b;
+    --layer-tianji: #7b5ea7;
+    --layer-path: #7f8c8d;
+
+    /* 代码/内联元素 */
+    --code-bg: rgba(0, 0, 0, 0.06);
+    --code-bg-block: rgba(0, 0, 0, 0.04);
+
+    /* 滚动条 */
+    --scrollbar-thumb: #d8c9ae;
+    --scrollbar-track: transparent;
+
+    /* 切换过渡 */
+    --theme-transition: background-color 0.3s ease, color 0.3s ease, border-color 0.3s ease;
+}
+
+/* ============================================
+   深色主题 —「灯烛夜读」
+   不是反色，而是暖棕深底 + 烛金点缀
+   ============================================ */
+[data-theme="dark"] {
+    --bg: #16120e;
+    --paper: #221c16;
+    --paper-soft: #1c1712;
+    --ink: #ece4d6;
+    --text: #ddd3c2;
+    --text-light: #a39481;
+    --muted: #8a7c69;
+    --border: #3a3129;
+    --card-bg: #221c16;
+
+    --surface-page: #16120e;
+    --surface-card: #221c16;
+    --surface-soft: #1c1712;
+    --surface-hover: #2c2419;
+    --surface-input: #1c1712;
+    --surface-glass: rgba(22, 18, 14, 0.88);
+    --surface-glass-strong: rgba(28, 23, 18, 0.94);
+
+    --on-surface: #ddd3c2;
+    --on-surface-strong: #ece4d6;
+    --on-surface-muted: #a39481;
+    --on-surface-faint: #8a7c69;
+
+    --border-color: #3a3129;
+    --border-strong: #4d4234;
+    --divider-warm: rgba(199, 137, 43, 0.22);
+
+    --accent: #d4594e;
+    --accent-strong: #e0705f;
+    --accent-hover: #c44a40;
+    --accent-gold: #d9a84a;
+    --accent-gold-soft: rgba(217, 168, 74, 0.14);
+
+    --shadow-color: rgba(0, 0, 0, 0.4);
+    --shadow: 0 18px 45px rgba(0, 0, 0, 0.45);
+    --small-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --shadow-scrolled: 0 2px 16px rgba(0, 0, 0, 0.5);
+    --shadow-graph-card: 0 2px 12px rgba(0, 0, 0, 0.45);
+    --shadow-concept-active: 0 4px 12px rgba(212, 89, 78, 0.35);
+
+    --grid-line: rgba(217, 168, 74, 0.045);
+
+    /* 图谱深色画布 + 提亮节点色 */
+    --graph-canvas-bg: #131009;
+    --graph-link: #5a4d3a;
+    --graph-link-opacity: 0.3;
+    --graph-node-stroke: #221c16;
+    --graph-label-core: #ece4d6;
+    --graph-label-standard: #8a7c69;
+    --graph-label-halo: rgba(19, 16, 9, 0.85);
+
+    --layer-cosmology: #d4594e;
+    --layer-diagnosis: #5a8fc0;
+    --layer-treatment: #4da88d;
+    --layer-cases: #d9a84a;
+    --layer-tianji: #a07fd0;
+    --layer-path: #9aa5a0;
+
+    --code-bg: rgba(255, 255, 255, 0.08);
+    --code-bg-block: rgba(255, 255, 255, 0.05);
+
+    --scrollbar-thumb: #4d4234;
+    --scrollbar-track: transparent;
+
+    color-scheme: dark;
+}
+
+/* ============================================
+   结构覆盖 — 把原文件里的硬编码颜色接到变量上
+   ============================================ */
+
+/* 页面底 + 网格纹理 */
+body {
+    background-color: var(--surface-page);
+    background-image:
+        linear-gradient(90deg, var(--grid-line) 1px, transparent 1px),
+        linear-gradient(180deg, var(--grid-line) 1px, transparent 1px);
+    transition: var(--theme-transition);
+}
+
+/* 顶栏 */
+.header {
+    background: var(--surface-glass);
+    border-bottom-color: var(--border-color);
+}
+.header.scrolled { box-shadow: var(--shadow-scrolled); }
+.nav-btn { color: var(--on-surface-faint); }
+.nav-btn:hover { color: var(--on-surface-strong); background: var(--surface-hover); }
+.nav-btn.active { background: var(--accent); color: #fff; }
+.header-search input {
+    background: var(--surface-input);
+    border-color: var(--border-color);
+    color: var(--on-surface);
+}
+.header-search input:focus { border-color: var(--accent-gold); background: var(--surface-card); }
+.node-count { color: var(--on-surface-faint); }
+.logo { color: var(--accent); }
+
+/* 侧边栏 */
+.sidebar { background: var(--surface-card); border-right-color: var(--border-color); }
+.sidebar-header { background: var(--surface-card); }
+.sidebar-title, .sidebar-group-count, .sidebar-count { color: var(--on-surface-faint); }
+.sidebar-group-name { color: var(--on-surface); }
+.sidebar-item { color: var(--on-surface-muted); }
+.sidebar-item:hover { background: var(--surface-hover); color: var(--on-surface-strong); }
+.sidebar-item.active { color: var(--accent); border-left-color: var(--accent); }
+.sidebar-group-arrow { color: var(--on-surface-faint); }
+
+/* Hero / 总览 */
+.hero-new .eyebrow { color: var(--on-surface-faint); }
+.hero-title { color: var(--on-surface-strong); }
+.hero-title-accent { color: var(--accent); }
+.hero-subtitle { color: var(--on-surface-muted); }
+.stage-card, .route-card-new {
+    background: var(--surface-card);
+    border-color: var(--border-color);
+    color: var(--on-surface);
+}
+.stage-card:hover, .route-card-new:hover { border-color: var(--accent); box-shadow: var(--small-shadow); }
+.stage-name { color: var(--on-surface-strong); }
+.stage-num, .route-card-num { color: var(--accent); }
+.stage-desc, .route-card-new span:last-child { color: var(--on-surface-muted); }
+.stage-node { background: var(--surface-soft); color: var(--on-surface); }
+.stage-node:hover { background: var(--accent); color: #fff; }
+.stage-content { background: var(--surface-card); border-color: var(--border-color); }
+.overview-footer { color: var(--on-surface-faint); }
+
+/* 学习路径 */
+.path-tab { color: var(--on-surface-muted); border-color: var(--border-color); }
+.path-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+.path-stage-card { background: var(--surface-card); border-color: var(--border-color); }
+
+/* 图谱视图 */
+.graph-container, .graph-canvas { background: var(--graph-canvas-bg); }
+.graph-legend {
+    background: var(--surface-glass);
+    box-shadow: var(--shadow-graph-card);
+}
+.graph-legend-title, .graph-legend-hint { color: var(--on-surface-faint); }
+.graph-legend-item { color: var(--on-surface); }
+.graph-legend-divider { background: var(--border-color); }
+.graph-detail-panel {
+    background: var(--surface-card);
+    border-left-color: var(--border-color);
+    box-shadow: -6px 0 24px rgba(0, 0, 0, 0.18);
+}
+.graph-detail-panel .placeholder { color: var(--on-surface-muted); }
+.detail-link-item { background: var(--surface-soft); color: var(--on-surface); }
+.detail-link-item:hover { border-color: var(--accent); background: var(--surface-hover); }
+
+.graph-concepts {
+    background: var(--surface-glass);
+    box-shadow: var(--shadow-graph-card);
+}
+.graph-concept-box { background: var(--surface-soft); }
+.graph-concept-box:hover { background: var(--surface-hover); border-color: var(--accent); }
+.graph-concept-box.active { background: var(--accent); box-shadow: var(--shadow-concept-active); }
+.graph-concept-label { color: var(--on-surface-strong); }
+.graph-concept-desc { color: var(--on-surface-muted); }
+
+.graph-node.tier-core text { fill: var(--graph-label-core); }
+.graph-node.tier-standard text { fill: var(--graph-label-standard); }
+.graph-node.tier-core circle { stroke: var(--graph-node-stroke); }
+.graph-node text { paint-order: stroke; stroke: var(--graph-label-halo); stroke-width: 3px; }
+.graph-link { stroke: var(--graph-link); stroke-opacity: var(--graph-link-opacity); }
+.graph-node.search-match text { fill: var(--accent-strong); }
+
+/* 概念详情页 */
+.note-view {
+    background: var(--surface-card);
+    border-color: var(--divider-warm);
+}
+.note-title, .note-section-header { color: var(--on-surface-strong); }
+.note-definition { background: var(--surface-soft); color: var(--on-surface-muted); border-left-color: var(--accent); }
+.note-section-content { color: var(--on-surface); }
+.note-tag { background: var(--surface-soft); border-color: var(--border-color); color: var(--on-surface-muted); }
+.note-tag.layer { border-color: var(--accent); color: var(--accent); }
+.note-quote { background: var(--surface-soft); border-left-color: var(--accent); }
+.note-quote-text { color: var(--on-surface); }
+.note-quote-source { color: var(--on-surface-muted); }
+.note-misconception { background: var(--accent-gold-soft); border-color: var(--border-strong); }
+.note-related-node { background: var(--surface-soft); color: var(--on-surface); }
+.note-related-node:hover { border-color: var(--accent); color: var(--accent); }
+.note-breadcrumb-current { color: var(--on-surface); }
+.note-back { color: var(--on-surface-muted); }
+.note-back:hover { color: var(--accent); }
+.note-link { color: var(--accent); }
+
+/* 提示词页 */
+.prompts-view { background: var(--surface-card); border-color: var(--divider-warm); }
+.prompt-skill-card, .prompt-card { background: var(--surface-soft); border-color: var(--border-color); }
+.prompt-notice { background: var(--accent-gold-soft); border-color: var(--border-strong); }
+.prompt-content pre { background: var(--code-bg-block); color: var(--on-surface); }
+.prompt-filter.active { background: var(--accent); color: #fff; }
+
+/* AI 问答 */
+.qa-hero { background: var(--surface-card); border-color: var(--divider-warm); box-shadow: var(--small-shadow); }
+.qa-hero h2 { color: var(--on-surface-strong); }
+.qa-hero p { color: var(--on-surface-muted); }
+.qa-notice { background: var(--accent-gold-soft); border-color: var(--border-strong); color: var(--on-surface-muted); }
+.qa-question-card { background: var(--surface-card); border-color: var(--border-color); color: var(--on-surface); }
+.qa-question-card:hover { border-color: var(--accent); box-shadow: var(--small-shadow); }
+.qa-chat { background: var(--surface-card); border-color: var(--border-color); }
+.qa-chat-messages { background: var(--surface-soft); }
+.qa-chat-message.user .qa-chat-bubble { background: var(--accent); color: #fff; }
+.qa-chat-message.assistant .qa-chat-bubble {
+    background: var(--surface-hover);
+    color: var(--on-surface);
+    border-color: var(--border-color);
+}
+.qa-chat-bubble code { background: var(--code-bg); }
+.qa-chat-bubble pre { background: var(--code-bg-block); }
+.qa-chat-bubble .qa-md-heading { color: var(--on-surface-strong); border-bottom-color: var(--border-color); }
+.qa-chat-input-row { background: var(--surface-glass-strong); border-top-color: var(--border-color); }
+.qa-chat-input { background: var(--surface-input); border-color: var(--border-strong); color: var(--on-surface); }
+.qa-chat-input:focus { border-color: var(--accent); }
+.qa-chat-send { background: var(--accent); }
+.qa-chat-send:hover { background: var(--accent-hover); }
+.qa-source-item { background: var(--surface-soft); border-color: var(--border-color); border-left-color: var(--accent-gold); }
+.qa-source-title { color: var(--on-surface-strong); }
+.qa-evidence { color: var(--on-surface-muted); }
+.qa-status-tag { color: var(--on-surface-muted); border-color: var(--border-color); }
+.qa-chat-typing, .qa-chat-status { color: var(--on-surface-faint); }
+
+/* 页脚 */
+.site-footer {
+    background: var(--surface-glass);
+    border-top-color: var(--border-color);
+    color: var(--on-surface-faint);
+}
+.footer-brand { color: var(--accent); }
+.footer-popover-card { background: var(--surface-card); box-shadow: 0 8px 32px rgba(0,0,0,0.35); }
+.footer-popover-title { color: var(--on-surface-strong); }
+.footer-popover-hint { color: var(--on-surface-muted); }
+
+/* 滚动条（暗色下协调） */
+* { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+
+/* 全局面料过渡（切换主题时柔和变化） */
+.header, .sidebar, .main, .stage-card, .route-card-new,
+.graph-legend, .graph-detail-panel, .note-view, .qa-chat,
+.site-footer, .graph-concepts, .prompts-view {
+    transition: var(--theme-transition);
+}
+
+/* ============================================
+   主题切换按钮
+   ============================================ */
+.theme-toggle {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-soft);
+    color: var(--on-surface-muted);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+.theme-toggle:hover {
+    border-color: var(--accent-gold);
+    color: var(--accent-gold);
+    transform: translateY(-1px);
+}
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+.theme-toggle svg { display: block; }
+.theme-toggle .icon-sun { display: none; }
+.theme-toggle .icon-moon { display: block; }
+[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
+[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
+
+@media (max-width: 768px) {
+    .theme-toggle { width: 30px; height: 30px; border-radius: 6px; }
+    .theme-toggle svg { width: 15px; height: 15px; }
+}
+
+/* ============================================
+   v2 — 天纪紫去外来化 + 提示词页主题化 + 中性深灰
+   ============================================ */
+
+/* 紫砂（融入暖色体系的灰调紫，替代刺眼的 #8e44ad） */
+:root {
+    --tianji: #7b5ea7;
+    --tianji-strong: #6a4f93;
+    --tianji-soft: #f3edf8;
+    --tianji-border: #dcc9ec;
+}
+[data-theme="dark"] {
+    --tianji: #a78fc7;
+    --tianji-strong: #9478bd;
+    --tianji-soft: rgba(167, 143, 199, 0.12);
+    --tianji-border: rgba(167, 143, 199, 0.35);
+}
+
+/* ============================================
+   提示词页主题化（修复：亮色终端框 + 刺眼紫）
+   ============================================ */
+.prompt-notice { background: var(--surface-soft); border-color: var(--border-color); border-left-color: var(--tianji); }
+.prompt-notice strong { color: var(--on-surface); }
+.prompt-skill-card { background: var(--tianji-soft); border-color: var(--tianji-border); border-left-color: var(--tianji); }
+.prompt-skill-kicker { color: var(--tianji); }
+.prompt-skill-copy h2 { color: var(--on-surface-strong); }
+.prompt-skill-copy p { color: var(--on-surface-muted); }
+
+.prompt-terminal {
+    background: var(--surface-card);
+    border-color: var(--tianji-border);
+    color: var(--on-surface);
+}
+.prompt-terminal-mark { color: var(--tianji); }
+
+.prompt-skill-link {
+    border-color: var(--tianji);
+    color: var(--tianji);
+    background: var(--surface-card);
+}
+.prompt-skill-link:hover { background: var(--tianji); color: #fff; }
+
+.prompt-filter {
+    background: var(--surface-card);
+    border-color: var(--border-color);
+    color: var(--on-surface-muted);
+}
+.prompt-filter:hover { border-color: var(--tianji); color: var(--on-surface); }
+.prompt-filter.active { background: var(--tianji); border-color: var(--tianji); color: #fff; }
+
+.prompt-card { background: var(--surface-card); border-color: var(--border-color); border-left-color: var(--tianji); }
+.prompt-card-header { border-bottom-color: var(--border-color); }
+.prompt-card-title { color: var(--on-surface-strong); }
+.prompt-card-subtitle { color: var(--on-surface-muted); }
+.prompt-badge { background: var(--tianji-soft); color: var(--tianji); border-color: var(--tianji-border); }
+.prompt-empty { color: var(--on-surface-faint); }
+
+.prompt-meta-label { color: var(--on-surface-muted); }
+.prompt-meta-value { color: var(--on-surface); }
+
+.prompt-tabs { border-bottom-color: var(--border-color); }
+.prompt-tab { color: var(--on-surface-muted); }
+.prompt-tab:hover { color: var(--on-surface); }
+.prompt-tab.active { color: var(--tianji); border-bottom-color: var(--tianji); }
+
+.prompt-content { background: var(--surface-soft); border-color: var(--border-color); }
+.prompt-content pre { color: var(--on-surface); }
+.prompt-template-label { color: var(--tianji); }
+
+.prompt-copy-btn { background: var(--tianji); border-color: var(--tianji); color: #fff; }
+.prompt-copy-btn:hover { background: var(--tianji-strong); border-color: var(--tianji-strong); }
+.prompt-copy-btn.copied { background: var(--layer-treatment); border-color: var(--layer-treatment); }
+.prompt-copy-btn.copy-failed { background: var(--accent); border-color: var(--accent); }
+
+.path-cta-link { border-color: var(--tianji); color: var(--tianji); background: var(--tianji-soft); }
+.path-cta-link:hover { background: var(--tianji); color: #fff; }
+
+/* ============================================
+   三态主题切换器（浅色 / 暖棕 / 深灰）
+   ============================================ */
+.theme-switch {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    background: var(--surface-soft);
+    flex-shrink: 0;
+}
+.theme-switch-btn {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
+    font-family: inherit;
+    color: var(--on-surface-muted);
+    transition: all 0.18s ease;
+    white-space: nowrap;
+    line-height: 1.4;
+}
+.theme-switch-btn:hover { color: var(--on-surface-strong); }
+.theme-switch-btn.active {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 500;
+}
+.theme-switch-btn:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 1px;
+}
+
+/* 单图标按钮在三态模式下隐藏（保留兼容） */
+.theme-toggle { display: none; }
+
+@media (max-width: 768px) {
+    .theme-switch-btn { padding: 3px 7px; font-size: 11px; }
+}
+
+/* ============================================
+   v3 — 五项视觉升级
+   ① 字体排版 ② Hero 记忆点 ③ 图谱交互样式
+   ④ 卡片/动效统一 ⑤ 无障碍动效收敛
+   ============================================ */
+
+/* ---- ① 字体与排版节奏 ---- */
+body {
+    font-family: "Noto Serif SC", "Songti SC", "STSong", "PingFang SC", "Hiragino Sans GB", serif;
+    line-height: 1.72;
+}
+strong, b { font-weight: 600; }
+
+.hero-title {
+    font-size: 52px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    line-height: 1.22;
+}
+.hero-title-accent { font-weight: 900; }
+.hero-new .eyebrow { letter-spacing: 0.22em; }
+.hero-subtitle { font-size: 17px; }
+
+.stage-name { font-size: 17px; font-weight: 700; }
+.route-card-new strong { font-size: 18px; }
+.note-title { font-size: 34px; letter-spacing: 0.01em; }
+.note-section-header { font-size: 19px; }
+
+/* 数字等宽，避免跳动 */
+.stage-num, .route-card-num, .node-count, .stat-number,
+.sidebar-count, .sidebar-group-count, .graph-zoom-level, .qa-source-score {
+    font-variant-numeric: tabular-nums;
+}
+
+@media (max-width: 768px) {
+    .hero-title { font-size: 34px; }
+    .note-title { font-size: 28px; }
+}
+
+/* ---- ② Hero 记忆点 ---- */
+.hero-new { position: relative; overflow: visible; }
+
+/* 呼吸感暖光（不遮挡交互） */
+.hero-new::before {
+    content: "";
+    position: absolute;
+    top: -60px;
+    left: 50%;
+    width: 720px;
+    height: 380px;
+    transform: translateX(-50%);
+    background: radial-gradient(ellipse at center, var(--accent-gold-soft) 0%, transparent 65%);
+    pointer-events: none;
+    animation: heroBreath 9s ease-in-out infinite alternate;
+    z-index: 0;
+}
+.hero-new > * { position: relative; z-index: 1; }
+@keyframes heroBreath {
+    from { opacity: 0.45; transform: translateX(-50%) scale(0.97); }
+    to   { opacity: 1;    transform: translateX(-50%) scale(1.03); }
+}
+
+/* 朱砂印章：人纪·天纪 */
+.hero-seal {
+    position: absolute;
+    top: 44px;
+    right: max(24px, calc(50% - 360px));
+    width: 62px;
+    height: 62px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    place-items: center;
+    background: var(--accent);
+    color: #fff;
+    font-size: 21px;
+    font-weight: 900;
+    line-height: 1;
+    border-radius: 8px;
+    transform: rotate(-5deg);
+    box-shadow: 0 6px 18px rgba(185, 54, 44, 0.28);
+    text-shadow: 0 0 1px rgba(255,255,255,0.35);
+    user-select: none;
+    z-index: 1;
+    animation: sealIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) 0.5s both;
+}
+.hero-seal::after {
+    content: "";
+    position: absolute;
+    inset: 5px;
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
+    pointer-events: none;
+}
+@keyframes sealIn {
+    from { opacity: 0; transform: rotate(-5deg) scale(1.6); }
+    to   { opacity: 1; transform: rotate(-5deg) scale(1); }
+}
+@media (max-width: 900px) { .hero-seal { display: none; } }
+
+/* 标题字符级淡入 */
+.hero-title .char {
+    display: inline-block;
+    opacity: 0;
+    animation: charIn 0.55s cubic-bezier(0.22, 0.61, 0.36, 1) both;
+    animation-delay: calc(var(--ci) * 70ms);
+}
+@keyframes charIn {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- ③ 图谱交互：工具条 + 详情面板层级条 ---- */
+.graph-zoombar {
+    position: absolute;
+    top: 14px;
+    right: 16px;
+    z-index: 6;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+    padding: 4px 6px;
+    background: var(--surface-glass);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    box-shadow: var(--shadow-graph-card);
+}
+.graph-zoombar-btn {
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: none;
+    color: var(--on-surface-muted);
+    font-size: 15px;
+    font-family: inherit;
+    border-radius: 7px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+    line-height: 1;
+}
+.graph-zoombar-btn:hover { background: var(--surface-hover); color: var(--on-surface-strong); }
+.graph-zoombar-btn:focus-visible { outline: 2px solid var(--accent-gold); outline-offset: 1px; }
+.graph-zoom-level {
+    font-size: 11px;
+    color: var(--on-surface-faint);
+    min-width: 40px;
+    text-align: center;
+    user-select: none;
+}
+@media (max-width: 768px) {
+    .graph-zoombar { top: auto; bottom: 56px; right: 10px; }
+}
+
+/* 详情面板顶部层级色条 */
+.graph-detail-panel { border-top: 3px solid var(--panel-accent, transparent); }
+
+/* ---- ④ 卡片语言与动效统一 ---- */
+/* 圆角：内容 8 / 浮层 12 / 胶囊 999，收编 4px 和 6px */
+.stage-node, .note-related-node, .detail-link-item,
+.prompt-filter, .prompt-skill-link, .prompt-terminal,
+.prompt-content, .prompt-copy-btn, .nav-btn,
+.header-search input, .qa-chat-clear, .path-cta-link {
+    border-radius: 8px;
+}
+.sidebar-item { border-radius: 6px; }
+
+/* Hover 统一：浮起 + 描边变色 + 阴影加深 */
+.stage-card, .route-card-new, .qa-question-card, .prompt-card {
+    transition: transform 0.22s ease, box-shadow 0.22s ease, border-color 0.22s ease;
+}
+.stage-card:hover, .route-card-new:hover, .qa-question-card:hover {
+    transform: translateY(-2px);
+    border-color: var(--accent);
+    box-shadow: var(--small-shadow);
+}
+.prompt-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--small-shadow);
+}
+
+/* 路由切换柔和过渡（消除跳闪） */
+.view.active { animation: viewIn 0.24s ease both; }
+@keyframes viewIn {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* provider 状态标签收编进语义色 */
+.qa-provider-tag { background: var(--accent-gold-soft); color: var(--on-surface-muted); }
+.qa-provider-tag.qa-provider-degraded { background: rgba(212, 89, 78, 0.12); color: var(--accent); }
+
+/* ---- ⑤ 减少动态偏好 ---- */
+@media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* ---- 回迁修正：graph-view 背景硬编码 ---- */
+.graph-view { background: var(--graph-canvas-bg); }

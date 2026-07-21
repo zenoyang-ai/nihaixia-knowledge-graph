@@ -14,6 +14,7 @@ class ForceGraph {
         this.nodeEls = null;
         this.viewport = null;
         this.positionStorageKey = 'nihaixia_graph_positions_v1';
+        this.transformKey = 'nihaixia_graph_transform_v1';
 
         // 标签显隐状态
         this.labelZoomThreshold = 1.5;
@@ -45,9 +46,18 @@ class ForceGraph {
             },
         ];
 
+        // 主题化：从 CSS 变量读取层级色，暗色模式下自动切换
+        const cssVar = (name, fallback) => {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v || fallback;
+        };
         this.layerColor = {
-            '底层框架': '#c0392b', '辨证框架': '#2980b9', '方法工具': '#27ae60',
-            '案例研读': '#d4a017', '天纪体系': '#8e44ad', '学习路径': '#7f8c8d',
+            '底层框架': cssVar('--layer-cosmology', '#b9362c'),
+            '辨证框架': cssVar('--layer-diagnosis', '#315d82'),
+            '方法工具': cssVar('--layer-treatment', '#2c705f'),
+            '案例研读': cssVar('--layer-cases', '#c7892b'),
+            '天纪体系': cssVar('--layer-tianji', '#7b5ea7'),
+            '学习路径': cssVar('--layer-path', '#7f8c8d'),
         };
         this.layerAngle = {
             '底层框架': -90, '辨证框架': -18, '方法工具': 54,
@@ -189,11 +199,32 @@ class ForceGraph {
                 g.setAttribute('transform', event.transform);
                 this.currentZoomScale = event.transform.k;
                 this.updateLabelVisibility();
+                if (this.zoomLabelEl) {
+                    this.zoomLabelEl.textContent = Math.round(event.transform.k * 100) + '%';
+                }
+            })
+            .on('end', (event) => {
+                // 记住缩放状态，从详情页返回时恢复视野
+                try { sessionStorage.setItem(this.transformKey, JSON.stringify(event.transform)); } catch (e) {}
             });
 
         d3.select(this.svg).call(zoomBehavior).on('dblclick.zoom', null);
         this.zoomBehavior = zoomBehavior;
         this.viewport = g;
+
+        // 恢复上次的缩放/平移状态
+        try {
+            const savedT = sessionStorage.getItem(this.transformKey);
+            if (savedT) {
+                const t = JSON.parse(savedT);
+                if (t && Number.isFinite(t.k)) {
+                    d3.select(this.svg).call(
+                        zoomBehavior.transform,
+                        d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
+                    );
+                }
+            }
+        } catch (e) {}
 
         // 边
         this.linkEls = document.createElementNS(NS, 'g');
@@ -274,7 +305,9 @@ class ForceGraph {
             })
             .on('end', function(event, d) {
                 if (!event.active) {
-                    self.simulation.alphaTarget(0.02).restart();
+                    // 拖拽结束后自然冷却至静止，不再持续低功率晃动
+                    self.simulation.alphaTarget(0);
+                    self.simulation.alpha(Math.max(self.simulation.alpha(), 0.18)).restart();
                 }
                 // 保留拖拽位置，避免松手后节点突然弹回；双击节点可解除固定。
                 d.fx = d.x;
@@ -321,7 +354,7 @@ class ForceGraph {
                 self.linkEls.querySelectorAll('line').forEach(line => {
                     const hit = (line.dataset.source === d.id || line.dataset.target === d.id);
                     line.style.opacity = hit ? '0.7' : '0.03';
-                    if (hit) line.style.stroke = '#b9362c';
+                    if (hit) line.style.stroke = self.getAccent();
                 });
             })
             .on('mouseleave', function() {
@@ -355,11 +388,12 @@ class ForceGraph {
                 const a = (this.layerAngle[d.layer] || 0) * Math.PI / 180;
                 return cy + Math.sin(a) * spread * 0.28;
             }).strength(d => isCore(d) ? 0.025 : 0.012))
-            .velocityDecay(0.42)
-            .alphaDecay(0.006);
+            .velocityDecay(0.4)
+            .alphaMin(0.02)
+            .alphaDecay(0.024);
 
         // tick
-        this.simulation.on('tick', () => {
+        const ticked = () => {
             this.linkEls.querySelectorAll('line').forEach((line, i) => {
                 const l = this.links[i];
                 line.setAttribute('x1', l.source.x);
@@ -371,13 +405,61 @@ class ForceGraph {
                 const n = this.nodes[i];
                 ng.setAttribute('transform', `translate(${n.x},${n.y})`);
             });
-        });
+        };
+        this.simulation.on('tick', ticked);
+
+        // 预热：同步迭代到准稳态，页面打开时布局已基本稳定，不再长时间漂移
+        this.simulation.stop();
+        for (let i = 0; i < 140; i++) this.simulation.tick();
+        ticked();
+        // 轻量重启保留一点有机感，随后自然冷却至静止
+        this.simulation.alpha(0.22).restart();
 
         // 顶部大概念框（HTML overlay）
         this.renderConceptBoxes();
 
+        // 缩放工具条（＋ － ⌂ + 缩放百分比）
+        this.renderToolbar();
+
         // 初始化标签可见性
         this.updateLabelVisibility();
+    }
+
+    // 缩放工具条：放大 / 缩小 / 回到全局视图 + 百分比指示
+    renderToolbar() {
+        const existing = this.container.querySelector('.graph-zoombar');
+        if (existing) existing.remove();
+        const bar = document.createElement('div');
+        bar.className = 'graph-zoombar';
+        bar.setAttribute('role', 'group');
+        bar.setAttribute('aria-label', '图谱缩放控制');
+
+        const mkBtn = (text, title, onClick) => {
+            const btn = document.createElement('button');
+            btn.type = 'button';
+            btn.className = 'graph-zoombar-btn';
+            btn.textContent = text;
+            btn.setAttribute('aria-label', title);
+            btn.setAttribute('title', title);
+            btn.addEventListener('click', (e) => { e.stopPropagation(); onClick(); });
+            return btn;
+        };
+
+        const svgSel = d3.select(this.svg);
+        bar.appendChild(mkBtn('＋', '放大', () =>
+            svgSel.transition().duration(250).call(this.zoomBehavior.scaleBy, 1.35)));
+        bar.appendChild(mkBtn('－', '缩小', () =>
+            svgSel.transition().duration(250).call(this.zoomBehavior.scaleBy, 1 / 1.35)));
+        bar.appendChild(mkBtn('⌂', '回到全局视图', () =>
+            svgSel.transition().duration(450).call(this.zoomBehavior.transform, d3.zoomIdentity)));
+
+        const label = document.createElement('span');
+        label.className = 'graph-zoom-level';
+        label.textContent = Math.round((this.currentZoomScale || 1) * 100) + '%';
+        this.zoomLabelEl = label;
+        bar.appendChild(label);
+
+        this.container.appendChild(bar);
     }
 
     // 根据缩放比例切换标签可见性
@@ -472,8 +554,9 @@ class ForceGraph {
                 }
             }
         });
-        // 将第一个命中节点滚动到视野中央
-        if (firstMatch && this.viewport && this.zoomBehavior) {
+        // 将第一个命中节点滚动到视野中央（同一目标不重复触发，避免输入时连续跳动）
+        if (firstMatch && this.viewport && this.zoomBehavior && firstMatch !== this._lastSearchFocus) {
+            this._lastSearchFocus = firstMatch;
             const ng = firstMatch;
             const data = ng.__data__;
             if (data && Number.isFinite(data.x) && Number.isFinite(data.y)) {
@@ -490,6 +573,7 @@ class ForceGraph {
         if (!this.nodeEls) return;
         this.nodeEls.querySelectorAll('.search-match').forEach(ng => ng.classList.remove('search-match'));
         this.activeSearchQuery = null;
+        this._lastSearchFocus = null;
     }
 
     loadPositions() {
@@ -518,6 +602,12 @@ class ForceGraph {
         } catch (error) {
             // 布局保存失败不影响图谱使用。
         }
+    }
+
+    // 主题化的强调色（暗色模式下为提亮后的朱砂）
+    getAccent() {
+        const v = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+        return v || '#b9362c';
     }
 
     clearSelection() {
@@ -549,13 +639,28 @@ class ForceGraph {
         this.viewport.querySelectorAll('.graph-link').forEach(line => {
             const hit = (line.dataset.source === node.id || line.dataset.target === node.id);
             line.style.opacity = hit ? '0.8' : '0.03';
-            if (hit) line.style.stroke = '#b9362c';
+            if (hit) line.style.stroke = this.getAccent();
         });
+
+        // 画布平滑居中到选中节点（为详情面板让出右侧空间）
+        if (this.zoomBehavior && Number.isFinite(node.x) && Number.isFinite(node.y)) {
+            const rect = this.container.getBoundingClientRect();
+            const panelW = (window.innerWidth > 1024) ? 340 : 0;
+            const k = Math.max(this.currentZoomScale || 1, 1.35);
+            const t = d3.zoomIdentity
+                .translate((rect.width - panelW) / 2 - node.x * k, rect.height / 2 - node.y * k)
+                .scale(k);
+            d3.select(this.svg).transition().duration(500).ease(d3.easeCubicOut)
+                .call(this.zoomBehavior.transform, t);
+        }
 
         this.showDetail(node);
     }
 
     showDetail(node) {
+        // 顶部色条标识节点所属层级
+        this.detailPanel.style.setProperty('--panel-accent', this.layerColor[node.layer] || '#b9362c');
+
         const all = [...this.data.nodes, ...this.data.articles];
         const up = (node.upstream || []).map(n => all.find(x => x.title === n)).filter(Boolean);
         const down = (node.downstream || []).map(n => all.find(x => x.title === n)).filter(Boolean);

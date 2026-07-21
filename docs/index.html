@@ -5,7 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>倪海厦知识图谱</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="assets/styles.css?v=20260718-v3">
+    <link rel="stylesheet" href="assets/fonts.css?v=20260721-v4">
+    <link rel="stylesheet" href="assets/styles.css?v=20260721-v4">
+    <link rel="stylesheet" href="assets/theme.css?v=20260721-v4">
+    <!-- 主题初始化放最前，避免明暗闪烁 -->
+    <script src="assets/theme.js?v=20260721-v4"></script>
     <!-- D3 完整包（力导向 + 拖拽 + 缩放） -->
     <script src="vendor/d3.v7.min.js"></script>
     <!-- marked.js 用于 Markdown 渲染 -->
@@ -121,11 +125,11 @@
                         <!-- 左下角图例卡 -->
                         <div class="graph-legend">
                             <div class="graph-legend-title">层级</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#c0392b"></span>底层框架</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#2980b9"></span>辨证框架</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#27ae60"></span>方法工具</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#d4a017"></span>案例研读</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:#8e44ad"></span>天纪体系</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cosmology)"></span>底层框架</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-diagnosis)"></span>辨证框架</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-treatment)"></span>方法工具</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cases)"></span>案例研读</div>
+                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-tianji)"></span>天纪体系</div>
                             <div class="graph-legend-divider"></div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="width:14px;height:14px;background:#999"></span>核心节点</div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="width:7px;height:7px;background:#999"></span>普通节点</div>
@@ -237,14 +241,15 @@
     <!-- 移动端遮罩 -->
     <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
-    <script src="assets/router.js"></script>
-    <script src="assets/sidebar.js"></script>
-    <script src="assets/graph.js"></script>
-    <script src="assets/detail.js"></script>
-    <script src="assets/overview.js"></script>
-    <script src="assets/path.js"></script>
-    <script src="assets/prompts.js"></script>
-    <script src="assets/search.js"></script>
-    <script src="assets/app.js?v=20260718-v3"></script>
+    <script src="assets/router.js?v=20260721-v4"></script>
+    <script src="assets/sidebar.js?v=20260721-v4"></script>
+    <script src="assets/graph.js?v=20260721-v4"></script>
+    <script src="assets/detail.js?v=20260721-v4"></script>
+    <script src="assets/overview.js?v=20260721-v4"></script>
+    <script src="assets/path.js?v=20260721-v4"></script>
+    <script src="assets/prompts.js?v=20260721-v4"></script>
+    <script src="assets/search.js?v=20260721-v4"></script>
+    <script src="assets/app.js?v=20260721-v4"></script>
+    <script src="assets/enhance.js?v=20260721-v4"></script>
 </body>
 </html>
