@@ -6,6 +6,62 @@
 
 ---
 
+## 0.1 实施状态更新（2026-07-21，优先于后文的原始诊断）
+
+**状态：本地代码、语料重建与自动化验证已完成；两个 CloudBase 云函数尚待部署。线上健康接口当前仍返回旧版 `3.1.0`，本轮代码统一为 `5.3.0`，可作为部署后的明确验收标记。**
+
+本轮没有只调大同组结果上限，而是完成了“语义分块 + 查询分权排序 + 模型回答约束”三层修复：
+
+1. `scripts/generate-knowledge-base.js` 会识别无 Markdown 标记、以反斜杠结尾的星曜标题，并把 `紫微星`、`天府星`、`左辅右弼、三台八座` 等拆成独立语义块；新块会保存 `section_title` 和可读的 `chunk_title`。
+2. 两套 `knowledge-search.js` 现在将用户原问题与主题扩展词分权：原问题为主、扩展词权重为 `0.25`，并对章节标题和用户明确点名的星曜加权；目录、排盘表、图片 OCR 表格在普通概念问答中不会占用模型上下文。
+3. 同一 `source_group` 的上限从 2 调整为 4；只有用户明确问排盘、安星或星表时，结构化表格才不受“正文优先”策略压低。
+4. “紫薇”会规范为“紫微”，两种常见写法均可命中相同的正文。
+5. 两个云函数的提示词新增规则：一次点名多颗星曜时，分别回答主星，再说明上下文中直接相关的辅星/组合关系，不以目录或表格代替正文解释。
+
+### 实测结果
+
+本地重建使用 `/Users/zeno/AI/倪海厦-QA上传包` 的 11 份校验通过语料，生成 **4,852** 个分块（原为 4,837）。针对：
+
+```text
+紫微星、天府星，这两颗星有啥用
+```
+
+前三条上下文依次为：
+
+1. `天府星`
+2. `紫微星`
+3. `左辅右弼、三台八座`
+
+三条合计包含：`帝星`、`官带`、`解厄制化`、`左辅右弼`、`三台八座`、`南斗星君`、`府相会命`。相同测试使用“紫薇星”写法也通过。
+
+### 已通过的验证
+
+```bash
+node --test tests/test_qa_mp.js       # 58/58
+node --test tests/test_qa_router.js   # 24/24
+python3 scripts/build_site_data.py --validate
+npm ci --ignore-scripts --dry-run     # 两个云函数目录均通过
+git diff --check
+```
+
+新增 CI 可运行的回归测试覆盖：星曜语义分块、正文优先/目录过滤、以及“紫薇/紫微”别名召回。`knowledge-base.json` 与 `inverted-index.json` 继续由本机上传包生成，受 `.gitignore` 保护，不进入公开 Git 仓库。
+
+### 仍需执行的发布步骤
+
+当前机器可通过临时 `npm exec` 运行官方 `@cloudbase/cli@3.6.4`，但 `env:list` 返回“无有效身份信息”；因此本轮没有假装部署成功。下一位执行者在确认 CloudBase 登录状态后，先重新生成语料，再部署两套函数：
+
+```bash
+cd /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
+node scripts/generate-knowledge-base.js '/Users/zeno/AI/倪海厦-QA上传包'
+npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase login
+npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase fn deploy nihaixia-qa-router --env-id zeno-d9g0gdvw4a57635c0 --force
+npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase fn deploy nihaixia-qa-mp --env-id zeno-d9g0gdvw4a57635c0 --force
+```
+
+部署后必须用第 8 节的 Router 请求复测，并确认回答不出现排盘表名称、原始资料文件名、作者/整理者人名或可执行医疗建议。
+
+---
+
 ## 0. 一句话总结
 
 当前 RAG 系统回答"紫微星、天府星有啥用"时，缺少"帝星""官带星""三台八座"等关键信息，而 IMA 知识库能完整回答。**根本原因不是知识库缺内容，而是分块策略和检索限制导致包含详细象征意义的 chunk 被 BM25 评分较低的排盘表格 chunk 挤掉。**
@@ -78,7 +134,7 @@
 
 ---
 
-## 3. 为什么当前模式达不到理想效果
+## 3. 实施前为什么达不到理想效果（历史诊断）
 
 ### 3.1 根本原因：分块策略 + 检索限制
 
@@ -109,7 +165,7 @@
 
 **关键发现**：chunk 5 包含"主星之紫微星"的完整内容（帝星、解厄制化、官带、左辅右弼），但它同时包含化忌、财帛宫、天机星、太阳星、武曲星等内容，导致 BM25 评分低。
 
-### 3.3 检索限制：MAX_PER_SOURCE_GROUP = 2
+### 3.3 实施前检索限制：MAX_PER_SOURCE_GROUP = 2
 
 文件位置：`cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` 第 42 行
 
@@ -169,7 +225,7 @@ LLM 只看到天府星的详细内容 + 大量概览内容
 
 ---
 
-## 4. 当前系统完整状况
+## 4. 当前系统完整状况（v5.3.0 本地待部署）
 
 ### 4.1 系统架构
 
@@ -182,7 +238,7 @@ CloudBase 云函数
        ↓
        BM25 关键词检索（knowledge-search.js）
        ↓
-       knowledge-base.json（4837 个 chunk，12.3 MB）
+       knowledge-base.json（4852 个 chunk，约 8.6 MB）
        ↓
        generateText() 生成回答（混元模型 hy3-preview）
 ```
@@ -196,13 +252,13 @@ CloudBase 云函数
 | 04_经文原文-完整版 | 1077 | 完整版经文 |
 | 05_汉唐方剂讲解 | 339 | 方剂 |
 | 08_补充课程 | 274 | 补充课程 |
-| 07_天纪资料 | 215 | **天纪/紫微斗数** |
+| 07_天纪资料 | 230 | **天纪/紫微斗数；含星曜语义块** |
 | 01_知识卡片 | 131 | 知识卡片 |
 | 06_补充资料 | 39 | 补充资料 |
 | 02_主题文章 | 19 | 主题文章 |
 | 11_玄学体系 | 17 | 玄学体系 |
 | 10_课程字幕 | 6 | 课程字幕 |
-| **总计** | **4837** | |
+| **总计** | **4852** | |
 
 ### 4.3 检索配置（当前值）
 
@@ -212,8 +268,9 @@ CloudBase 云函数
 |--------|-------|------|------|
 | MIN_SCORE_THRESHOLD | 18.0 | 第 38 行 | BM25 最低分阈值 |
 | MIN_MATCHED_TERMS | 3 | 第 39 行 | 最少匹配词数 |
-| MAX_PER_SOURCE_GROUP | 2 | 第 42 行 | **同一 source_group 最多返回条数** |
-| searchDocuments 调用 | topK=12 | MP 第 423 行 / Router 第 370 行 | 搜索返回总数 |
+| MAX_PER_SOURCE_GROUP | 4 | `knowledge-search.js` | **同一 source_group 最多返回条数** |
+| EXPANSION_TOKEN_WEIGHT | 0.25 | `knowledge-search.js` | 查询扩展词仅用于召回，不压过用户原问题 |
+| searchDocuments 调用 | topK=12 | MP / Router | 搜索返回总数 |
 | MAX_CONTEXT_CHARS | 30000 | MP 第 122 行 | 上下文总量上限 |
 
 ### 4.4 当前 prompt
@@ -269,7 +326,7 @@ ${context}
 | Router 云函数主逻辑 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/index.js` | 680 行，含 prompt（第 398 行）、搜索调用（第 370 行） |
 | BM25 检索器 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` | 含 MIN_SCORE_THRESHOLD、MAX_PER_SOURCE_GROUP 等配置 |
 | Router BM25 检索器 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-search.js` | 与 MP 版本相同 |
-| 知识库（MP） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 12.3 MB，4837 个 chunk |
+| 知识库（MP） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 约 8.6 MB，4852 个 chunk |
 | 知识库（Router） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-base.json` | 与 MP 版本相同 |
 | 倒排索引（MP） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/inverted-index.json` | BM25 倒排索引 |
 | 倒排索引（Router） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/inverted-index.json` | 与 MP 版本相同 |
@@ -316,7 +373,7 @@ ${context}
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| MP 测试 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_mp.js` | 56 个用例 |
+| MP 测试 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_mp.js` | 58 个用例 |
 | Router 测试 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_router.js` | 24 个用例 |
 | 知识库夹具 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/knowledge-base.json` | 测试用 |
 | 倒排索引夹具 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/inverted-index.json` | 测试用 |
@@ -331,7 +388,7 @@ ${context}
 
 ---
 
-## 6. 优化建议（给下一个模型）
+## 6. 历史优化建议（已完成，保留原始决策依据）
 
 ### 6.1 方案 A：调整检索参数（最小改动，效果有限）
 
@@ -398,15 +455,13 @@ const reRanked = docs.sort((a, b) => {
 
 **效果**：确保包含详细象征意义的 chunk 排在前面，LLM 能充分提取。
 
-### 6.4 推荐方案
+### 6.4 执行结论
 
-**短期（立即）**：方案 A + 方案 C，只改检索参数和重排序逻辑，不重新生成知识库。
-
-**长期（后续）**：方案 B，重新分块，从根源解决内容混杂问题。
+第 0.1 节已完成比原建议更完整的实现：不是将上限粗略改为 5，而是使用上限 4、语义分块、原词/扩展词分权、章节标题/实体加权和结构噪声过滤。此处的 A/B/C 内容仅保留为问题来源，不应重复执行。
 
 ---
 
-## 7. 部署方式
+## 7. 部署方式（以第 0.1 节的 `npm exec` 命令为准）
 
 ### 7.1 修改后如何部署
 

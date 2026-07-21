@@ -12,7 +12,8 @@
  * 分块策略：
  *   - 每个 QA MD 文件按 "={80,}" 分隔符切分子文件
  *   - 每个子文件按段落（双换行）进一步切分
- *   - 累积段落直到 1200-2000 字符为一块
+ *   - 对明确的星曜标题优先按语义段落切分，避免多个主星混在同一块
+ *   - 其余内容累积段落直到 1200-2000 字符为一块
  *
  * 校验：
  *   - manifest 的 11 个文件必须全部存在
@@ -27,16 +28,22 @@ const crypto = require('crypto');
 const QA_DIR = process.argv[2] || process.env.QA_DIR || '';
 const OUTPUT_DIR = process.argv[3] || '';
 
-if (!QA_DIR) {
-  console.error('Usage: node scripts/generate-knowledge-base.js <qa-upload-dir> [output-dir]');
-  console.error('Example: node scripts/generate-knowledge-base.js /path/to/QA上传包');
-  process.exit(1);
-}
-
 const MANIFEST_PATH = path.join(QA_DIR, 'manifest.json');
 
 const TARGET_CHUNK_MIN = 1200;
 const TARGET_CHUNK_MAX = 2000;
+
+// 天纪原始资料中部分标题没有 Markdown #，而是独占一行并以反斜杠结尾。
+// 只识别明确的星曜章节，避免把目录中的“紫微星 12”之类条目误判为正文。
+const STAR_SECTION_HEADING = /^(?:主星之)?(?:紫微|天机|太阳|武曲|天同|廉贞|天府|太阴|天梁|天相|七杀|破军|贪狼|巨门)星$/;
+const AUXILIARY_STAR_SECTION_HEADINGS = new Set([
+  '左辅右弼、三台八座',
+  '禄存星',
+  '六吉星之曲昌',
+  '六吉星之魁钺',
+  '六吉星之红鸾、天喜',
+  '六煞星：羊陀 火铃 空劫',
+]);
 
 // BM25 参数（与 knowledge-search.js 保持一致）
 const BM25_K1 = 1.5;
@@ -160,6 +167,71 @@ function splitIntoChunks(content, maxLen = TARGET_CHUNK_MAX, minLen = TARGET_CHU
   return chunks;
 }
 
+function getSemanticSectionTitle(line) {
+  const normalized = line
+    .trim()
+    .replace(/\\+$/, '')
+    .replace(/^#+\s*/, '')
+    .trim();
+
+  if (STAR_SECTION_HEADING.test(normalized)) {
+    return normalized.replace(/^主星之/, '');
+  }
+  return AUXILIARY_STAR_SECTION_HEADINGS.has(normalized) ? normalized : '';
+}
+
+function splitSemanticSections(content) {
+  const sections = [];
+  const prefix = [];
+  let current = null;
+
+  for (const line of content.split('\n')) {
+    const sectionTitle = getSemanticSectionTitle(line);
+    if (sectionTitle) {
+      if (current) {
+        sections.push({ title: current.title, content: current.lines.join('\n').trim() });
+      } else if (prefix.join('\n').trim()) {
+        sections.push({ title: '', content: prefix.join('\n').trim() });
+      }
+      current = { title: sectionTitle, lines: [line] };
+    } else if (current) {
+      current.lines.push(line);
+    } else {
+      prefix.push(line);
+    }
+  }
+
+  if (current) {
+    sections.push({ title: current.title, content: current.lines.join('\n').trim() });
+  }
+
+  return sections.some((section) => section.title) ? sections : null;
+}
+
+function splitSubfileContent(content, fallbackTitle) {
+  const sections = splitSemanticSections(content);
+  if (!sections) {
+    return splitIntoChunks(content).map((chunkContent) => ({
+      chunkContent,
+      chunkTitle: fallbackTitle,
+      sectionTitle: '',
+    }));
+  }
+
+  const chunks = [];
+  for (const section of sections) {
+    const sectionChunks = splitIntoChunks(section.content);
+    for (const chunkContent of sectionChunks) {
+      chunks.push({
+        chunkContent,
+        chunkTitle: section.title || fallbackTitle,
+        sectionTitle: section.title,
+      });
+    }
+  }
+  return chunks;
+}
+
 function extractSubfileTitle(subfileContent) {
   for (const line of subfileContent.split('\n')) {
     const m = line.match(/^#+\s*(.+)$/);
@@ -202,8 +274,8 @@ function processQaFile(filePath, manifestEntry) {
 
     if (!actualContent.trim()) continue;
 
-    const subChunks = splitIntoChunks(actualContent);
-    subChunks.forEach((chunkContent, idx) => {
+    const subChunks = splitSubfileContent(actualContent, subfileTitle);
+    subChunks.forEach(({ chunkContent, chunkTitle, sectionTitle }, idx) => {
       chunks.push({
         id: `${manifestEntry.source_group}#${subfileIndex}#${idx}`,
         source_group: manifestEntry.source_group,
@@ -211,11 +283,12 @@ function processQaFile(filePath, manifestEntry) {
         learning_use: fileFm.learning_use || 'learning_research',
         medical_safety: fileFm.medical_safety || 'learning_only',
         subfile: subfilePath || subfileTitle,
-        chunk_title: subfileTitle,
+        chunk_title: chunkTitle,
+        section_title: sectionTitle || undefined,
         chunk_index: idx,
         content: chunkContent,
         content_length: chunkContent.length,
-        keywords: extractKeywords(chunkContent),
+        keywords: extractKeywords(`${sectionTitle ? `# ${sectionTitle}\n` : ''}${chunkContent}`),
       });
     });
 
@@ -323,6 +396,11 @@ function buildInvertedIndex(chunks) {
 // 主流程
 // ---------------------------------------------------------------------------
 function main() {
+  if (!QA_DIR) {
+    console.error('Usage: node scripts/generate-knowledge-base.js <qa-upload-dir> [output-dir]');
+    console.error('Example: node scripts/generate-knowledge-base.js /path/to/QA上传包');
+    process.exit(1);
+  }
   if (!fs.existsSync(MANIFEST_PATH)) {
     console.error(`Manifest not found: ${MANIFEST_PATH}`);
     process.exit(1);
@@ -429,4 +507,13 @@ function main() {
   console.log(`Inverted index: ${indexSizeKB} KB`);
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  getSemanticSectionTitle,
+  splitIntoChunks,
+  splitSemanticSections,
+  splitSubfileContent,
+};

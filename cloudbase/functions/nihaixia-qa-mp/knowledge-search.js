@@ -1,12 +1,14 @@
 /**
- * 知识库检索模块 v4 — 倒排索引 + BM25 + 真哈希去重 + source_group 限额
+ * 知识库检索模块 v5 — 语义分块 + 加权 BM25 + 去重 + source_group 限额
  *
  * 改进（v4）：
  *   1. 支持 setDataDir(dir) 注入测试 fixture，不再固定读 __dirname
  *   2. 支持 setMinScoreThreshold(n) 测试时降低阈值（fixture N 小，分数天然低）
  *   3. 去重改用 SHA-256(content) 而非 content.slice(0, 200)
- *   4. 同一 source_group 最多保留 2 个结果，保证多样性
- *   5. 保留 BM25 阈值 + 最低匹配数 + 证据片段
+ *   4. 用户原问题权重大于查询扩展词，避免泛主题词淹没具体问题
+ *   5. 对章节标题精确匹配加权，并压低目录、排盘表等结构性噪声
+ *   6. 同一 source_group 最多保留 4 个结果，兼顾专题完整性与多样性
+ *   7. 保留 BM25 阈值 + 最低匹配数 + 证据片段
  *
  * 依赖：
  *   - knowledge-base.json：分块语料（chunks 数组）
@@ -38,8 +40,20 @@ const BM25_B = 0.75;
 const MIN_SCORE_THRESHOLD = 18.0;
 const MIN_MATCHED_TERMS = 3;
 
-// 同一 source_group 在最终结果中最多占多少条（保证多样性）
-const MAX_PER_SOURCE_GROUP = 2;
+// 查询扩展只用于召回，不能与用户明确提到的概念等权竞争。
+const EXPANSION_TOKEN_WEIGHT = 0.25;
+const TITLE_MATCH_BOOST = 4;
+const MAX_TITLE_MATCH_BOOST = 16;
+const SEMANTIC_SECTION_BOOST = 2;
+const ENTITY_MATCH_BOOST = 10;
+const MAX_ENTITY_MATCH_BOOST = 20;
+const STRUCTURAL_CHUNK_PENALTY = 50;
+
+// 同一 source_group 在最终结果中最多占多少条。星曜等专题回答常需要
+// 同组的主星、辅星和组合关系，2 条不足；4 条仍能留下其他资料来源。
+const MAX_PER_SOURCE_GROUP = 4;
+const MAX_STRUCTURAL_PER_SOURCE_GROUP = 1;
+const STAR_ENTITY_PATTERN = /(?:紫微|紫薇|天机|太阳|武曲|天同|廉贞|天府|太阴|天梁|天相|七杀|破军|贪狼|巨门)星/g;
 
 // 主题领域关键词（备用，如果 inverted-index.json 未内嵌）
 const TOPIC_KEYWORDS_FALLBACK = {
@@ -158,11 +172,11 @@ function expandQuery(query) {
 }
 
 // BM25 打分单个文档（使用扁平格式倒排表）
-function bm25ScoreDoc(queryTokens, docIndex, docLength) {
+function scoreTokens(tokens, docIndex, docLength) {
   let score = 0;
   let matchedCount = 0;
 
-  for (const qt of queryTokens) {
+  for (const qt of tokens) {
     const flat = _inverted[qt];
     if (!flat) continue;
 
@@ -191,6 +205,71 @@ function bm25ScoreDoc(queryTokens, docIndex, docLength) {
   return { score, matchedCount };
 }
 
+function bm25ScoreDoc(primaryTokens, expansionTokens, docIndex, docLength) {
+  const primary = scoreTokens(primaryTokens, docIndex, docLength);
+  const expansion = scoreTokens(expansionTokens, docIndex, docLength);
+  return {
+    score: primary.score + expansion.score * EXPANSION_TOKEN_WEIGHT,
+    matchedCount: primary.matchedCount + expansion.matchedCount,
+    primaryMatchedCount: primary.matchedCount,
+  };
+}
+
+function getTitleMatchBoost(doc, primaryTokens) {
+  const title = `${doc.section_title || ''} ${doc.chunk_title || ''}`;
+  if (!title.trim()) return 0;
+
+  const matched = new Set();
+  for (const token of primaryTokens) {
+    if (token.length >= 2 && title.includes(token)) matched.add(token);
+  }
+  return Math.min(matched.size * TITLE_MATCH_BOOST, MAX_TITLE_MATCH_BOOST);
+}
+
+function getExplicitStarEntities(query) {
+  return [...new Set((query.match(STAR_ENTITY_PATTERN) || []).map((entity) => entity.replace(/^紫薇/, '紫微')))];
+}
+
+function getEntityMatchBoost(doc, entities) {
+  if (!entities.length) return { boost: 0, count: 0 };
+  const searchable = `${doc.section_title || ''}\n${doc.content || ''}`;
+  const count = entities.filter((entity) => {
+    if (searchable.includes(entity)) return true;
+    return entity === '紫微星' && searchable.includes('紫薇星');
+  }).length;
+  return {
+    boost: Math.min(count * ENTITY_MATCH_BOOST, MAX_ENTITY_MATCH_BOOST),
+    count,
+  };
+}
+
+function isStructuralChunk(content) {
+  if (!content) return false;
+  if (/(?:目\s*录|安紫微诸星表|定天府表|安天府诸星表|起紫微表|HYPERLINK|INCLUDEPICTURE|Start of picture text)/.test(content)) {
+    return true;
+  }
+  const tableMarks = (content.match(/\|/g) || []).length;
+  return tableMarks >= 12;
+}
+
+function isStructuralLookupQuery(query) {
+  return /(?:排盘|排法|安(?:星|紫微|天府)|定(?:星|紫微|天府)|星表)/.test(query);
+}
+
+function getRankingScore(doc, bm25Score, primaryTokens, entities, query) {
+  const titleBoost = getTitleMatchBoost(doc, primaryTokens);
+  const sectionBoost = doc.section_title ? SEMANTIC_SECTION_BOOST : 0;
+  const entity = getEntityMatchBoost(doc, entities);
+  const structuralPenalty = isStructuralChunk(doc.content) && !isStructuralLookupQuery(query)
+    ? STRUCTURAL_CHUNK_PENALTY
+    : 0;
+  return {
+    score: bm25Score + titleBoost + sectionBoost + entity.boost - structuralPenalty,
+    isStructural: structuralPenalty > 0,
+    entityMatches: entity.count,
+  };
+}
+
 // 提取证据片段
 function extractEvidence(content, queryTokens, contextChars = 80) {
   if (!content) return '';
@@ -216,16 +295,19 @@ function searchDocuments(query, limit = 5) {
   const threshold = _thresholdOverride !== null ? _thresholdOverride : MIN_SCORE_THRESHOLD;
   const minMatched = _matchedTermsOverride !== null ? _matchedTermsOverride : MIN_MATCHED_TERMS;
 
-  // 分词查询
-  let queryTokens = tokenize(query);
+  // 用户原问题是排序的主要依据；主题扩展词只用于扩大召回范围。
+  // “紫薇”与“紫微”在资料中混用，统一后保证别名也能命中正文。
+  const normalizedQuery = query.replace(/紫薇/g, '紫微');
+  const primaryTokens = [...new Set(tokenize(normalizedQuery))];
+  const explicitStarEntities = getExplicitStarEntities(normalizedQuery);
 
   // 查询扩展
-  const expanded = expandQuery(query);
-  if (expanded.length) {
-    queryTokens = [...new Set([...queryTokens, ...expanded])];
-  }
+  const expanded = expandQuery(normalizedQuery);
+  const primaryTokenSet = new Set(primaryTokens);
+  const expansionTokens = [...new Set(expanded.filter((token) => !primaryTokenSet.has(token)))];
+  const queryTokens = [...new Set([...primaryTokens, ...expansionTokens])];
 
-  if (!queryTokens.length) return [];
+  if (!primaryTokens.length) return [];
 
   // 收集候选文档：只打分包含至少一个查询 token 的文档
   const candidateDocs = new Set();
@@ -242,22 +324,45 @@ function searchDocuments(query, limit = 5) {
   const scored = [];
   for (const docIndex of candidateDocs) {
     const docLength = _docLengths[docIndex] || 0;
-    const { score, matchedCount } = bm25ScoreDoc(queryTokens, docIndex, docLength);
-    if (score < threshold) continue;
-    if (matchedCount < minMatched) continue;
-    scored.push({ doc: _data.chunks[docIndex], score, matchedCount });
+    const bm25 = bm25ScoreDoc(primaryTokens, expansionTokens, docIndex, docLength);
+    // 对短问题自动降低最低原词匹配要求；例如“天纪”只有一个有效 token。
+    const requiredPrimaryMatches = Math.min(minMatched, Math.max(1, primaryTokens.length));
+    if (bm25.primaryMatchedCount < requiredPrimaryMatches) continue;
+    const doc = _data.chunks[docIndex];
+    const ranked = getRankingScore(doc, bm25.score, primaryTokens, explicitStarEntities, normalizedQuery);
+    // 用户明确点名某些星曜时，不让只命中“紫微斗数”等泛词的概览块占上下文。
+    if (explicitStarEntities.length && ranked.entityMatches === 0) continue;
+    if (ranked.score < threshold) continue;
+    scored.push({
+      doc,
+      score: ranked.score,
+      matchedCount: bm25.matchedCount,
+      primaryMatchedCount: bm25.primaryMatchedCount,
+      isStructural: ranked.isStructural,
+      entityMatches: ranked.entityMatches,
+    });
   }
 
-  // 按分数降序
+  // 按最终相关度降序：原词匹配、章节标题和内容质量均已纳入。
   scored.sort((a, b) => b.score - a.score);
+  const hasNonStructuralResult = scored.some((item) => !item.isStructural);
+  const hasSemanticEntityResult = explicitStarEntities.length > 0
+    && !isStructuralLookupQuery(normalizedQuery)
+    && scored.some((item) => item.entityMatches > 0 && item.doc.section_title && !item.isStructural);
 
   // 去重 + source_group 限额：
   //   - 真正的 SHA-256 哈希，不再用前 200 字符
   //   - 同一 source_group 最多保留 MAX_PER_SOURCE_GROUP 条，保证多样性
   const seenHashes = new Set();
   const sourceGroupCount = new Map();
+  const structuralGroupCount = new Map();
   const deduped = [];
   for (const s of scored) {
+    // 普通学习问答已有正文时，不把目录、排盘表等噪声塞进模型上下文。
+    // 用户明确问排盘/安星/星表时 isStructural 为 false，仍可正常召回表格。
+    if (s.isStructural && hasNonStructuralResult) continue;
+    if (hasSemanticEntityResult && !s.doc.section_title) continue;
+
     const hashKey = crypto.createHash('sha256').update(s.doc.content).digest('hex');
     if (seenHashes.has(hashKey)) continue;
     seenHashes.add(hashKey);
@@ -265,7 +370,10 @@ function searchDocuments(query, limit = 5) {
     const group = s.doc.source_group || '__unknown__';
     const currentCount = sourceGroupCount.get(group) || 0;
     if (currentCount >= MAX_PER_SOURCE_GROUP) continue;
+    const structuralCount = structuralGroupCount.get(group) || 0;
+    if (s.isStructural && structuralCount >= MAX_STRUCTURAL_PER_SOURCE_GROUP) continue;
     sourceGroupCount.set(group, currentCount + 1);
+    if (s.isStructural) structuralGroupCount.set(group, structuralCount + 1);
 
     deduped.push(s);
     if (deduped.length >= limit) break;
@@ -277,6 +385,7 @@ function searchDocuments(query, limit = 5) {
     source_quality: s.doc.source_quality,
     subfile: s.doc.subfile,
     chunk_title: s.doc.chunk_title,
+    section_title: s.doc.section_title,
     content: s.doc.content,
     content_length: s.doc.content_length,
     score: Math.round(s.score * 100) / 100,

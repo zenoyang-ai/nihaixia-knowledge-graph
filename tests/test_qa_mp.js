@@ -8,6 +8,8 @@
 const assert = require('assert');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { splitSubfileContent } = require('../scripts/generate-knowledge-base');
 
 // 加载云函数模块
 const functionPath = path.join(__dirname, '..', 'cloudbase', 'functions', 'nihaixia-qa-mp', 'index.js');
@@ -90,6 +92,35 @@ try {
 const TESTS = [];
 function test(name, fn) {
   TESTS.push({ name, fn });
+}
+
+function createSearchFixture(chunks) {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'nihaixia-search-'));
+  const postings = new Map();
+  const docLengths = [];
+  let totalTokens = 0;
+
+  for (const [docIndex, chunk] of chunks.entries()) {
+    const tokens = searchMod.tokenize(chunk.content);
+    docLengths.push(tokens.length);
+    totalTokens += tokens.length;
+    const tf = new Map();
+    for (const token of tokens) tf.set(token, (tf.get(token) || 0) + 1);
+    for (const [token, count] of tf) {
+      if (!postings.has(token)) postings.set(token, []);
+      postings.get(token).push(docIndex, count);
+    }
+  }
+
+  const index = {
+    total_docs: chunks.length,
+    avg_doc_length: totalTokens / chunks.length,
+    doc_lengths: docLengths,
+    inverted_index: Object.fromEntries(postings),
+  };
+  fs.writeFileSync(path.join(tempDir, 'knowledge-base.json'), JSON.stringify({ chunks }));
+  fs.writeFileSync(path.join(tempDir, 'inverted-index.json'), JSON.stringify(index));
+  return tempDir;
 }
 
 // ===========================================================================
@@ -466,7 +497,72 @@ if (searchDocuments) {
     }
   });
 
-  test('v5.1.0 检索：同一 source_group 最多 2 条结果', () => {
+  test('v5.3.0 分块：星曜标题应成为独立语义块', () => {
+    const chunks = splitSubfileContent(`目录\\
+主星之紫微星\\
+北斗星君，为帝星。紫微为官带。\\
+天府星\\
+天府星是南斗星君。\\
+左辅右弼、三台八座\\
+左辅右弼辅佐紫微星，三台八座辅佐天府星。`, '子文件21');
+    const titles = chunks.map((chunk) => chunk.chunkTitle);
+    assert.ok(titles.includes('紫微星'), '紫微星应独立切块');
+    assert.ok(titles.includes('天府星'), '天府星应独立切块');
+    assert.ok(titles.includes('左辅右弼、三台八座'), '辅星关系应独立切块');
+  });
+
+  test('v5.3.0 检索：具体星曜问题优先正文并排除目录噪声', () => {
+    const chunks = [
+      {
+        id: '07#0#0', source_group: '07_天纪资料', source_quality: 'reference',
+        chunk_title: '紫微星', section_title: '紫微星',
+        content: '主星之紫微星。北斗星君，为帝星。紫微为官带，且有解厄制化的说法。', content_length: 40,
+      },
+      {
+        id: '07#0#1', source_group: '07_天纪资料', source_quality: 'reference',
+        chunk_title: '天府星', section_title: '天府星',
+        content: '天府星是南斗星君。天府星没有解厄制化的功能，府相会命有其组合意义。', content_length: 40,
+      },
+      {
+        id: '07#0#2', source_group: '07_天纪资料', source_quality: 'reference',
+        chunk_title: '左辅右弼、三台八座', section_title: '左辅右弼、三台八座',
+        content: '左辅右弼辅佐紫微星，三台八座辅佐天府星；两组辅星有不同的组合关系。', content_length: 42,
+      },
+      {
+        id: '07#0#3', source_group: '07_天纪资料', source_quality: 'reference',
+        chunk_title: '目录',
+        content: '目 录：安紫微诸星表、定天府表、紫微星、天府星。', content_length: 30,
+      },
+      {
+        id: '06#0#0', source_group: '06_补充资料', source_quality: 'core',
+        chunk_title: '学习路径',
+        content: '天纪包括紫微斗数等内容，建议先建立学习路径。', content_length: 30,
+      },
+    ];
+    const tempDir = createSearchFixture(chunks);
+    try {
+      searchMod.setDataDir(tempDir);
+      searchMod.setMinScoreThreshold(0);
+      searchMod.setMinMatchedTerms(1);
+      const docs = searchMod.searchDocuments('紫微星、天府星，这两颗星有啥用', 5);
+      const titles = docs.map((doc) => doc.chunk_title);
+      assert.ok(titles.includes('紫微星'), '应召回紫微星正文');
+      assert.ok(titles.includes('天府星'), '应召回天府星正文');
+      assert.ok(titles.includes('左辅右弼、三台八座'), '应召回辅星关系正文');
+      assert.ok(!titles.includes('目录'), '不应把目录或排盘表作为普通问答上下文');
+
+      const aliasTitles = searchMod.searchDocuments('紫薇星、天府星，这两颗星有啥用', 5)
+        .map((doc) => doc.chunk_title);
+      assert.ok(aliasTitles.includes('紫微星'), '“紫薇星”别名应命中紫微星正文');
+    } finally {
+      fs.rmSync(tempDir, { recursive: true, force: true });
+      searchMod.setDataDir(fixtureDir);
+      searchMod.setMinScoreThreshold(2.0);
+      searchMod.setMinMatchedTerms(2);
+    }
+  });
+
+  test('v5.3.0 检索：同一 source_group 最多 4 条结果', () => {
     const docs = searchDocuments('什么是太阳病', 5);
     if (docs.length >= 3) {
       const groupCount = new Map();
@@ -475,7 +571,7 @@ if (searchDocuments) {
         groupCount.set(g, (groupCount.get(g) || 0) + 1);
       }
       for (const [, count] of groupCount) {
-        assert.ok(count <= 2, `同一 source_group 不应超过 2 条，实际 ${count} 条`);
+        assert.ok(count <= 4, `同一 source_group 不应超过 4 条，实际 ${count} 条`);
       }
     }
   });
