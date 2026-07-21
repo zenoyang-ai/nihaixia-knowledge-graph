@@ -148,6 +148,12 @@
    结构覆盖 — 把原文件里的硬编码颜色接到变量上
    ============================================ */
 
+/* 固定滚动条空间，防止主题切换时滚动条出现/消失导致布局抖动 */
+html {
+    scrollbar-gutter: stable;
+    overflow-y: scroll;
+}
+
 /* 页面底 + 网格纹理 */
 body {
     background-color: var(--surface-page);
@@ -312,9 +318,11 @@ body {
 .footer-popover-title { color: var(--on-surface-strong); }
 .footer-popover-hint { color: var(--on-surface-muted); }
 
-/* 滚动条（暗色下协调） */
-* { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
-::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); }
+/* 滚动条（暗色下协调，限定 html/body 避免全元素重绘闪动） */
+html, body { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 4px; }
 
 /* 全局面料过渡（切换主题时柔和变化） */
 .header, .sidebar, .main, .stage-card, .route-card-new,
@@ -324,42 +332,10 @@ body {
 }
 
 /* ============================================
-   主题切换按钮
+   主题切换按钮 — 见下方 v2 定义（单图标旋转切换）
+   早期 display:none/block 方案已移除，避免与
+   v2 的 opacity/transform 方案冲突导致图标偏移
    ============================================ */
-.theme-toggle {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 34px;
-    height: 34px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--surface-soft);
-    color: var(--on-surface-muted);
-    cursor: pointer;
-    flex-shrink: 0;
-    transition: all 0.2s ease;
-    font-family: inherit;
-}
-.theme-toggle:hover {
-    border-color: var(--accent-gold);
-    color: var(--accent-gold);
-    transform: translateY(-1px);
-}
-.theme-toggle:focus-visible {
-    outline: 2px solid var(--accent-gold);
-    outline-offset: 2px;
-}
-.theme-toggle svg { display: block; }
-.theme-toggle .icon-sun { display: none; }
-.theme-toggle .icon-moon { display: block; }
-[data-theme="dark"] .theme-toggle .icon-sun { display: block; }
-[data-theme="dark"] .theme-toggle .icon-moon { display: none; }
-
-@media (max-width: 768px) {
-    .theme-toggle { width: 30px; height: 30px; border-radius: 6px; }
-    .theme-toggle svg { width: 15px; height: 15px; }
-}
 
 /* ============================================
    v2 — 天纪紫去外来化 + 提示词页主题化 + 中性深灰
