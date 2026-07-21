@@ -40,37 +40,38 @@
         updateSwitchState(next);
     }
 
-    /* ---- 3. 三态切换器（插入 header） ---- */
-    var OPTIONS = [
-        { value: 'light', label: '浅色' },
-        { value: 'dark',  label: '暖棕' },
-    ];
+    /* ---- 3. 单图标切换按钮（浅色 ⇄ 暖棕，太阳/月亮） ---- */
+    var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">'
+        + '<circle cx="12" cy="12" r="4"/>'
+        + '<path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M19.1 4.9l-1.4 1.4M6.3 17.7l-1.4 1.4"/>'
+        + '</svg>';
+    var ICON_MOON = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">'
+        + '<path d="M20.6 14.5A8.5 8.5 0 0 1 9.5 3.4a8.5 8.5 0 1 0 11.1 11.1z"/>'
+        + '</svg>';
+
+    function currentTheme() {
+        return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+    }
 
     function createSwitch() {
-        var wrap = document.createElement('div');
-        wrap.className = 'theme-switch';
-        wrap.setAttribute('role', 'group');
-        wrap.setAttribute('aria-label', '切换站点主题');
-        OPTIONS.forEach(function (opt) {
-            var btn = document.createElement('button');
-            btn.type = 'button';
-            btn.className = 'theme-switch-btn';
-            btn.dataset.themeValue = opt.value;
-            btn.textContent = opt.label;
-            btn.setAttribute('aria-label', '切换到' + opt.label + '主题');
-            btn.addEventListener('click', function () { setTheme(opt.value); });
-            wrap.appendChild(btn);
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'theme-toggle';
+        btn.innerHTML = '<span class="theme-toggle-icon icon-sun">' + ICON_SUN + '</span>'
+            + '<span class="theme-toggle-icon icon-moon">' + ICON_MOON + '</span>';
+        btn.addEventListener('click', function () {
+            setTheme(currentTheme() === 'dark' ? 'light' : 'dark');
         });
-        return wrap;
+        return btn;
     }
 
     function updateSwitchState(t) {
-        var btns = document.querySelectorAll('.theme-switch-btn');
-        btns.forEach(function (btn) {
-            var active = btn.dataset.themeValue === t;
-            btn.classList.toggle('active', active);
-            btn.setAttribute('aria-pressed', active ? 'true' : 'false');
-        });
+        var btn = document.querySelector('.theme-toggle');
+        if (!btn) return;
+        var label = t === 'dark' ? '切换到浅色阅读' : '切换到暖棕夜读';
+        btn.setAttribute('aria-label', label);
+        btn.setAttribute('title', label);
+        btn.setAttribute('aria-pressed', t === 'dark' ? 'true' : 'false');
     }
 
     /* ---- 4. 挂载 ---- */

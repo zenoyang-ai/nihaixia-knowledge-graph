@@ -439,47 +439,57 @@ body {
 .path-cta-link:hover { background: var(--tianji); color: #fff; }
 
 /* ============================================
-   三态主题切换器（浅色 / 暖棕 / 深灰）
+   主题切换按钮（单图标：浅色 ⇄ 暖棕）
+   太阳/月亮 SVG 交叉旋转淡入
    ============================================ */
-.theme-switch {
+.theme-toggle {
+    position: relative;
+    width: 30px;
+    height: 30px;
+    flex-shrink: 0;
+    border: 1px solid var(--border-color);
+    border-radius: 50%;
+    background: var(--surface-soft);
+    color: var(--on-surface-muted);
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+.theme-toggle:hover {
+    color: var(--accent);
+    border-color: var(--accent);
+}
+.theme-toggle:focus-visible {
+    outline: 2px solid var(--accent-gold);
+    outline-offset: 2px;
+}
+.theme-toggle-icon {
+    position: absolute;
+    inset: 0;
     display: flex;
     align-items: center;
-    gap: 2px;
-    padding: 2px;
-    border: 1px solid var(--border-color);
-    border-radius: 8px;
-    background: var(--surface-soft);
-    flex-shrink: 0;
+    justify-content: center;
+    transition: transform 0.34s cubic-bezier(0.34, 1.4, 0.64, 1), opacity 0.2s ease;
 }
-.theme-switch-btn {
-    border: none;
-    background: none;
-    cursor: pointer;
-    padding: 4px 10px;
-    border-radius: 6px;
-    font-size: 12px;
-    font-family: inherit;
-    color: var(--on-surface-muted);
-    transition: all 0.18s ease;
-    white-space: nowrap;
-    line-height: 1.4;
-}
-.theme-switch-btn:hover { color: var(--on-surface-strong); }
-.theme-switch-btn.active {
-    background: var(--accent);
-    color: #fff;
-    font-weight: 500;
-}
-.theme-switch-btn:focus-visible {
-    outline: 2px solid var(--accent-gold);
-    outline-offset: 1px;
-}
+.theme-toggle-icon svg { width: 15px; height: 15px; }
 
-/* 单图标按钮在三态模式下隐藏（保留兼容） */
-.theme-toggle { display: none; }
+/* 浅色模式：显示月亮（点击 → 暖棕夜读） */
+[data-theme="light"] .icon-sun  { opacity: 0; transform: rotate(90deg) scale(0.4); }
+[data-theme="light"] .icon-moon { opacity: 1; transform: rotate(0deg) scale(1); }
+/* 暖棕模式：显示太阳（点击 → 浅色） */
+[data-theme="dark"] .icon-moon { opacity: 0; transform: rotate(-90deg) scale(0.4); }
+[data-theme="dark"] .icon-sun  { opacity: 1; transform: rotate(0deg) scale(1); }
+
+@media (prefers-reduced-motion: reduce) {
+    .theme-toggle-icon { transition: none; }
+}
 
 @media (max-width: 768px) {
-    .theme-switch-btn { padding: 3px 7px; font-size: 11px; }
+    /* 移动端头部 flex-wrap 布局：排到 logo 之后、靠右对齐 */
+    .theme-toggle { order: 2; margin-left: auto; width: 28px; height: 28px; }
 }
 
 /* ============================================
