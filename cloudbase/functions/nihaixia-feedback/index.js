@@ -3,7 +3,7 @@
  * CloudBase HTTP 函数入口
  */
 
-const VERSION = '1.1.0';
+const VERSION = '1.1.1';
 const MAX_CONTENT_LENGTH = 2000;
 const ALLOWED_CATEGORIES = ['功能建议', 'Bug 报错', '知识补充', '知识点补充', '其他'];
 const DEFAULT_NOTIFY_OPEN_ID = 'ou_1527d3dbbeae3c13a25cb0159a6bff94';
@@ -81,15 +81,51 @@ function validateFeedback(body) {
   };
 }
 
+function formatLocalTime(timeStr) {
+  const d = timeStr ? new Date(timeStr) : new Date();
+  if (Number.isNaN(d.getTime())) return '';
+  const parts = new Intl.DateTimeFormat('zh-CN', {
+    timeZone: 'Asia/Shanghai',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  }).formatToParts(d);
+  const get = (type) => parts.find((p) => p.type === type)?.value || '';
+  return `${get('month')}月${get('day')}日 ${get('hour')}:${get('minute')}`;
+}
+
+function shortenPage(page) {
+  if (!page) return '';
+  try {
+    const url = new URL(page);
+    if (url.hash) return url.hash;
+    if (url.pathname && url.pathname !== '/') return url.pathname;
+    return '';
+  } catch {
+    if (page.startsWith('#') || page.startsWith('/')) return page;
+    return '';
+  }
+}
+
 function buildFeishuText(payload) {
   const lines = [
-    `【倪海厦图谱反馈】${payload.category || '其他'}`,
+    `【图谱反馈】${payload.category || '其他'}`,
+    '',
     payload.content,
   ];
   if (payload.contact) lines.push(`联系：${payload.contact}`);
-  if (payload.time) lines.push(`时间：${payload.time}`);
-  if (payload.page) lines.push(`页面：${payload.page}`);
-  if (payload.userAgent) lines.push(`UA：${payload.userAgent}`);
+
+  const metaParts = [];
+  const timeStr = formatLocalTime(payload.time);
+  const pageStr = shortenPage(payload.page);
+  if (timeStr) metaParts.push(timeStr);
+  if (pageStr) metaParts.push(pageStr);
+  if (metaParts.length) {
+    lines.push('');
+    lines.push(metaParts.join(' · '));
+  }
   return lines.join('\n');
 }
 
@@ -254,6 +290,9 @@ function createFeedbackHandler({ env, fetchImpl } = {}) {
     }
 
     const text = buildFeishuText(validation.valid);
+    if (validation.valid.userAgent) {
+      console.log(JSON.stringify({ status: 'feedback_ua', ua: validation.valid.userAgent }));
+    }
 
     try {
       await deliverToFeishu(feishuChannel, text, _fetch);
@@ -292,6 +331,8 @@ exports.VERSION = VERSION;
 exports.DEFAULT_NOTIFY_OPEN_ID = DEFAULT_NOTIFY_OPEN_ID;
 exports.validateFeedback = validateFeedback;
 exports.buildFeishuText = buildFeishuText;
+exports.formatLocalTime = formatLocalTime;
+exports.shortenPage = shortenPage;
 exports.resolveFeishuChannel = resolveFeishuChannel;
 exports.getTenantAccessToken = getTenantAccessToken;
 exports.sendToFeishuApp = sendToFeishuApp;

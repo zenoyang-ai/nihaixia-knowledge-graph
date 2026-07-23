@@ -84,19 +84,23 @@ test('validateFeedback keeps whitelisted category', () => {
   assert.equal(result.valid.category, 'Bug 报错');
 });
 
-test('buildFeishuText includes key fields', () => {
+test('buildFeishuText highlights content with compact metadata', () => {
   const text = buildFeishuText({
     category: '功能建议',
     content: '希望增加搜索',
     contact: 'wx123',
-    time: '2026-07-23T12:00:00.000Z',
-    page: 'https://example.com',
+    time: '2026-07-23T08:19:00.000Z',
+    page: 'https://zenoyang-ai.github.io/nihaixia-knowledge-graph-open/#/qa',
     userAgent: 'TestAgent',
   });
-  assert.match(text, /【倪海厦图谱反馈】功能建议/);
+  assert.match(text, /【图谱反馈】功能建议/);
   assert.match(text, /希望增加搜索/);
   assert.match(text, /联系：wx123/);
-  assert.match(text, /页面：https:\/\/example\.com/);
+  assert.match(text, /7月23日 16:19 · #\/qa/);
+  assert.equal(text.includes('TestAgent'), false);
+  assert.equal(text.includes('时间：'), false);
+  assert.equal(text.includes('页面：'), false);
+  assert.equal(text.includes('UA：'), false);
 });
 
 test('resolveFeishuChannel prefers app_im when app credentials present', () => {
@@ -132,7 +136,7 @@ test('GET health check reports app_im without leaking secrets', async () => {
   assert.equal(body.ok, true);
   assert.equal(body.feishu_configured, true);
   assert.equal(body.channel, 'app_im');
-  assert.equal(body.version, '1.1.0');
+  assert.equal(body.version, '1.1.1');
   const serialized = JSON.stringify(body);
   assert.equal(serialized.includes('test-secret'), false);
   assert.equal(serialized.includes('ou_1527d3dbbeae3c13a25cb0159a6bff94'), false);
