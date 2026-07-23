@@ -36,6 +36,21 @@
       "envVariables": {
         "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765"
       }
+    },
+    {
+      "name": "nihaixia-analytics",
+      "handler": "index.main",
+      "timeout": 30,
+      "runtime": "Nodejs18.15",
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "dailyVisitReport",
+          "type": "timer",
+          "config": "0 15 16 * * * *"
+        }
+      ]
     }
   ]
 }

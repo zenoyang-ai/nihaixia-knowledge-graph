@@ -1,0 +1,10 @@
+{
+  "name": "nihaixia-analytics",
+  "version": "0.1.0",
+  "description": "图谱网页访问统计与飞书日报",
+  "main": "index.js",
+  "dependencies": {
+    "@cloudbase/node-sdk": "^3.18.3",
+    "ws": "^8.21.1"
+  }
+}

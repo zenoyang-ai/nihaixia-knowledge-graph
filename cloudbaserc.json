@@ -38,6 +38,21 @@
         "FEISHU_APP_ID": "cli_aa9059f5d038dcd4",
         "FEISHU_NOTIFY_OPEN_ID": "ou_1527d3dbbeae3c13a25cb0159a6bff94"
       }
+    },
+    {
+      "name": "nihaixia-analytics",
+      "handler": "index.main",
+      "timeout": 30,
+      "runtime": "Nodejs18.15",
+      "memorySize": 256,
+      "installDependency": true,
+      "triggers": [
+        {
+          "name": "dailyVisitReport",
+          "type": "timer",
+          "config": "0 15 16 * * * *"
+        }
+      ]
     }
   ]
 }
