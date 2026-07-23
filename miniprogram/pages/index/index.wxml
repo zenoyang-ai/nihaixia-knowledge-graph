@@ -1,13 +1,12 @@
 <!--pages/index/index.wxml-->
 <view class="index-container">
 
-  <!-- 顶部标题区 -->
   <view class="index-hero">
     <view class="index-hero-badge">
       <text>学习资料库</text>
     </view>
     <view class="index-hero-title">
-      <text>经典中医学习问答</text>
+      <text>倪师智慧学习问答</text>
     </view>
     <view class="index-hero-subtitle">
       <text>从经典、概念与学习路径开始提问</text>
@@ -17,14 +16,12 @@
     </view>
   </view>
 
-  <!-- 主操作 -->
   <view class="index-actions">
-    <view class="index-primary-btn" bindtap="onStartChat">
+    <view class="index-primary-btn" bindtap="onStartChat" hover-class="index-primary-btn-hover">
       <text>开始学习对话</text>
     </view>
   </view>
 
-  <!-- 最近对话 -->
   <view class="index-recent" wx:if="{{recentSessions.length > 0}}">
     <view class="index-section-title">
       <text class="index-section-title-text">最近对话</text>
@@ -32,11 +29,12 @@
     </view>
     <view class="index-session-list">
       <view
-        class="index-session-card"
+        class="index-session-row"
         wx:for="{{recentSessions}}"
         wx:key="sessionId"
         bindtap="onContinueSession"
         data-session-id="{{item.sessionId}}"
+        hover-class="index-session-row-hover"
       >
         <view class="index-session-card-title">
           <text>{{item.title || '未命名对话'}}</text>
@@ -48,7 +46,6 @@
     </view>
   </view>
 
-  <!-- 空状态 -->
   <view class="index-empty" wx:else>
     <view class="index-empty-text">
       <text>还没有学习对话记录</text>

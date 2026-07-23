@@ -1,7 +1,8 @@
 {
   "usingComponents": {},
-  "navigationBarTitleText": "经典中医学习",
-  "navigationBarBackgroundColor": "#F7F7F4",
-  "navigationBarTextStyle": "black",
+  "navigationBarTitleText": "倪师智库",
+  "navigationBarBackgroundColor": "@navBg",
+  "navigationBarTextStyle": "@navText",
+  "backgroundColor": "@bg",
   "enablePullDownRefresh": false
 }

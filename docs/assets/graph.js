@@ -148,7 +148,9 @@ class ForceGraph {
 
         // 初始位置：确定性布局避免每次切换页面都完全跳变；用户拖拽后的位置会恢复。
         const cx = width / 2, cy = height / 2;
-        const spread = Math.min(width, height) * 0.36;
+        const isNarrow = width <= 768;
+        // 窄屏收紧散布半径，减少节点落到画布外
+        const spread = Math.min(width, height) * (isNarrow ? 0.26 : 0.36);
         const savedPositions = this.loadPositions();
         const hash = (value) => {
             let result = 0;
@@ -194,7 +196,7 @@ class ForceGraph {
         this.svg.style.touchAction = 'none';
 
         const zoomBehavior = d3.zoom()
-            .scaleExtent([0.25, 4])
+            .scaleExtent([0.15, 4])
             .on('zoom', (event) => {
                 g.setAttribute('transform', event.transform);
                 this.currentZoomScale = event.transform.k;
@@ -211,20 +213,9 @@ class ForceGraph {
         d3.select(this.svg).call(zoomBehavior).on('dblclick.zoom', null);
         this.zoomBehavior = zoomBehavior;
         this.viewport = g;
-
-        // 恢复上次的缩放/平移状态
-        try {
-            const savedT = sessionStorage.getItem(this.transformKey);
-            if (savedT) {
-                const t = JSON.parse(savedT);
-                if (t && Number.isFinite(t.k)) {
-                    d3.select(this.svg).call(
-                        zoomBehavior.transform,
-                        d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
-                    );
-                }
-            }
-        } catch (e) {}
+        this._graphWidth = width;
+        this._graphHeight = height;
+        this._isNarrow = width <= 768;
 
         // 边
         this.linkEls = document.createElementNS(NS, 'g');
@@ -375,19 +366,21 @@ class ForceGraph {
 
         // 力模拟
         const isCore = (n) => n.tier === 'core';
+        const chargeCore = isNarrow ? -520 : -900;
+        const chargeStd = isNarrow ? -160 : -280;
         this.simulation = d3.forceSimulation(this.nodes)
-            .force('link', d3.forceLink(this.links).id(d => d.id).distance(d => isCore(d.source) || isCore(d.target) ? 155 : 105).strength(d => isCore(d.source) || isCore(d.target) ? 0.18 : 0.09))
-            .force('charge', d3.forceManyBody().strength(d => isCore(d) ? -900 : -280).distanceMax(420))
-            .force('center', d3.forceCenter(cx, cy).strength(0.04))
-            .force('collision', d3.forceCollide().radius(d => getRadius(d) + (isCore(d) ? 18 : 10)).iterations(2))
+            .force('link', d3.forceLink(this.links).id(d => d.id).distance(d => isCore(d.source) || isCore(d.target) ? (isNarrow ? 110 : 155) : (isNarrow ? 72 : 105)).strength(d => isCore(d.source) || isCore(d.target) ? 0.18 : 0.09))
+            .force('charge', d3.forceManyBody().strength(d => isCore(d) ? chargeCore : chargeStd).distanceMax(isNarrow ? 280 : 420))
+            .force('center', d3.forceCenter(cx, cy).strength(isNarrow ? 0.08 : 0.04))
+            .force('collision', d3.forceCollide().radius(d => getRadius(d) + (isCore(d) ? (isNarrow ? 12 : 18) : (isNarrow ? 7 : 10))).iterations(2))
             .force('x', d3.forceX(d => {
                 const a = (this.layerAngle[d.layer] || 0) * Math.PI / 180;
                 return cx + Math.cos(a) * spread * 0.28;
-            }).strength(d => isCore(d) ? 0.025 : 0.012))
+            }).strength(d => isCore(d) ? 0.04 : 0.02))
             .force('y', d3.forceY(d => {
                 const a = (this.layerAngle[d.layer] || 0) * Math.PI / 180;
                 return cy + Math.sin(a) * spread * 0.28;
-            }).strength(d => isCore(d) ? 0.025 : 0.012))
+            }).strength(d => isCore(d) ? 0.04 : 0.02))
             .velocityDecay(0.4)
             .alphaMin(0.02)
             .alphaDecay(0.024);
@@ -421,8 +414,78 @@ class ForceGraph {
         // 缩放工具条（＋ － ⌂ + 缩放百分比）
         this.renderToolbar();
 
+        // 视野：窄屏始终 fit（避免恢复的旧 transform 把节点裁出屏外）；
+        // 宽屏优先恢复用户上次缩放，否则 fit 全局。
+        const appliedSaved = this._isNarrow ? false : this.restoreSavedTransform();
+        if (!appliedSaved) {
+            this.fitToView({ animate: false });
+        }
+
         // 初始化标签可见性
         this.updateLabelVisibility();
+    }
+
+    /** 计算节点包围盒并缩放到可见安全区内（避开概念栏/图例/缩放条） */
+    fitToView({ animate = true } = {}) {
+        if (!this.svg || !this.zoomBehavior || !this.nodes.length) return;
+        const width = this._graphWidth || this.container.getBoundingClientRect().width || 800;
+        const height = this._graphHeight || this.container.getBoundingClientRect().height || 600;
+
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        this.nodes.forEach((n) => {
+            if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) return;
+            const r = 20;
+            minX = Math.min(minX, n.x - r);
+            maxX = Math.max(maxX, n.x + r);
+            minY = Math.min(minY, n.y - r - 16); // 标签在上方
+            maxY = Math.max(maxY, n.y + r);
+        });
+        if (!Number.isFinite(minX) || maxX <= minX || maxY <= minY) return;
+
+        const isNarrow = width <= 768;
+        // 顶部概念栏、底部图例/安全区、左右边距
+        const padL = isNarrow ? 16 : 28;
+        const padR = isNarrow ? 16 : 28;
+        const padT = isNarrow ? 72 : 64;
+        const padB = isNarrow ? 96 : 72;
+        const availW = Math.max(80, width - padL - padR);
+        const availH = Math.max(80, height - padT - padB);
+        const bw = maxX - minX;
+        const bh = maxY - minY;
+        const k = Math.max(0.15, Math.min(2.2, Math.min(availW / bw, availH / bh) * 0.92));
+        const midX = (minX + maxX) / 2;
+        const midY = (minY + maxY) / 2;
+        const tx = padL + availW / 2 - midX * k;
+        const ty = padT + availH / 2 - midY * k;
+        const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
+        const sel = d3.select(this.svg);
+        if (animate) {
+            sel.transition().duration(420).call(this.zoomBehavior.transform, transform);
+        } else {
+            sel.call(this.zoomBehavior.transform, transform);
+        }
+        this.currentZoomScale = k;
+        if (this.zoomLabelEl) this.zoomLabelEl.textContent = Math.round(k * 100) + '%';
+        try { sessionStorage.setItem(this.transformKey, JSON.stringify(transform)); } catch (e) {}
+    }
+
+    restoreSavedTransform() {
+        try {
+            const savedT = sessionStorage.getItem(this.transformKey);
+            if (!savedT) return false;
+            const t = JSON.parse(savedT);
+            if (!t || !Number.isFinite(t.k) || !Number.isFinite(t.x) || !Number.isFinite(t.y)) return false;
+            // 拒绝明显异常的旧状态（例如几乎看不见）
+            if (t.k < 0.12 || t.k > 4) return false;
+            d3.select(this.svg).call(
+                this.zoomBehavior.transform,
+                d3.zoomIdentity.translate(t.x, t.y).scale(t.k)
+            );
+            this.currentZoomScale = t.k;
+            return true;
+        } catch (e) {
+            return false;
+        }
     }
 
     // 缩放工具条：放大 / 缩小 / 回到全局视图 + 百分比指示
@@ -450,8 +513,7 @@ class ForceGraph {
             svgSel.transition().duration(250).call(this.zoomBehavior.scaleBy, 1.35)));
         bar.appendChild(mkBtn('－', '缩小', () =>
             svgSel.transition().duration(250).call(this.zoomBehavior.scaleBy, 1 / 1.35)));
-        bar.appendChild(mkBtn('⌂', '回到全局视图', () =>
-            svgSel.transition().duration(450).call(this.zoomBehavior.transform, d3.zoomIdentity)));
+        bar.appendChild(mkBtn('⌂', '回到全局视图', () => this.fitToView({ animate: true })));
 
         const label = document.createElement('span');
         label.className = 'graph-zoom-level';

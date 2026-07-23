@@ -49,8 +49,10 @@
     --graph-link-opacity: 0.25;
     --graph-node-stroke: #ffffff;
     --graph-label-core: #2d2520;
-    --graph-label-standard: #9a9289;
-    --graph-label-halo: rgba(246, 240, 230, 0.85);
+    --graph-label-standard: #5c534a;
+    /* 与画布同色、不透明，避免半透明叠在连线上发灰成「阴影框」 */
+    --graph-label-halo: #f6f0e6;
+    --graph-label-halo-width: 2px;
 
     /* 图谱五色（浅色 = 原样） */
     --layer-cosmology: #b9362c;
@@ -126,7 +128,8 @@
     --graph-node-stroke: #221c16;
     --graph-label-core: #ece4d6;
     --graph-label-standard: #8a7c69;
-    --graph-label-halo: rgba(19, 16, 9, 0.85);
+    --graph-label-halo: #131009;
+    --graph-label-halo-width: 2.5px;
 
     --layer-cosmology: #d4594e;
     --layer-diagnosis: #5a8fc0;
@@ -246,7 +249,14 @@ body {
 .graph-node.tier-core text { fill: var(--graph-label-core); }
 .graph-node.tier-standard text { fill: var(--graph-label-standard); }
 .graph-node.tier-core circle { stroke: var(--graph-node-stroke); }
-.graph-node text { paint-order: stroke; stroke: var(--graph-label-halo); stroke-width: 3px; }
+/* 细描边光晕：隔开连线，但不形成可见「灰底框」 */
+.graph-node text {
+    paint-order: stroke fill;
+    stroke: var(--graph-label-halo);
+    stroke-width: var(--graph-label-halo-width, 2px);
+    stroke-linejoin: round;
+    stroke-linecap: round;
+}
 .graph-link { stroke: var(--graph-link); stroke-opacity: var(--graph-link-opacity); }
 .graph-node.search-match text { fill: var(--accent-strong); }
 
@@ -264,6 +274,9 @@ body {
 .note-quote-text { color: var(--on-surface); }
 .note-quote-source { color: var(--on-surface-muted); }
 .note-misconception { background: var(--accent-gold-soft); border-color: var(--border-strong); }
+/* 暗色下 --accent-dark(#7f211c) 压在深棕底上几乎不可读，改用提亮的 accent-strong */
+.note-misconception-wrong { color: var(--accent-strong); }
+.note-misconception-wrong::before { color: var(--accent); }
 .note-related-node { background: var(--surface-soft); color: var(--on-surface); }
 .note-related-node:hover { border-color: var(--accent); color: var(--accent); }
 .note-breadcrumb-current { color: var(--on-surface); }
@@ -275,7 +288,7 @@ body {
 .prompts-view { background: var(--surface-card); border-color: var(--divider-warm); }
 .prompt-skill-card, .prompt-card { background: var(--surface-soft); border-color: var(--border-color); }
 .prompt-notice { background: var(--accent-gold-soft); border-color: var(--border-strong); }
-.prompt-content pre { background: var(--code-bg-block); color: var(--on-surface); }
+.prompt-content pre { color: var(--on-surface); background: transparent; }
 .prompt-filter.active { background: var(--accent); color: #fff; }
 
 /* AI 问答 */
@@ -402,8 +415,12 @@ html, body { scrollbar-color: var(--scrollbar-thumb) var(--scrollbar-track); }
 .prompt-tab:hover { color: var(--on-surface); }
 .prompt-tab.active { color: var(--tianji); border-bottom-color: var(--tianji); }
 
-.prompt-content { background: var(--surface-soft); border-color: var(--border-color); }
-.prompt-content pre { color: var(--on-surface); }
+.prompt-content { background: transparent; border: none; }
+.prompt-content pre {
+    color: var(--on-surface);
+    background: transparent;
+    border-left-color: var(--tianji-border);
+}
 .prompt-template-label { color: var(--tianji); }
 
 .prompt-copy-btn { background: var(--tianji); border-color: var(--tianji); color: #fff; }

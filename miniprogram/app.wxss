@@ -1,13 +1,63 @@
-/* 全局样式
+/* 全局样式 — 对齐网页端暖宣纸 + 朱砂（无外部字体，仅系统宋体）
  *
- * 案头学习索引配色（与网站品牌统一：纸色 + 朱砂）：
- *   底色 #F7F7F4 / 墨色 #263238 / 辅助 #6B767A
- *   品牌主色（操作·状态·引用）#B94736 / 分隔线 #E5DED2
+ * 浅色：纸色 #f6f0e6 / 墨 #241f1a / 朱砂 #b9362c
+ * 暗色：灯烛夜读 #16120e / 象牙字 #ece4d6
  */
 page {
-  background-color: #F7F7F4;
+  --surface-page: #f6f0e6;
+  --surface-card: #fffaf1;
+  --surface-soft: #fbf5ea;
+  --surface-hover: #f3e3ca;
+  --surface-input: #fbf5ea;
+  --on-surface: #342d25;
+  --on-surface-strong: #241f1a;
+  --on-surface-muted: #776b5f;
+  --on-surface-faint: #a59684;
+  --border-color: #e7d8c1;
+  --divider-warm: rgba(145, 107, 66, 0.18);
+  --accent: #b9362c;
+  --accent-hover: #a92f27;
+  --accent-soft: rgba(185, 54, 44, 0.08);
+  --accent-border: rgba(185, 54, 44, 0.22);
+  /* 朱砂底上的文字：浅色用象牙，暗色用暖墨，避免纯白对比不足 */
+  --on-accent: #fffaf1;
+  --user-bubble: #b9362c;
+  --user-bubble-text: #fffaf1;
+  --surface-glass: rgba(246, 240, 230, 0.96);
+  --mask: rgba(0, 0, 0, 0.45);
+
+  background-color: var(--surface-page);
   font-family: -apple-system, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
-  color: #263238;
+  color: var(--on-surface);
   font-size: 28rpx;
   line-height: 1.6;
+}
+
+@media (prefers-color-scheme: dark) {
+  page {
+    --surface-page: #16120e;
+    --surface-card: #221c16;
+    --surface-soft: #1c1712;
+    --surface-hover: #2c2419;
+    --surface-input: #1c1712;
+    --on-surface: #ddd3c2;
+    --on-surface-strong: #ece4d6;
+    --on-surface-muted: #a39481;
+    --on-surface-faint: #8a7c69;
+    --border-color: #3a3129;
+    --divider-warm: rgba(199, 137, 43, 0.22);
+    --accent: #d4594e;
+    --accent-hover: #c44a40;
+    --accent-soft: rgba(212, 89, 78, 0.12);
+    --accent-border: rgba(212, 89, 78, 0.35);
+    --on-accent: #16120e;
+    --user-bubble: #d4594e;
+    --user-bubble-text: #16120e;
+    --surface-glass: rgba(22, 18, 14, 0.96);
+    --mask: rgba(0, 0, 0, 0.62);
+  }
+}
+
+.oriental-serif {
+  font-family: "Songti SC", "STSong", "SimSun", serif;
 }

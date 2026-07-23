@@ -11,8 +11,13 @@ Page({
 
   // 加载最近的对话记录
   loadRecentSessions() {
-    const sessions = wx.getStorageSync('chat_sessions') || [];
-    // 按更新时间倒序，取最近 3 条
+    let sessions = [];
+    try {
+      sessions = wx.getStorageSync('chat_sessions') || [];
+    } catch (e) {
+      wx.showToast({ title: '读取本地记录失败', icon: 'none' });
+      sessions = [];
+    }
     const recent = sessions
       .slice()
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))
@@ -49,7 +54,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '经典中医学习问答',
+      title: '倪师智慧学习问答',
       path: '/pages/index/index',
     };
   },

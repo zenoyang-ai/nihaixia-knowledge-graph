@@ -76,6 +76,7 @@ class PathView {
 
     renderStages(containerId, stages) {
         const container = document.getElementById(containerId);
+        if (!container) return;
         container.innerHTML = stages.map(stage => `
             <div class="path-stage">
                 <div class="path-stage-header">${stage.title}</div>

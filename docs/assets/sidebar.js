@@ -40,13 +40,13 @@ class Sidebar {
             const color = layerColors[layer] || 'var(--muted)';
             return `
                 <div class="sidebar-group" data-layer="${layer}">
-                    <div class="sidebar-group-header">
+                    <div class="sidebar-group-header" role="button" tabindex="0" aria-expanded="false" aria-controls="sidebar-group-${encodeURIComponent(layer)}">
                         <span class="sidebar-group-dot" style="background:${color}"></span>
                         <span class="sidebar-group-name">${layer}</span>
                         <span class="sidebar-group-count">${nodes.length}</span>
                         <span class="sidebar-group-arrow">▶</span>
                     </div>
-                    <div class="sidebar-group-items">
+                    <div class="sidebar-group-items" id="sidebar-group-${encodeURIComponent(layer)}" role="group" aria-label="${layer}">
                         ${nodes.map(n => `
                             <a class="sidebar-item" data-title="${n.title}" href="#/note/${encodeURIComponent(n.title)}">
                                 ${n.title}
@@ -69,12 +69,24 @@ class Sidebar {
         this.toggle.addEventListener('click', () => this.toggleSidebar());
         this.overlay.addEventListener('click', () => this.closeSidebar());
 
+        const toggleGroup = (header) => {
+            const group = header.closest('.sidebar-group');
+            if (!group) return;
+            group.classList.toggle('expanded');
+            header.setAttribute('aria-expanded', group.classList.contains('expanded') ? 'true' : 'false');
+        };
+
         // 目录组折叠/展开
         this.nav.addEventListener('click', (e) => {
             const header = e.target.closest('.sidebar-group-header');
-            if (header) {
-                const group = header.closest('.sidebar-group');
-                group.classList.toggle('expanded');
+            if (header) toggleGroup(header);
+        });
+        this.nav.addEventListener('keydown', (e) => {
+            const header = e.target.closest('.sidebar-group-header');
+            if (!header) return;
+            if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                toggleGroup(header);
             }
         });
     }
@@ -105,7 +117,11 @@ class Sidebar {
             const node = [...this.data.nodes, ...this.data.articles].find(n => n.title === title);
             if (node) {
                 const group = this.nav.querySelector(`.sidebar-group[data-layer="${node.layer || '其他'}"]`);
-                if (group) group.classList.add('expanded');
+                if (group) {
+                    group.classList.add('expanded');
+                    const header = group.querySelector('.sidebar-group-header');
+                    if (header) header.setAttribute('aria-expanded', 'true');
+                }
             }
         }
     }

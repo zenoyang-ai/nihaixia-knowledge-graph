@@ -5,14 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>倪海厦知识图谱</title>
     <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="assets/fonts.css?v=20260722-v6">
-    <link rel="stylesheet" href="assets/styles.css?v=20260722-v6">
-    <link rel="stylesheet" href="assets/theme.css?v=20260722-v6">
-    <!-- 主题初始化放最前，避免明暗闪烁 -->
-    <script src="assets/theme.js?v=20260722-v6"></script>
-    <!-- D3 完整包（力导向 + 拖拽 + 缩放） -->
+    <link rel="stylesheet" href="assets/fonts.css?v=20260723-v17">
+    <link rel="stylesheet" href="assets/styles.css?v=20260723-v17">
+    <link rel="stylesheet" href="assets/theme.css?v=20260723-v17">
+    <link rel="stylesheet" href="assets/oriental.css?v=20260723-v17">
+    <script src="assets/theme.js?v=20260723-v17"></script>
     <script src="vendor/d3.v7.min.js"></script>
-    <!-- marked.js 用于 Markdown 渲染 -->
     <script src="vendor/marked.min.js"></script>
 </head>
 <body>
@@ -25,7 +23,7 @@
                         <path d="M3 5h14M3 10h14M3 15h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
                     </svg>
                 </button>
-                <a href="#/" class="logo">倪海厦知识图谱</a>
+                <a href="#/" class="logo oriental-serif">倪海厦知识图谱</a>
                 <nav class="nav">
                     <a href="#/" class="nav-btn" data-route="/">总览</a>
                     <a href="#/path" class="nav-btn" data-route="/path">学习路径</a>
@@ -44,13 +42,12 @@
         <!-- 左侧目录栏 -->
         <aside class="sidebar" id="sidebar">
             <div class="sidebar-header">
-                <span class="sidebar-title">目录</span>
+                <span class="sidebar-title oriental-serif">目录</span>
                 <span class="sidebar-count" id="sidebar-count"></span>
             </div>
-            <nav class="sidebar-nav" id="sidebar-nav">
-                <!-- 由 JS 动态生成 -->
-            </nav>
+            <nav class="sidebar-nav" id="sidebar-nav"></nav>
         </aside>
+        <div class="sidebar-overlay" id="sidebar-overlay"></div>
 
         <!-- 主内容区 -->
         <main class="main" id="main-content">
@@ -58,7 +55,7 @@
             <div id="view-overview" class="view active">
                 <section class="hero-new">
                     <div class="eyebrow">NI HAIXIA KNOWLEDGE ATLAS</div>
-                    <h1 class="hero-title">倪海厦<br><span class="hero-title-accent">知识图谱</span></h1>
+                    <h1 class="hero-title oriental-serif">倪海厦<br><span class="hero-title-accent">知识图谱</span></h1>
                     <p class="hero-subtitle">从底层框架到案例研读，五个层级系统梳理倪海厦的中医与天纪体系</p>
                 </section>
 
@@ -69,23 +66,23 @@
                 <div class="route-cards-new">
                     <a href="#/path" class="route-card-new">
                         <span class="route-card-num">01</span>
-                        <strong>人纪路径</strong>
+                        <strong class="oriental-serif">人纪路径</strong>
                         <span>从黄帝内经、伤寒论到经方、针灸与医案。</span>
                     </a>
                     <a href="#/path" class="route-card-new">
                         <span class="route-card-num">02</span>
-                        <strong>天纪路径</strong>
+                        <strong class="oriental-serif">天纪路径</strong>
                         <span>从阴阳五行、易经象数，进入三才与天人关系。</span>
                     </a>
                     <a href="#/graph" class="route-card-new">
                         <span class="route-card-num">03</span>
-                        <strong>知识图谱</strong>
-                        <span>交互式力导向图，探索节点间的知识网络。</span>
+                        <strong class="oriental-serif">知识图谱</strong>
+                        <span>交互式力导向图，支持自由拖拽与 1-Degree 关联聚焦。</span>
                     </a>
                     <a href="#/prompts" class="route-card-new">
                         <span class="route-card-num">04</span>
-                        <strong>天纪提示词</strong>
-                        <span>可直接复制的玄学分析提示词，八字、紫微、易经、小六壬。</span>
+                        <strong class="oriental-serif">天纪提示词</strong>
+                        <span>可直接复制与调用的玄学分析工具包。</span>
                     </a>
                 </div>
 
@@ -102,12 +99,12 @@
                         <button class="path-tab" data-path="tianji">天纪</button>
                     </div>
                     <div id="renji-path" class="path-content active">
-                        <h2>倪海厦人纪学习路径</h2>
+                        <h2 class="oriental-serif">倪海厦人纪学习路径</h2>
                         <p class="path-desc">人纪是倪海厦的中医教学体系，以五大经典为核心，从理论到临床逐步深入。</p>
                         <div class="path-stages" id="renji-stages"></div>
                     </div>
                     <div id="tianji-path" class="path-content">
-                        <h2>倪海厦天纪学习路径</h2>
+                        <h2 class="oriental-serif">倪海厦天纪学习路径</h2>
                         <p class="path-desc">天纪是倪海厦的"天人地三才"体系，以易经为轴，涵盖紫微斗数、风水堪舆、四柱命理等。</p>
                         <div class="path-stages" id="tianji-stages"></div>
                     </div>
@@ -118,13 +115,11 @@
             <div id="view-graph" class="view">
                 <div class="graph-view">
                     <div class="graph-container">
-                        <div class="graph-canvas" id="graph-canvas">
-                            <!-- d3-force SVG 渲染到此处 -->
-                        </div>
+                        <div class="graph-canvas" id="graph-canvas"></div>
                         
-                        <!-- 左下角图例卡 -->
+                        <!-- 图例 -->
                         <div class="graph-legend">
-                            <div class="graph-legend-title">层级</div>
+                            <div class="graph-legend-title oriental-serif">层级</div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cosmology)"></span>底层框架</div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-diagnosis)"></span>辨证框架</div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-treatment)"></span>方法工具</div>
@@ -134,9 +129,10 @@
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="width:14px;height:14px;background:#999"></span>核心节点</div>
                             <div class="graph-legend-item"><span class="graph-legend-dot" style="width:7px;height:7px;background:#999"></span>普通节点</div>
                             <div class="graph-legend-divider"></div>
-                            <div class="graph-legend-hint">拖拽 · 滚轮缩放 · 点击查看</div>
+                            <div class="graph-legend-hint">拖拽 · 滚轮缩放 · 悬停聚焦</div>
                         </div>
 
+                        <!-- 节点详情 Panel -->
                         <div class="graph-detail-panel" id="graph-detail-panel">
                             <p class="placeholder">点击节点查看详情</p>
                         </div>
@@ -146,9 +142,7 @@
 
             <!-- 提示词工具包视图 -->
             <div id="view-prompts" class="view">
-                <div class="prompts-view" id="prompts-view">
-                    <!-- 由 prompts.js 动态渲染 -->
-                </div>
+                <div class="prompts-view" id="prompts-view"></div>
             </div>
 
             <!-- AI 问答视图 -->
@@ -157,10 +151,10 @@
                     <section class="qa-hero">
                         <div>
                             <div class="eyebrow">KNOWLEDGE QA</div>
-                            <h2>倪海厦知识库 AI 问答</h2>
+                            <h2 class="oriental-serif">倪海厦知识库 AI 问答</h2>
                             <p>围绕知识库中的经典、概念与学习路径进行提问，回答仅作学习参考。</p>
                         </div>
-                        <div class="qa-status-tag" aria-label="站内知识库问答状态">
+                        <div class="qa-status-tag">
                             <span class="qa-status-dot"></span>
                             <span>站内知识库问答</span>
                         </div>
@@ -170,9 +164,9 @@
                         本问答仅供学习研究，不构成医疗建议；请勿用于诊断、处方、剂量或治疗决策。
                     </div>
 
-                    <section class="qa-questions" aria-labelledby="qa-questions-title">
+                    <section class="qa-questions">
                         <div class="qa-section-heading">
-                            <span id="qa-questions-title">推荐问题</span>
+                            <span>推荐问题</span>
                             <small>点击即发送，也可以在下方自由提问</small>
                         </div>
                         <div class="qa-question-grid">
@@ -183,22 +177,16 @@
                         </div>
                     </section>
 
-                    <section class="qa-chat" aria-label="倪海厦知识库 AI 问答">
-                        <div class="qa-chat-messages" id="qa-chat-messages" aria-live="polite">
+                    <section class="qa-chat">
+                        <div class="qa-chat-messages" id="qa-chat-messages">
                             <div class="qa-chat-empty">
                                 <p>从一个概念开始，逐步追问它与经典、方法和学习路径的关系。</p>
                                 <p class="qa-chat-empty-hint">回答来自当前接入的知识库；资料不足时会明确说明。</p>
                             </div>
                         </div>
                         <div class="qa-chat-input-row">
-                            <textarea
-                                id="qa-chat-input"
-                                class="qa-chat-input"
-                                placeholder="输入你的问题，例如：倪海厦讲伤寒论的核心思想是什么？"
-                                rows="1"
-                                maxlength="2000"
-                                aria-label="输入问题"></textarea>
-                            <button type="button" class="qa-chat-send" id="qa-chat-send" aria-label="发送">
+                            <textarea id="qa-chat-input" class="qa-chat-input" placeholder="输入你的问题，例如：倪海厦讲伤寒论的核心思想是什么？" rows="1" maxlength="2000"></textarea>
+                            <button type="button" class="qa-chat-send" id="qa-chat-send">
                                 <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
                                     <path d="M2 10l16-8-8 16-2-6-6-2z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
                                 </svg>
@@ -215,17 +203,16 @@
 
             <!-- 概念详情页 -->
             <div id="view-note" class="view">
-                <div class="note-view" id="note-view">
-                    <!-- 由 JS 动态渲染 -->
-                </div>
+                <div class="note-view" id="note-view"></div>
             </div>
         </main>
 
-        <!-- 全站 footer -->
+        <!-- 全站 footer：单一清爽反馈入口 -->
         <footer class="site-footer">
             <span>本站由</span>
-            <button type="button" class="footer-brand" id="footer-brand-btn" aria-controls="footer-popover" aria-expanded="false">「数字问渡」</button>
-            <span>制作 · 微信公众号同名，欢迎关注</span>
+            <button type="button" class="footer-brand" id="footer-brand-btn">「数字问渡」</button>
+            <span>制作 · 微信公众号同名，欢迎关注 · </span>
+            <button type="button" style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:13px;text-decoration:underline;" onclick="window.toggleFeedbackModal && window.toggleFeedbackModal(true)">意见与反馈</button>
         </footer>
 
         <!-- 公众号浮层 -->
@@ -238,18 +225,17 @@
         </div>
     </div>
 
-    <!-- 移动端遮罩 -->
-    <div class="sidebar-overlay" id="sidebar-overlay"></div>
-
-    <script src="assets/router.js?v=20260721-v5"></script>
-    <script src="assets/sidebar.js?v=20260721-v5"></script>
-    <script src="assets/graph.js?v=20260721-v5"></script>
-    <script src="assets/detail.js?v=20260721-v5"></script>
-    <script src="assets/overview.js?v=20260721-v5"></script>
-    <script src="assets/path.js?v=20260721-v5"></script>
-    <script src="assets/prompts.js?v=20260721-v5"></script>
-    <script src="assets/search.js?v=20260721-v5"></script>
-    <script src="assets/app.js?v=20260721-v5"></script>
-    <script src="assets/enhance.js?v=20260721-v5"></script>
+    <script src="assets/router.js?v=20260723-v17"></script>
+    <script src="assets/sidebar.js?v=20260723-v17"></script>
+    <script src="assets/graph.js?v=20260723-v17"></script>
+    <script src="assets/detail.js?v=20260723-v17"></script>
+    <script src="assets/overview.js?v=20260723-v17"></script>
+    <script src="assets/path.js?v=20260723-v17"></script>
+    <script src="assets/prompts.js?v=20260723-v17"></script>
+    <script src="assets/search.js?v=20260723-v17"></script>
+    <script src="assets/poster.js?v=20260723-v17"></script>
+    <script src="assets/feedback.js?v=20260723-v17"></script>
+    <script src="assets/app.js?v=20260723-v17"></script>
+    <script src="assets/enhance.js?v=20260723-v17"></script>
 </body>
 </html>

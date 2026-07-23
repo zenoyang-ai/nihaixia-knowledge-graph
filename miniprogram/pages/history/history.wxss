@@ -1,75 +1,74 @@
-/* pages/history/history.wxss */
+/* pages/history/history.wxss — 分隔线列表，对齐 Demo，扩大点击热区 */
 
 .history-container {
   display: flex;
   flex-direction: column;
   height: 100vh;
-  background-color: #F7F7F4;
+  background-color: var(--surface-page);
 }
 
-/* ===========================
- * 顶部工具栏
- * =========================== */
 .history-toolbar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 20rpx 32rpx;
-  background: rgba(247, 247, 244, 0.96);
-  border-bottom: 1rpx solid #E5DED2;
+  padding: 16rpx 28rpx;
+  background: var(--surface-glass);
+  border-bottom: 1rpx solid var(--divider-warm);
   flex-shrink: 0;
 }
 
 .history-toolbar-text {
   font-size: 24rpx;
-  color: #6B767A;
+  color: var(--on-surface-muted);
   letter-spacing: 0.02em;
 }
 
 .history-clear-btn {
-  padding: 8rpx 22rpx;
+  min-height: 64rpx;
+  padding: 12rpx 22rpx;
   background: transparent;
-  border: 1rpx solid #E5DED2;
+  border: 1rpx solid var(--border-color);
   border-radius: 10rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-clear-btn text {
-  font-size: 22rpx;
-  color: #B94736;
+  font-size: 24rpx;
+  color: var(--accent);
   letter-spacing: 0.04em;
 }
 
 .history-clear-btn:active {
-  background: rgba(185, 71, 54, 0.06);
-  border-color: #B94736;
+  background: var(--accent-soft);
+  border-color: var(--accent);
 }
 
-/* ===========================
- * 对话列表
- * =========================== */
 .history-list {
   flex: 1;
-  padding: 16rpx 24rpx;
+  padding: 0 28rpx;
 }
 
+/* 分隔线列表，去掉白底描边卡片 */
 .history-card {
   display: flex;
   align-items: stretch;
-  background: #FFFFFF;
-  border: 1rpx solid #E5DED2;
-  border-radius: 12rpx;
-  margin-bottom: 16rpx;
-  overflow: hidden;
+  background: transparent;
+  border: none;
+  border-bottom: 1rpx solid var(--divider-warm);
+  margin-bottom: 0;
+  overflow: visible;
 }
 
 .history-card-main {
   flex: 1;
-  padding: 22rpx 26rpx;
+  padding: 28rpx 12rpx 28rpx 0;
   min-width: 0;
 }
 
-.history-card-main:active {
-  background: #F6F2EA;
+.history-card-main:active .history-card-title text {
+  color: var(--accent);
 }
 
 .history-card-title {
@@ -77,8 +76,8 @@
 }
 
 .history-card-title text {
-  font-size: 28rpx;
-  color: #263238;
+  font-size: 30rpx;
+  color: var(--on-surface-strong);
   font-weight: 500;
   line-height: 1.4;
   display: -webkit-box;
@@ -93,7 +92,7 @@
 
 .history-card-preview text {
   font-size: 24rpx;
-  color: #9AA1A4;
+  color: var(--on-surface-muted);
   line-height: 1.5;
   display: -webkit-box;
   -webkit-box-orient: vertical;
@@ -101,14 +100,9 @@
   overflow: hidden;
 }
 
-.history-card-meta {
-  display: flex;
-  align-items: center;
-}
-
 .history-card-meta text {
   font-size: 22rpx;
-  color: #9AA1A4;
+  color: var(--on-surface-faint);
   letter-spacing: 0.02em;
 }
 
@@ -116,42 +110,42 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0 28rpx;
-  background: rgba(185, 71, 54, 0.04);
-  border-left: 1rpx solid #E5DED2;
+  min-width: 112rpx;
+  padding: 0 20rpx;
+  background: transparent;
+  border-left: none;
+  align-self: stretch;
 }
 
 .history-card-delete text {
-  font-size: 24rpx;
-  color: #B94736;
+  font-size: 26rpx;
+  color: var(--accent);
   letter-spacing: 0.02em;
+  padding: 16rpx 8rpx;
 }
 
 .history-card-delete:active {
-  background: rgba(185, 71, 54, 0.14);
+  background: var(--accent-soft);
 }
 
 .history-bottom-spacer {
-  height: 32rpx;
+  height: calc(48rpx + env(safe-area-inset-bottom));
 }
 
-/* ===========================
- * 空状态
- * =========================== */
 .history-empty {
   flex: 1;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80rpx 0;
+  padding: 80rpx 40rpx;
 }
 
 .history-empty-icon {
   width: 120rpx;
   height: 120rpx;
   border-radius: 50%;
-  background: #F0ECE4;
+  background: var(--surface-soft);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -160,7 +154,7 @@
 
 .history-empty-icon text {
   font-size: 36rpx;
-  color: #9AA1A4;
+  color: var(--on-surface-faint);
   font-weight: 600;
 }
 
@@ -170,7 +164,7 @@
 
 .history-empty-text text {
   font-size: 30rpx;
-  color: #6B767A;
+  color: var(--on-surface-muted);
 }
 
 .history-empty-hint {
@@ -179,24 +173,27 @@
 
 .history-empty-hint text {
   font-size: 24rpx;
-  color: #9AA1A4;
+  color: var(--on-surface-faint);
   letter-spacing: 0.04em;
 }
 
 .history-empty-btn {
-  padding: 16rpx 48rpx;
-  background: #B94736;
+  min-height: 80rpx;
+  padding: 18rpx 56rpx;
+  background: var(--accent);
   border-radius: 12rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .history-empty-btn text {
-  color: #FFFFFF;
+  color: var(--on-accent);
   font-size: 26rpx;
   font-weight: 600;
   letter-spacing: 0.06em;
 }
 
 .history-empty-btn:active {
-  background: #9C3A2C;
-  transform: scale(0.985);
+  background: var(--accent-hover);
 }

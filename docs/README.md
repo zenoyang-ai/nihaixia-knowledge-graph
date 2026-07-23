@@ -38,7 +38,7 @@ docs/
 │   ├── search.js        # 搜索
 │   └── prompts.js       # 天纪提示词工具包
 ├── data/
-│   └── graph.json       # 图谱数据（70 节点 / 289 关系）
+│   └── graph.json       # 图谱数据（64 节点 + 5 篇文章 = 69 项 / 338 条有向关系）
 ├── vendor/              # 本地化第三方库（D3、marked）
 ├── sources-public/      # 公开原文（3 个可读章节 + 1 个目录索引）
 └── README.md            # 本文件

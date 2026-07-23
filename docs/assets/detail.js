@@ -22,6 +22,8 @@ class NoteDetail {
         // 计算"为什么重要"
         const importanceText = this.generateImportance(node, upstream, downstream);
 
+        window.currentNodeData = node;
+
         this.view.innerHTML = `
             <div class="note-breadcrumb">
                 <a class="note-back" href="#/graph">← 返回图谱</a>
@@ -33,6 +35,17 @@ class NoteDetail {
                 <span class="note-tag">${this.typeLabel(node.node_type)}</span>
                 <span class="note-tag layer">${node.layer || '未分类'}</span>
                 ${node.importance === 'core' ? '<span class="note-tag" style="border-color:#c0392b;color:#c0392b;">核心节点</span>' : ''}
+                <button type="button" class="poster-trigger-btn"
+                    style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;font-size:12px;font-weight:600;color:#b9362c;background:transparent;border:1px solid #b9362c;border-radius:999px;cursor:pointer;font-family:inherit;transition:background .18s,color .18s;"
+                    onmouseover="this.style.background='#b9362c';this.style.color='#fff';"
+                    onmouseout="this.style.background='transparent';this.style.color='#b9362c';"
+                    onclick="window.generatePoster && window.generatePoster(window.currentNodeData)">
+                    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+                        <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                        <polyline points="16 6 12 2 8 6"/><line x1="12" y1="2" x2="12" y2="15"/>
+                    </svg>
+                    分享
+                </button>
             </div>
 
             <h1 class="note-title">${node.title}</h1>
@@ -191,7 +204,7 @@ class NoteDetail {
         // 层级说明
         const layerDesc = {
             '底层框架': '作为底层框架，它支撑着整个辨证和治疗体系。',
-            '辨证框架': '辨证框架是中医诊断的核心能力，掌握它才能准确判断病情。',
+            '辨证框架': '辨证框架是理解经典辨证思路的核心方法，掌握它有助于梳理证候层次与学习路径。',
             '方法工具': '这是理解经方、本草、针灸等方法体系的学习入口。',
             '案例研读': '通过真实案例验证理论，是从理论到实践的关键一步。',
             '天纪体系': '天纪体系拓展了中医的视野，从天地人的角度理解人体。',
@@ -214,13 +227,17 @@ class NoteDetail {
 
     renderMarkdown(text) {
         if (!text) return '';
-        let html = text.replace(/\[\[([^\]|]+)(?:\|[^\]]+)?\]\]/g, (match, name) => {
-            return `<a class="note-link" href="#/note/${encodeURIComponent(name)}">${name}</a>`;
+        // [[path|别名]] → 显示别名；[[短名]] → 显示短名；跳转用可读标题
+        let html = text.replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, (match, path, alias) => {
+            const label = (alias || path.split('/').pop().replace(/\.md$/i, '')).trim();
+            return `<a class="note-link" href="#/note/${encodeURIComponent(label)}">${label}</a>`;
         });
         if (window.marked) {
             html = marked.parse(html);
         } else {
-            html = html.replace(/\n/g, '<br>');
+            html = html
+                .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+                .replace(/\n/g, '<br>');
         }
         return html;
     }

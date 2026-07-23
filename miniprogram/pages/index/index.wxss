@@ -1,21 +1,13 @@
-/* pages/index/index.wxss
- *
- * 主页样式：案头学习索引风格（与网站品牌统一：纸色 + 朱砂）
- * 底色 #F7F7F4 / 墨色 #263238 / 辅助 #6B767A
- * 品牌主色 #B94736
- */
-
+/* pages/index/index.wxss — 宣纸气质，少卡片外框 */
 .index-container {
   display: flex;
   flex-direction: column;
   min-height: 100vh;
-  background-color: #F7F7F4;
-  padding: 0 40rpx;
+  background-color: var(--surface-page);
+  padding: 0 40rpx 80rpx;
+  box-sizing: border-box;
 }
 
-/* ===========================
- * 顶部标题区
- * =========================== */
 .index-hero {
   display: flex;
   flex-direction: column;
@@ -25,17 +17,15 @@
 
 .index-hero-badge {
   display: inline-block;
-  padding: 8rpx 20rpx;
-  background: rgba(185, 71, 54, 0.07);
-  border: 1rpx solid rgba(185, 71, 54, 0.16);
-  border-radius: 10rpx;
+  padding: 0 0 4rpx;
+  border-bottom: 1rpx solid var(--accent-border);
   margin-bottom: 28rpx;
 }
 
 .index-hero-badge text {
   font-size: 22rpx;
-  color: #B94736;
-  letter-spacing: 0.06em;
+  color: var(--accent);
+  letter-spacing: 0.08em;
 }
 
 .index-hero-title {
@@ -45,9 +35,9 @@
 .index-hero-title text {
   font-size: 52rpx;
   font-weight: 600;
-  color: #263238;
+  color: var(--on-surface-strong);
   letter-spacing: 0.02em;
-  line-height: 1.25;
+  line-height: 1.3;
   font-family: "Songti SC", "STSong", "SimSun", serif;
 }
 
@@ -57,150 +47,111 @@
 
 .index-hero-subtitle text {
   font-size: 28rpx;
-  color: #6B767A;
+  color: var(--on-surface-muted);
   line-height: 1.6;
 }
 
 .index-hero-warn {
-  padding: 12rpx 20rpx;
-  background: rgba(185, 71, 54, 0.06);
-  border: 1rpx solid rgba(185, 71, 54, 0.14);
-  border-radius: 10rpx;
+  padding: 20rpx 0;
+  border-top: 1rpx solid var(--divider-warm);
+  border-bottom: 1rpx solid var(--divider-warm);
 }
 
 .index-hero-warn text {
   font-size: 22rpx;
-  color: #B94736;
-  letter-spacing: 0.02em;
+  color: var(--accent);
   line-height: 1.5;
 }
 
-/* ===========================
- * 主操作按钮
- * =========================== */
 .index-actions {
-  margin: 20rpx 0 56rpx;
+  margin-top: 40rpx;
 }
 
 .index-primary-btn {
   width: 100%;
-  height: 96rpx;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: #B94736;
-  border-radius: 14rpx;
-  transition: all 0.18s;
-}
-
-.index-primary-btn:active {
-  background: #9C3A2C;
-  transform: scale(0.985);
+  padding: 28rpx 0;
+  background: var(--accent);
+  text-align: center;
+  box-sizing: border-box;
 }
 
 .index-primary-btn text {
-  color: #FFFFFF;
   font-size: 30rpx;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  color: var(--on-accent);
+  letter-spacing: 0.06em;
 }
 
-/* ===========================
- * 最近对话
- * =========================== */
-.index-recent {
-  flex: 1;
+.index-primary-btn-hover {
+  background: var(--accent-hover);
 }
 
 .index-section-title {
   display: flex;
-  align-items: baseline;
   justify-content: space-between;
-  margin-bottom: 20rpx;
+  align-items: baseline;
+  margin: 56rpx 0 16rpx;
 }
 
 .index-section-title-text {
-  font-size: 26rpx;
+  font-size: 30rpx;
   font-weight: 600;
-  color: #263238;
-  letter-spacing: 0.06em;
+  color: var(--on-surface-strong);
+  font-family: "Songti SC", "STSong", "SimSun", serif;
 }
 
 .index-section-title-action {
-  font-size: 22rpx;
-  color: #B94736;
-  letter-spacing: 0.02em;
+  font-size: 24rpx;
+  color: var(--accent);
+  padding: 16rpx 12rpx;
+  min-height: 64rpx;
+  display: inline-flex;
+  align-items: center;
 }
 
-.index-section-title-action:active {
-  color: #9C3A2C;
+.index-session-row {
+  padding: 28rpx 0;
+  border-bottom: 1rpx solid var(--divider-warm);
 }
 
-.index-session-list {
-  display: flex;
-  flex-direction: column;
-  gap: 16rpx;
-}
-
-.index-session-card {
-  padding: 22rpx 26rpx;
-  background: #FFFFFF;
-  border: 1rpx solid #E5DED2;
-  border-radius: 12rpx;
-  transition: all 0.18s;
-}
-
-.index-session-card:active {
-  background: #F6F2EA;
-  border-color: #B94736;
-}
-
-.index-session-card-title {
-  margin-bottom: 8rpx;
+.index-session-row-hover {
+  background: var(--surface-hover);
+  margin: 0 -16rpx;
+  padding-left: 16rpx;
+  padding-right: 16rpx;
 }
 
 .index-session-card-title text {
   font-size: 28rpx;
-  color: #263238;
   font-weight: 500;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
+  color: var(--on-surface-strong);
+  line-height: 1.45;
 }
 
 .index-session-card-meta {
-  display: flex;
-  align-items: center;
+  margin-top: 8rpx;
 }
 
 .index-session-card-meta text {
   font-size: 22rpx;
-  color: #9AA1A4;
-  letter-spacing: 0.02em;
+  color: var(--on-surface-faint);
 }
 
-/* ===========================
- * 空状态
- * =========================== */
 .index-empty {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 80rpx 0;
+  margin-top: 80rpx;
+  text-align: center;
 }
 
 .index-empty-text text {
   font-size: 28rpx;
-  color: #6B767A;
-  margin-bottom: 12rpx;
+  color: var(--on-surface-muted);
+}
+
+.index-empty-hint {
+  margin-top: 12rpx;
 }
 
 .index-empty-hint text {
-  font-size: 22rpx;
-  color: #9AA1A4;
-  letter-spacing: 0.04em;
+  font-size: 24rpx;
+  color: var(--on-surface-faint);
 }

@@ -5,9 +5,9 @@
 // ===========================================================================
 const MEDICAL_PATTERNS = [
   /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
-  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治)/,
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:配|开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方))/,
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
-  /(?:救命|急救|危重|抢救|快不行)/,
+  /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
   /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
@@ -19,7 +19,7 @@ function isMedicalRequest(text) {
 }
 
 // ===========================================================================
-// Markdown 转 HTML（用于 rich-text 组件，使用内联样式）
+// Markdown 转 HTML（rich-text 内联样式；按系统主题生成颜色，避免暗色割裂）
 // ===========================================================================
 function escapeHtml(text) {
   return text
@@ -28,16 +28,46 @@ function escapeHtml(text) {
     .replace(/>/g, '&gt;');
 }
 
-function formatInline(text) {
+function getThemePalette(theme) {
+  const dark = theme === 'dark';
+  return dark ? {
+    strong: '#ece4d6',
+    muted: '#a39481',
+    body: '#ddd3c2',
+    accent: '#d4594e',
+    quoteBg: '#1c1712',
+    codeBg: 'rgba(255,255,255,0.08)',
+  } : {
+    strong: '#241f1a',
+    muted: '#776b5f',
+    body: '#342d25',
+    accent: '#b9362c',
+    quoteBg: '#fbf5ea',
+    codeBg: 'rgba(0,0,0,0.06)',
+  };
+}
+
+function detectSystemTheme() {
+  try {
+    const info = wx.getSystemInfoSync();
+    return info.theme === 'dark' ? 'dark' : 'light';
+  } catch (e) {
+    return 'light';
+  }
+}
+
+function formatInline(text, palette) {
+  const p = palette || getThemePalette(detectSystemTheme());
   let s = escapeHtml(text);
-  s = s.replace(/`([^`]+)`/g, '<code style="background:#F0ECE4;padding:3rpx 10rpx;border-radius:6rpx;font-size:27rpx;color:#B94736;font-family:Menlo,Monaco,monospace;">$1</code>');
-  s = s.replace(/\*\*([^*]+)\*\*/g, '<strong style="font-weight:600;color:#263238;">$1</strong>');
+  s = s.replace(/`([^`]+)`/g, `<code style="background:${p.codeBg};padding:2px 6px;border-radius:4px;font-size:13px;color:${p.accent};font-family:Menlo,Monaco,monospace;">$1</code>`);
+  s = s.replace(/\*\*([^*]+)\*\*/g, `<strong style="font-weight:600;color:${p.strong};">$1</strong>`);
   s = s.replace(/\*([^*]+)\*/g, '<em>$1</em>');
   return s;
 }
 
-function formatContent(text) {
+function formatContent(text, theme) {
   if (!text) return '';
+  const p = getThemePalette(theme || detectSystemTheme());
   let lines = text.split('\n');
   let html = [];
   let inList = false;
@@ -50,18 +80,17 @@ function formatContent(text) {
       continue;
     }
 
-    // 引用块 (> 开头) — 单独样式，灰底+左竖线
     let quote = trimmed.match(/^>\s*(.*)/);
     if (quote) {
       if (inList) { html.push('</' + listType + '>'); inList = false; }
-      html.push('<div style="margin:14rpx 0;padding:14rpx 18rpx;background:#F6F2EA;border-left:6rpx solid #B94736;border-radius:6rpx;color:#6B767A;font-size:27rpx;line-height:1.7;">' + formatInline(quote[1]) + '</div>');
+      html.push(`<div style="margin:8px 0;padding:8px 10px;background:${p.quoteBg};border-left:3px solid ${p.accent};border-radius:4px;color:${p.muted};font-size:14px;line-height:1.7;">` + formatInline(quote[1], p) + '</div>');
       continue;
     }
 
     let h = trimmed.match(/^(#{1,6})\s+(.*)/);
     if (h) {
       if (inList) { html.push('</' + listType + '>'); inList = false; }
-      html.push('<div style="font-weight:600;font-size:31rpx;margin:20rpx 0 10rpx;color:#263238;letter-spacing:0.02em;">' + formatInline(h[2]) + '</div>');
+      html.push(`<div style="font-weight:600;font-size:16px;margin:12px 0 6px;color:${p.strong};letter-spacing:0.02em;">` + formatInline(h[2], p) + '</div>');
       continue;
     }
 
@@ -69,11 +98,11 @@ function formatContent(text) {
     if (ol) {
       if (!inList || listType !== 'ol') {
         if (inList) html.push('</' + listType + '>');
-        html.push('<ol style="padding-left:40rpx;margin:12rpx 0;">');
+        html.push(`<ol style="padding-left:22px;margin:8px 0;color:${p.body};">`);
         inList = true;
         listType = 'ol';
       }
-      html.push('<li style="margin:10rpx 0;line-height:1.75;">' + formatInline(ol[2]) + '</li>');
+      html.push(`<li style="margin:6px 0;line-height:1.75;color:${p.body};">` + formatInline(ol[2], p) + '</li>');
       continue;
     }
 
@@ -81,16 +110,16 @@ function formatContent(text) {
     if (ul) {
       if (!inList || listType !== 'ul') {
         if (inList) html.push('</' + listType + '>');
-        html.push('<ul style="padding-left:40rpx;margin:12rpx 0;">');
+        html.push(`<ul style="padding-left:22px;margin:8px 0;color:${p.body};">`);
         inList = true;
         listType = 'ul';
       }
-      html.push('<li style="margin:10rpx 0;line-height:1.75;">' + formatInline(ul[1]) + '</li>');
+      html.push(`<li style="margin:6px 0;line-height:1.75;color:${p.body};">` + formatInline(ul[1], p) + '</li>');
       continue;
     }
 
     if (inList) { html.push('</' + listType + '>'); inList = false; }
-    html.push('<p style="margin:14rpx 0;line-height:1.75;">' + formatInline(trimmed) + '</p>');
+    html.push(`<p style="margin:8px 0;line-height:1.75;color:${p.body};">` + formatInline(trimmed, p) + '</p>');
   }
 
   if (inList) html.push('</' + listType + '>');
@@ -162,8 +191,11 @@ function loadSessions() {
 function saveSessions(sessions) {
   try {
     wx.setStorageSync(SESSIONS_KEY, sessions);
+    return true;
   } catch (e) {
     console.error('saveSessions failed', e);
+    wx.showToast({ title: '对话未能保存到本地', icon: 'none', duration: 2500 });
+    return false;
   }
 }
 
@@ -171,26 +203,34 @@ function loadMessages(sessionId) {
   try {
     return wx.getStorageSync('chat_messages_' + sessionId) || [];
   } catch (e) {
+    wx.showToast({ title: '读取本地记录失败', icon: 'none' });
     return [];
   }
 }
 
 function saveMessages(sessionId, messages) {
   try {
-    // 只保存必要字段，避免存储过大
     const slim = messages.map(m => ({
       id: m.id,
       role: m.role,
       content: m.content || '',
       html: m.html || '',
       provider: m.provider || '',
-      sources: m.sources || [],
+      sources: (m.sources || []).map(s => ({
+        source_group: s.source_group || '',
+        title: s.title || '',
+        score: s.score,
+        evidence: String(s.evidence || s.snippet || '').slice(0, 180),
+      })),
       hasSources: !!m.hasSources,
       retryQuestion: m.retryQuestion || '',
     }));
     wx.setStorageSync('chat_messages_' + sessionId, slim);
+    return true;
   } catch (e) {
     console.error('saveMessages failed', e);
+    wx.showToast({ title: '消息未能保存到本地', icon: 'none', duration: 2500 });
+    return false;
   }
 }
 
@@ -258,9 +298,23 @@ Page({
     copyPanelVisible: false,
     copyParagraphs: [],
     copyTitle: '选择段落复制',
+    requestSeq: 0,
   },
 
   onLoad(options) {
+    this._requestSeq = 0;
+    this._destroyed = false;
+    this._theme = detectSystemTheme();
+    if (typeof wx.onThemeChange === 'function') {
+      this._onThemeChange = (res) => {
+        if (this._destroyed) return;
+        const next = (res && res.theme === 'dark') ? 'dark' : 'light';
+        if (next === this._theme) return;
+        this._theme = next;
+        this._reformatMessagesForTheme();
+      };
+      wx.onThemeChange(this._onThemeChange);
+    }
     let sessionId = '';
     let mode = '';
 
@@ -278,8 +332,16 @@ Page({
     }
 
     if (mode === 'resume' && sessionId) {
-      // 过滤掉中途退出留下的空 AI 占位消息（否则会一直显示打字动画）
-      const messages = loadMessages(sessionId).filter(m => m.role !== 'assistant' || m.content);
+      // 过滤空 AI 占位，并按当前主题重新生成 html（勿复用浅色下缓存的内联色）
+      const theme = this._theme || detectSystemTheme();
+      const messages = loadMessages(sessionId)
+        .filter((m) => m.role !== 'assistant' || m.content)
+        .map((m) => {
+          if (m.role === 'assistant' && m.content) {
+            return Object.assign({}, m, { html: formatContent(m.content, theme) });
+          }
+          return m;
+        });
       const maxId = messages.reduce((max, m) => Math.max(max, m.id || 0), 0);
       this.setData({
         sessionId,
@@ -332,8 +394,32 @@ Page({
   },
 
   onUnload() {
+    // 作废进行中的云函数请求，避免页面销毁后仍 setData / 持久化
+    this._destroyed = true;
+    this._requestSeq = (this._requestSeq || 0) + 1;
     this._stopLoadingStage();
     this._clearTypeTimer();
+    if (typeof wx.offThemeChange === 'function' && this._onThemeChange) {
+      try { wx.offThemeChange(this._onThemeChange); } catch (e) {}
+    }
+  },
+
+  _safeSetData(data, cb) {
+    if (this._destroyed) return;
+    this.setData(data, cb);
+  },
+
+  _reformatMessagesForTheme() {
+    const messages = this.data.messages || [];
+    if (!messages.length) return;
+    const theme = this._theme || detectSystemTheme();
+    const update = {};
+    messages.forEach((m, i) => {
+      if (m.role === 'assistant' && m.content) {
+        update[`messages[${i}].html`] = formatContent(m.content, theme);
+      }
+    });
+    this._safeSetData(update);
   },
 
   // 实际发送逻辑 — 接收已确认的文本，避免依赖 setData 时序
@@ -354,7 +440,7 @@ Page({
         id: warnId + 1,
         role: 'assistant',
         content: warnText,
-        html: `<p style="margin:8rpx 0;color:#B94736;">${warnText}</p>`,
+        html: `<p style="margin:8px 0;color:${getThemePalette(this._theme || detectSystemTheme()).accent};">${warnText}</p>`,
         provider: 'system',
         sources: [],
         hasSources: false,
@@ -389,50 +475,56 @@ Page({
     this._startLoadingStage();
     this._persist();
 
+    const requestSeq = (this._requestSeq || 0) + 1;
+    this._requestSeq = requestSeq;
+    this.setData({ requestSeq });
+
     try {
       // 调用云函数，只传当前问题和会话 ID
       const result = await this._callCloudFunction(text, history);
+      if (requestSeq !== this._requestSeq || this._destroyed) return;
       this._stopLoadingStage();
 
       const idx = this.data.messages.findIndex(m => m.id === aiMsgId);
       if (idx < 0) {
-        this.setData({ loading: false });
+        this._safeSetData({ loading: false });
         return;
       }
 
       if (result.reply) {
-        // 注入 knowledge_sources（用于"引用 N 条资料"提示）
         const sources = Array.isArray(result.knowledge_sources) && result.knowledge_sources.length > 0
           ? result.knowledge_sources.slice(0, 5).map(s => ({
               source_group: s.source_group || '',
+              title: s.chunk_title || s.title || s.source_group || '资料',
               chunk_title: s.chunk_title || '',
               score: s.score || 0,
+              evidence: String(s.evidence || s.snippet || s.text || '').slice(0, 180),
             }))
           : [];
-        // 打字机逐字显现纯文本，完成后切换富文本渲染
-        this._typewriter(idx, result.reply, formatContent(result.reply), result.provider || 'cloudbase-hybrid', sources);
+        this._typewriter(idx, result.reply, formatContent(result.reply, this._theme), result.provider || 'cloudbase-hybrid', sources);
       } else {
         const errText = result.error || '网络异常，请稍后重试';
         const update = { loading: false, lastFailedQuestion: text, scrollToView: 'msg-' + aiMsgId };
         update[`messages[${idx}].content`] = errText;
-        update[`messages[${idx}].html`] = formatContent(errText);
+        update[`messages[${idx}].html`] = formatContent(errText, this._theme);
         update[`messages[${idx}].provider`] = 'error';
         update[`messages[${idx}].retryQuestion`] = text;
-        this.setData(update);
+        this._safeSetData(update);
         this._persist();
       }
     } catch (err) {
+      if (requestSeq !== this._requestSeq || this._destroyed) return;
       this._stopLoadingStage();
       const idx = this.data.messages.findIndex(m => m.id === aiMsgId);
       const errText = err.message || '网络异常，请稍后重试';
       const update = { loading: false, lastFailedQuestion: text, scrollToView: 'msg-' + aiMsgId };
       if (idx >= 0) {
         update[`messages[${idx}].content`] = errText;
-        update[`messages[${idx}].html`] = formatContent(errText);
+        update[`messages[${idx}].html`] = formatContent(errText, this._theme);
         update[`messages[${idx}].provider`] = 'error';
         update[`messages[${idx}].retryQuestion`] = text;
       }
-      this.setData(update);
+      this._safeSetData(update);
       this._persist();
     }
   },
@@ -442,10 +534,14 @@ Page({
     this._stopLoadingStage();
     const stages = ['正在检索学习资料…', '正在组织回答…', '即将完成…'];
     let i = 0;
-    this.setData({ loadingStage: stages[0] });
+    this._safeSetData({ loadingStage: stages[0] });
     this._stageTimer = setInterval(() => {
+      if (this._destroyed) {
+        this._stopLoadingStage();
+        return;
+      }
       i = Math.min(i + 1, stages.length - 1);
-      this.setData({ loadingStage: stages[i] });
+      this._safeSetData({ loadingStage: stages[i] });
     }, 2400);
   },
 
@@ -469,6 +565,10 @@ Page({
     this._scrollFlip = false;
 
     this._typeTimer = setInterval(() => {
+      if (this._destroyed) {
+        this._clearTypeTimer();
+        return;
+      }
       pos = Math.min(total, pos + step);
       ticks += 1;
       const update = {};
@@ -478,16 +578,18 @@ Page({
         this._scrollFlip = !this._scrollFlip;
         update.scrollToView = this._scrollFlip ? 'chat-bottom' : 'msg-' + msgId;
       }
-      this.setData(update);
+      this._safeSetData(update);
 
       if (pos >= total) {
         this._clearTypeTimer();
+        if (this._destroyed) return;
         const done = { loading: false, scrollToView: 'chat-bottom' };
-        done[`messages[${idx}].html`] = html;
+        // 结束时按当前主题重渲，避免中途切主题后仍写入旧 html
+        done[`messages[${idx}].html`] = formatContent(fullText, this._theme || detectSystemTheme());
         done[`messages[${idx}].provider`] = provider;
         done[`messages[${idx}].sources`] = sources;
         done[`messages[${idx}].hasSources`] = sources.length > 0;
-        this.setData(done);
+        this._safeSetData(done);
         this._persist();
       }
     }, TICK);
@@ -502,14 +604,23 @@ Page({
 
   // 持久化当前会话
   _persist() {
+    if (this._destroyed) return;
     if (!this.data.sessionId) return;
     saveMessages(this.data.sessionId, this.data.messages);
     updateSessionMeta(this.data.sessionId, this.data.messages);
   },
 
-  // 云函数调用 — 直接调用 nihaixia-qa-mp（不再转发 router）
+  // 云函数调用 — 带超时；新对话后通过 requestSeq 丢弃过期响应
   _callCloudFunction(msg, history) {
+    const TIMEOUT_MS = 55000;
     return new Promise((resolve, reject) => {
+      let settled = false;
+      const timer = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        reject(new Error('请求超时，请稍后重试'));
+      }, TIMEOUT_MS);
+
       wx.cloud.callFunction({
         name: 'nihaixia-qa-mp',
         data: {
@@ -518,6 +629,9 @@ Page({
           history,
         },
         success: (res) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           if (res && res.result) {
             resolve(res.result);
           } else {
@@ -525,24 +639,27 @@ Page({
           }
         },
         fail: (err) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
           reject(new Error(err.errMsg || '云函数调用失败'));
         },
       });
     });
   },
 
-  // 清空对话 — 生成新的会话 ID，不引用旧对话
+  // 清空对话 — 生成新的会话 ID，并作废进行中的请求
   onClearChat() {
     wx.showModal({
       title: '新对话',
       content: '确定开始新的学习对话吗？当前对话将保存到历史记录。',
       confirmText: '开始新对话',
+      confirmColor: '#b9362c',
       success: (res) => {
         if (res.confirm) {
-          // 先停掉进行中的等待/打字动画，避免向已清空的列表写入
           this._stopLoadingStage();
           this._clearTypeTimer();
-          // 保存旧会话（已经保存过了，这里只清理页面状态）
+          this._requestSeq = (this._requestSeq || 0) + 1;
           this.setData({
             messages: [],
             msgIdCounter: 0,
@@ -550,6 +667,7 @@ Page({
             canSend: false,
             loading: false,
             lastFailedQuestion: '',
+            requestSeq: this._requestSeq,
             sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
             scrollToView: '',
           });
@@ -558,23 +676,27 @@ Page({
     });
   },
 
-  // 展示引用来源详情
+  // 展示引用来源详情（含截断证据摘要，不含本机路径）
   onShowSources(e) {
     const sources = e.currentTarget.dataset.sources;
     if (!sources || !sources.length) return;
 
     const lines = sources.slice(0, 5).map((s, i) => {
       const group = s.source_group || '未知来源';
-      const title = s.chunk_title ? ` · ${s.chunk_title}` : '';
+      const title = s.title || s.chunk_title || '';
+      const head = title ? `${group} · ${title}` : group;
       const score = s.score ? `（相关度 ${s.score}）` : '';
-      return `${i + 1}. ${group}${title} ${score}`;
+      const evidence = String(s.evidence || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+      const evLine = evidence ? `\n   ${evidence}${evidence.length >= 80 ? '…' : ''}` : '';
+      return `${i + 1}. ${head}${score}${evLine}`;
     });
 
     wx.showModal({
       title: '引用资料',
-      content: lines.join('\n'),
+      content: lines.join('\n\n'),
       showCancel: false,
       confirmText: '知道了',
+      confirmColor: '#b9362c',
     });
   },
 
@@ -652,7 +774,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '经典中医学习问答',
+      title: '倪师智慧学习问答',
       path: '/pages/index/index',
     };
   },

@@ -122,6 +122,18 @@ class NihaixiaApp {
             target.classList.add('active');
             target.style.display = 'block';
         }
+
+        // 普通路由切换回到页面顶部；图谱内部缩放/拖拽由 graph.js sessionStorage 自行保留
+        if (view !== 'graph') {
+            window.scrollTo(0, 0);
+            const main = document.querySelector('.main');
+            if (main) main.scrollTop = 0;
+            document.documentElement.scrollTop = 0;
+            document.body.scrollTop = 0;
+        } else {
+            // 进入图谱时也复位页面级滚动，避免外层偏移；图内 transform 另存
+            window.scrollTo(0, 0);
+        }
     }
 
     updateNav() {

@@ -343,7 +343,7 @@ body {
 
 .main {
     margin-left: var(--sidebar-w);
-    padding: 24px 24px 48px;
+    padding: 24px 24px 72px;
     width: calc(100% - var(--sidebar-w));
     transition: margin-left 0.3s ease;
 }
@@ -1448,23 +1448,26 @@ body {
 }
 
 .prompt-content {
-    background: var(--paper-soft);
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 14px 16px;
-    margin-bottom: 12px;
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 2px 0 0;
+    margin-bottom: 4px;
 }
 
 .prompt-content pre {
-    font-family: "SF Mono", "Menlo", "Consolas", "Liberation Mono", monospace;
-    font-size: 12px;
-    line-height: 1.6;
+    font-family: inherit;
+    font-size: 13px;
+    line-height: 1.75;
     color: var(--text);
     white-space: pre-wrap;
     word-break: break-word;
     margin: 0;
-    max-height: 400px;
+    max-height: 420px;
     overflow-y: auto;
+    padding: 10px 4px 8px 14px;
+    border-left: 2px solid rgba(123, 94, 167, 0.28);
+    background: transparent;
 }
 
 .prompt-template-section {
@@ -1479,7 +1482,7 @@ body {
 }
 
 .prompt-copy-row {
-    text-align: right;
+    text-align: left;
 }
 
 .prompt-copy-btn {
@@ -2215,8 +2218,19 @@ body {
     .logo { font-size: 13px; }
     .nav { gap: 1px; }
     .nav-btn { padding: 5px 6px; font-size: 10px; }
-    .header-search { display: none; }
-    .main { padding: 8px 6px; }
+    /* 保留紧凑搜索入口，不再整块隐藏 */
+    .header-search {
+        display: block;
+        max-width: 108px;
+        min-width: 72px;
+        flex: 1 1 auto;
+        margin-left: 4px;
+    }
+    .header-search input {
+        font-size: 11px;
+        padding: 5px 8px;
+    }
+    .main { padding: 8px 6px 72px; }
     .note-view { padding: 16px 14px; }
     .note-title { font-size: 22px; }
 
@@ -2329,7 +2343,16 @@ body {
 
     .header-content .nav::-webkit-scrollbar { display: none; }
     .header-content .nav-btn { padding: 5px 11px; font-size: 12px; }
-    .header-content .header-search,
+    .header-content .header-search {
+        display: block;
+        max-width: 120px;
+        min-width: 80px;
+        flex: 1 1 auto;
+    }
+    .header-content .header-search input {
+        font-size: 12px;
+        padding: 5px 8px;
+    }
     .header-content .node-count { display: none; }
 
     .qa-chat-messages {

@@ -32,7 +32,7 @@
         <view class="welcome-status-dot"></view>
         <text>学习资料库</text>
       </view>
-      <view class="welcome-title">经典中医学习问答</view>
+      <view class="welcome-title">倪师智慧学习问答</view>
       <view class="welcome-subtitle">从经典、概念与学习路径开始提问</view>
       <view class="welcome-tag">仅供学习研究 · 不提供诊断、处方或剂量建议</view>
 
@@ -139,7 +139,7 @@
         value="{{inputValue}}"
         bindinput="onInput"
         bindconfirm="onSend"
-        placeholder="输入关于中医经典的学习问题…"
+        placeholder="输入关于倪师智慧的学习问题…"
         placeholder-class="chat-input-placeholder"
         confirm-type="send"
         maxlength="1000"

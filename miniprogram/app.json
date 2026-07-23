@@ -1,5 +1,5 @@
 {
-  "desc": "数字问渡经典学习问答助手",
+  "desc": "倪师智慧学习问答",
   "pages": [
     "pages/index/index",
     "pages/chat/chat",
@@ -7,11 +7,13 @@
   ],
   "window": {
     "backgroundTextStyle": "light",
-    "navigationBarBackgroundColor": "#F7F7F4",
-    "navigationBarTitleText": "经典中医学习",
-    "navigationBarTextStyle": "black",
-    "backgroundColor": "#F7F7F4"
+    "navigationBarBackgroundColor": "@navBg",
+    "navigationBarTitleText": "倪师智库",
+    "navigationBarTextStyle": "@navText",
+    "backgroundColor": "@bg"
   },
+  "darkmode": true,
+  "themeLocation": "theme.json",
   "sitemapLocation": "sitemap.json",
   "style": "v2",
   "lazyCodeLoading": "requiredComponents"
