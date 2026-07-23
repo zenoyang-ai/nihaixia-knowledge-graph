@@ -78,6 +78,9 @@ App({
         this.showPrivacyBlockedModal(onSuccess);
         return false;
       }
+      if (typeof onSuccess === 'function') {
+        onSuccess();
+      }
       return true;
     });
   },

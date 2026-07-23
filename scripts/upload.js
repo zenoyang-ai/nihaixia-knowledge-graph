@@ -7,8 +7,8 @@ const path = require('path');
 
 const PROJECT_PATH = path.resolve(__dirname, '..');
 const APP_ID = 'wx11826bcc1883aa28';
-const VERSION = '5.5.0';
-const DESC = 'v5.5.0 医疗拦截+限流fail-closed+隐私授权阻断';
+const VERSION = '5.5.1';
+const DESC = 'v5.5.1 修复隐私授权通过后无法进入对话页';
 
 async function main() {
   const keyPath = process.argv[2];
