@@ -117,7 +117,7 @@ jobs:
         run: npm ci
         working-directory: cloudbase/functions/nihaixia-qa-router
 
-      - name: Run QA router tests (24 tests)
+      - name: Run QA router tests (31 tests)
         run: node --test tests/test_qa_router.js
 
       - name: Syntax check nihaixia-qa-router/index.js
@@ -145,7 +145,7 @@ jobs:
         run: git diff --check
 
   # ===========================================================================
-  # Job 3: 小程序云函数测试（mp 58 tests）
+  # Job 3: 小程序云函数测试（mp 115 tests）
   # ===========================================================================
   mp-tests:
     name: MP Function Tests
@@ -166,7 +166,7 @@ jobs:
         run: npm ci
         working-directory: cloudbase/functions/nihaixia-qa-mp
 
-      - name: Run QA mp tests (58 tests)
+      - name: Run QA mp tests (115 tests)
         run: node --test tests/test_qa_mp.js
 
   # ===========================================================================

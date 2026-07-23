@@ -1,59 +1,119 @@
-# 反馈功能：本地保存 → 独立真实接口
+# 反馈功能：飞书应用私聊（推荐）
 
-当前网站反馈（`docs/assets/feedback.js`）采用 **本机 localStorage 真实保存**：
+网站反馈（`docs/assets/feedback.js`）通过独立云函数 `nihaixia-feedback` 转发至飞书。
 
-- 成功文案明确写「已保存在本机」，**不会**再假装写入云端。
-- 站长在浏览器控制台执行：`getFeedbacks()` 或 `exportFeedbacks()`。
-- 也可引导用户到公众号「数字问渡」留言。
+- 前端 POST：`https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-feedback`
+- 成功文案：**已送达飞书**
+- 失败：诚实报错，并尝试 `localStorage` 兜底保存
+- 客户端限流：同页 60 秒内最多 1 次
 
-用户量不大时，本地保存足够。需要飞书/邮箱时，按下面接入，不要再把反馈塞进问答云函数。
+云函数路径：`cloudbase/functions/nihaixia-feedback/`
 
 ---
 
-## 方案 A：飞书自定义机器人 Webhook（推荐）
+## 推荐方案：飞书 CLI 应用私聊
 
-1. 飞书群 → 设置 → 群机器人 → 添加「自定义机器人」→ 复制 Webhook URL。  
-2. **不要把 Webhook 写进前端公开仓库**（会被滥用）。应走：
-   - 新建云函数 `nihaixia-feedback`（仅接受 `{category,content,contact,time}`），或
-   - Cloudflare Worker / 自建小后端代理转发。
-3. 云函数伪代码：
+使用飞书开放平台应用（如「杨圣旦的飞书 CLI」）以 bot 身份向指定用户发送私聊消息。无需群机器人 Webhook。
 
-```js
-exports.main = async (event) => {
-  const body = typeof event === 'string' ? JSON.parse(event) : event;
-  if (!body.content || String(body.content).length > 2000) {
-    return { ok: false, error: 'invalid' };
-  }
-  const text = [
-    `【倪海厦图谱反馈】${body.category || '其他'}`,
-    body.content,
-    body.contact ? `联系：${body.contact}` : '',
-    body.time || new Date().toISOString(),
-    body.page || '',
-  ].filter(Boolean).join('\n');
+### 1. 获取应用凭证
 
-  await fetch(process.env.FEISHU_WEBHOOK, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ msg_type: 'text', content: { text } }),
-  });
-  return { ok: true };
-};
+1. 打开 [飞书开发者后台](https://open.feishu.cn/app)
+2. 进入目标应用（示例：`cli_aa9059f5d038dcd4`，杨圣旦的飞书 CLI）
+3. 复制 **App ID** 与 **App Secret**
+
+### 2. 确认应用权限与可用范围
+
+应用需具备发消息相关权限（如 `im:message`），且接收通知的用户须在应用**可用范围**内。
+
+接收人 open_id 示例：`ou_1527d3dbbeae3c13a25cb0159a6bff94`（可通过飞书 API 或 CLI 获取）。
+
+### 3. 部署云函数
+
+```bash
+cd cloudbase
+tcb fn deploy nihaixia-feedback
 ```
 
-4. 前端仅在 **HTTP 200 且 ok:true** 时显示「已送达」；失败显示错误，并可继续本地兜底保存。
+### 4. 配置环境变量（控制台，勿写入仓库）
 
-环境变量示例：`FEISHU_WEBHOOK=https://open.feishu.cn/open-apis/bot/v2/hook/xxxx`
+在 [CloudBase 控制台](https://console.cloud.tencent.com/tcb) → 云函数 → `nihaixia-feedback` → 环境变量，添加：
+
+| 变量名 | 说明 |
+|--------|------|
+| `FEISHU_APP_ID` | 飞书应用 App ID（**推荐必填**） |
+| `FEISHU_APP_SECRET` | 飞书应用 App Secret（**推荐必填**，仅控制台配置） |
+| `FEISHU_NOTIFY_OPEN_ID` | 接收通知用户的 open_id（默认 `ou_1527d3dbbeae3c13a25cb0159a6bff94`，可按需覆盖） |
+| `ALLOWED_ORIGINS` | CORS 白名单（已在 `cloudbaserc.json` 预设，可按需覆盖） |
+
+> **安全提示**：`FEISHU_APP_SECRET` 具有应用调用权限，**绝不**写入前端代码或 Git 仓库明文。`APP_ID` / `OPEN_ID` 也建议仅在控制台配置。
+
+### 5. 验证
+
+```bash
+# 健康检查（配置后 feishu_configured 应为 true，channel 为 app_im）
+curl -s 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-feedback' | jq
+
+# 发送测试反馈（需从白名单 origin 发起）
+curl -s -X POST \
+  -H 'Content-Type: application/json' \
+  -H 'Origin: https://zenoyang-ai.github.io' \
+  -d '{"category":"其他","content":"测试反馈，请忽略"}' \
+  'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-feedback' | jq
+```
+
+健康检查响应示例：
+
+```json
+{
+  "ok": true,
+  "version": "1.1.0",
+  "feishu_configured": true,
+  "channel": "app_im"
+}
+```
 
 ---
 
-## 方案 B：邮箱（Formspree / Resend / 自建 SMTP）
+## 备用方案：飞书群机器人 Webhook（可选）
+
+若未配置应用凭证，可降级使用群机器人 Webhook：
+
+1. 目标飞书群 → **设置** → **群机器人** → **添加机器人** → **自定义机器人**
+2. 复制 Webhook 地址（格式：`https://open.feishu.cn/open-apis/bot/v2/hook/xxxxxxxx`）
+3. 在 CloudBase 控制台配置 `FEISHU_WEBHOOK`
+
+> 通道优先级：`FEISHU_APP_ID` + `FEISHU_APP_SECRET` + `FEISHU_NOTIFY_OPEN_ID` 齐全时走应用私聊；否则有 `FEISHU_WEBHOOK` 时走 webhook；都没有则返回 503。
+
+---
+
+## 云函数行为
+
+| 方法 | 说明 |
+|------|------|
+| `GET` | 健康检查 `{ ok:true, version:'1.1.0', feishu_configured: bool, channel: 'app_im'|'webhook'|'none' }` |
+| `POST` | 接收 `{ category, content, contact?, page?, time?, userAgent? }` |
+| `OPTIONS` | CORS 预检 |
+
+校验规则：
+- `content` 非空，长度 ≤ 2000
+- `category` 白名单或截断至 20 字符
+- 未配置飞书通道 → 503 `feishu_not_configured`
+- 飞书返回非 200 或 `code !== 0` → 502，不假成功
+- 进程内 IP+origin 限流：60 秒 1 次
+
+应用私聊发送流程：
+1. `POST /auth/v3/tenant_access_token/internal` 换取 `tenant_access_token`
+2. `POST /im/v1/messages?receive_id_type=open_id` 发送文本消息
+
+---
+
+## 方案 B：邮箱（备选，未实现）
 
 ### Formspree（最快）
 
-1. 注册 Formspree，创建 form，得到 `https://formspree.io/f/xxxxxx`。  
-2. 前端 `fetch` POST：`{ email: contact, message: content, _subject: category }`。  
-3. 同样：只有响应成功才提示成功。
+1. 注册 Formspree，创建 form，得到 `https://formspree.io/f/{id}`
+2. 前端 `fetch` POST：`{ email: contact, message: content, _subject: category }`
+3. 同样：只有响应成功才提示成功
 
 ### Resend / SMTP
 
@@ -61,21 +121,13 @@ exports.main = async (event) => {
 
 ---
 
-## 方案 C：继续本地 + 定期导出
+## 本地导出（兜底）
+
+站长在浏览器控制台：
 
 ```js
-exportFeedbacks()  // 下载 nihaixia-feedbacks.json
+getFeedbacks()      // 查看本机保存的反馈
+exportFeedbacks()   // 下载 nihaixia-feedbacks.json
 ```
 
-适合早期，零运维。
-
----
-
-## 前端改造要点（接入真实接口时）
-
-1. 删除/停用问答 router 作为反馈通道。  
-2. `await fetch(FEEDBACK_URL)` → 检查 `res.ok`。  
-3. 成功：显示「已送达站长」；失败：显示原因 + 仍可 `localStorage` 兜底。  
-4. 加简单限流（同页 60 秒内最多 1 次）防刷。
-
-当前阶段：**本地保存已诚实可用**；真实接口按 A/B 择一即可上线。
+也可引导用户到公众号「数字问渡」留言。

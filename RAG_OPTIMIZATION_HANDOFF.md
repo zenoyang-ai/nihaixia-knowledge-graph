@@ -20,7 +20,7 @@
 
 ### 实测结果
 
-本地重建使用 `/Users/zeno/AI/倪海厦-QA上传包` 的 11 份校验通过语料，生成 **4,852** 个分块（原为 4,837）。针对：
+本地重建使用 `/Users/zeno/Workspace/90_归档/Projects/2026/倪海厦知识库项目/倪海厦-QA上传包` 的 11 份校验通过语料，生成 **4,852** 个分块（原为 4,837）。针对：
 
 ```text
 紫微星、天府星，这两颗星有啥用
@@ -37,7 +37,7 @@
 ### 已通过的验证
 
 ```bash
-node --test tests/test_qa_mp.js       # 58/58
+node --test tests/test_qa_mp.js       # 98/98
 node --test tests/test_qa_router.js   # 24/24
 python3 scripts/build_site_data.py --validate
 npm ci --ignore-scripts --dry-run     # 两个云函数目录均通过
@@ -51,8 +51,8 @@ git diff --check
 当前机器可通过临时 `npm exec` 运行官方 `@cloudbase/cli@3.6.4`，但 `env:list` 返回“无有效身份信息”；因此本轮没有假装部署成功。下一位执行者在确认 CloudBase 登录状态后，先重新生成语料，再部署两套函数：
 
 ```bash
-cd /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
-node scripts/generate-knowledge-base.js '/Users/zeno/AI/倪海厦-QA上传包'
+cd /Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
+node scripts/generate-knowledge-base.js '/Users/zeno/Workspace/90_归档/Projects/2026/倪海厦知识库项目/倪海厦-QA上传包'
 npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase login
 npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase fn deploy nihaixia-qa-router --env-id zeno-d9g0gdvw4a57635c0 --force
 npm exec --yes --package=@cloudbase/cli@3.6.4 -- cloudbase fn deploy nihaixia-qa-mp --env-id zeno-d9g0gdvw4a57635c0 --force
@@ -315,76 +315,76 @@ ${context}
 ### 5.1 项目根目录
 
 ```
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
+/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
 ```
 
 ### 5.2 核心文件（需要修改的文件）
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| MP 云函数主逻辑 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/index.js` | 746 行，含 prompt（第 459 行）、搜索调用（第 423 行） |
-| Router 云函数主逻辑 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/index.js` | 680 行，含 prompt（第 398 行）、搜索调用（第 370 行） |
-| BM25 检索器 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` | 含 MIN_SCORE_THRESHOLD、MAX_PER_SOURCE_GROUP 等配置 |
-| Router BM25 检索器 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-search.js` | 与 MP 版本相同 |
-| 知识库（MP） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 约 8.6 MB，4852 个 chunk |
-| 知识库（Router） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-base.json` | 与 MP 版本相同 |
-| 倒排索引（MP） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/inverted-index.json` | BM25 倒排索引 |
-| 倒排索引（Router） | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/inverted-index.json` | 与 MP 版本相同 |
+| MP 云函数主逻辑 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/index.js` | 746 行，含 prompt（第 459 行）、搜索调用（第 423 行） |
+| Router 云函数主逻辑 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/index.js` | 680 行，含 prompt（第 398 行）、搜索调用（第 370 行） |
+| BM25 检索器 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` | 含 MIN_SCORE_THRESHOLD、MAX_PER_SOURCE_GROUP 等配置 |
+| Router BM25 检索器 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-search.js` | 与 MP 版本相同 |
+| 知识库（MP） | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 约 8.6 MB，4852 个 chunk |
+| 知识库（Router） | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/knowledge-base.json` | 与 MP 版本相同 |
+| 倒排索引（MP） | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-mp/inverted-index.json` | BM25 倒排索引 |
+| 倒排索引（Router） | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/functions/nihaixia-qa-router/inverted-index.json` | 与 MP 版本相同 |
 
 ### 5.3 知识库生成脚本
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| 知识库生成 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/generate-knowledge-base.js` | 生成 knowledge-base.json 和 inverted-index.json |
-| QA 语料构建 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/build_qa_corpus.py` | Python 脚本 |
+| 知识库生成 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/generate-knowledge-base.js` | 生成 knowledge-base.json 和 inverted-index.json |
+| QA 语料构建 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/build_qa_corpus.py` | Python 脚本 |
 
 ### 5.4 原始资料
 
 | 目录 | 绝对路径 | 说明 |
 |------|---------|------|
-| 天纪资料 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/sources-public/` | 原始资料目录 |
+| 天纪资料 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/sources-public/` | 原始资料目录 |
 
 ### 5.5 小程序前端
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| 聊天页逻辑 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/chat/chat.js` | 616 行 |
-| 聊天页模板 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/chat/chat.wxml` | 204 行 |
-| 主页 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/index/index.js` | 56 行 |
-| 历史记录页 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/history/history.js` | 108 行 |
-| 小程序配置 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/app.json` | 页面注册 |
-| 项目配置 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/project.config.json` | AppID=wx11826bcc1883aa28 |
+| 聊天页逻辑 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/chat/chat.js` | 616 行 |
+| 聊天页模板 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/chat/chat.wxml` | 204 行 |
+| 主页 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/index/index.js` | 56 行 |
+| 历史记录页 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/pages/history/history.js` | 108 行 |
+| 小程序配置 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/miniprogram/app.json` | 页面注册 |
+| 项目配置 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/project.config.json` | AppID=wx11826bcc1883aa28 |
 
 ### 5.6 网页端
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| 网页端主逻辑 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/docs/assets/app.js` | 含知识来源显示逻辑 |
+| 网页端主逻辑 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/docs/assets/app.js` | 含知识来源显示逻辑 |
 | Router URL | `https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router` | 网页端调用的云函数地址 |
 
 ### 5.7 CloudBase 配置
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| CloudBase 配置 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/cloudbaserc.json` | envId=zeno-d9g0gdvw4a57635c0 |
-| 根目录配置 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbaserc.json` | 可能重复 |
+| CloudBase 配置 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbase/cloudbaserc.json` | envId=zeno-d9g0gdvw4a57635c0 |
+| 根目录配置 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/cloudbaserc.json` | 可能重复 |
 
 ### 5.8 测试文件
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| MP 测试 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_mp.js` | 58 个用例 |
-| Router 测试 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_router.js` | 24 个用例 |
-| 知识库夹具 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/knowledge-base.json` | 测试用 |
-| 倒排索引夹具 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/inverted-index.json` | 测试用 |
+| MP 测试 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_mp.js` | 98 个用例 |
+| Router 测试 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/test_qa_router.js` | 24 个用例 |
+| 知识库夹具 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/knowledge-base.json` | 测试用 |
+| 倒排索引夹具 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/tests/fixtures/inverted-index.json` | 测试用 |
 
 ### 5.9 部署相关
 
 | 文件 | 绝对路径 | 说明 |
 |------|---------|------|
-| 上传脚本 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/upload.js` | miniprogram-ci 上传 |
-| CI 配置 | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/.github/workflows/ci.yml` | GitHub Actions |
-| .gitignore | `/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/.gitignore` | 排除 *.key 等 |
+| 上传脚本 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/scripts/upload.js` | miniprogram-ci 上传 |
+| CI 配置 | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/.github/workflows/ci.yml` | GitHub Actions |
+| .gitignore | `/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/.gitignore` | 排除 *.key 等 |
 
 ---
 
@@ -467,7 +467,7 @@ const reRanked = docs.sort((a, b) => {
 
 ```bash
 # 1. 语法检查
-cd /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
+cd /Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
 node -c cloudbase/functions/nihaixia-qa-mp/index.js
 node -c cloudbase/functions/nihaixia-qa-router/index.js
 node -c cloudbase/functions/nihaixia-qa-mp/knowledge-search.js
@@ -512,7 +512,7 @@ node scripts/generate-knowledge-base.js
 ### 8.1 本地测试搜索
 
 ```bash
-cd /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
+cd /Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
 node -e "
 const search = require('./cloudbase/functions/nihaixia-qa-mp/knowledge-search.js');
 const results = search.searchDocuments('紫微星、天府星，这两颗星有啥用', 12);
@@ -564,7 +564,7 @@ curl -s -X POST "https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tclou
 ### 9.1 如何验证知识库中有这些内容
 
 ```bash
-cd /Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
+cd /Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open
 node -e "
 const kb = require('./cloudbase/functions/nihaixia-qa-mp/knowledge-base.json');
 const keywords = ['帝星', '解厄制化', '府相会命', '南斗星君', '北斗星君', '左辅右弼', '三台八座', '官带星'];
@@ -583,7 +583,7 @@ for (const kw of keywords) {
 2. **不要删除 .key 文件**，但确保它在 .gitignore 中
 3. **不要在日志、文档或代码中包含 API Key、Token 或 .key 文件内容**
 4. **修改云函数后需要重新部署**到 CloudBase（使用 `cloudbase fn deploy`）
-5. **修改小程序代码后需要重新上传**到微信后台（使用 `node scripts/upload.js private.wx11826bcc1883aa28.key`）
+5. **修改小程序代码后需要重新上传**到微信后台（使用 `node scripts/upload.js private.<appid>.key`；私钥权限 `chmod 600`，勿入库）
 6. **项目名与备注不得出现具体个人名**（使用"经典中医学习问答"等中性名）
 7. **不得在回复中提及"天机道终稿""原稿""完整版"等原始资料文件名**
 8. **不得在回复中引用排盘表格名**（安紫微诸星表、定天府表等）

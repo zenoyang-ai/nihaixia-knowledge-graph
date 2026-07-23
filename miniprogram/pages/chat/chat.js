@@ -2,20 +2,126 @@
 
 // ===========================================================================
 // 医疗可执行请求检测 — 客户端即时提示（服务端是最终边界）
+// 意图结构优先，学习语境豁免（与云函数 index.js 保持同步）
 // ===========================================================================
-const MEDICAL_PATTERNS = [
-  /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
-  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:配|开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方))/,
+const LEARNING_CONTEXT_PATTERN = /(?:学习|原文|归经|原则|意义|类型|有哪些|是什么|如何理解|讲解|论述|在学习|经方学习|配伍原则|穴位归经|承担什么作用|经典|古籍|定位|伤寒论|金匮|内经|神农|治什么病|组成是什么|对应什么)/;
+
+const PERSON_PATTERN = /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女|本人|老公|老婆|妻子|丈夫|先生|太太|爱人|老伴|父亲|母亲|爷爷|奶奶|外公|外婆|他|她)/;
+
+const SYMPTOM_PATTERN = /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症)/;
+
+const HERB_SUBSTANCE_PATTERN = /(?:酸枣仁|川贝|当归|黄芪|党参|枸杞|茯苓|白术|甘草|附子|桂枝|白芍|生姜|大枣|半夏|陈皮|天麻|人参|熟地|川芎|柴胡|黄芩|黄连|黄柏|山药|麦冬|五味子|丹参|红花|桃仁|麻黄|细辛|独活|防风|连翘|金银花|薄荷|菊花|桑叶|杏仁|桔梗|厚朴|枳实|香附|远志|龙骨|牡蛎|阿胶|肉桂|吴茱萸|干姜|薏苡仁|车前子|泽泻|猪苓|石膏|知母|栀子|大黄|蜂蜜)/;
+const ACUPOINT_NAME_PATTERN = /(?:涌泉|足三里|三阴交|合谷|关元|神阙|百会|太冲|内关|风池|肩井|曲池|天枢|膻中|命门|肾俞|脾俞|肺俞|太溪|照海|申脉|阳陵泉|阴陵泉|承山|委中|丰隆|公孙|厉兑|迎香|印堂|风门|大椎|身柱|曲泽|地机|血海|睛明|攒竹)/;
+const SUBSTANCE_EXECUTABLE_PATTERN = new RegExp(
+  HERB_SUBSTANCE_PATTERN.source + '.{0,10}(?:能吃|能吃吗|可以吃|可以吃吗|能服用|服用吗|能用|能用吗|泡水喝|天天吃|一起吃|适合我吗|适合吃|适合吃吗)'
+);
+const ACUPOINT_EXECUTABLE_PATTERN = new RegExp(
+  ACUPOINT_NAME_PATTERN.source + '.{0,12}(?:可以灸|能灸|灸吗|可以针|能针|针吗|可以按|能按|可以吗)'
+);
+const MOXIBUSTION_ACUPOINT_PATTERN = new RegExp(
+  '(?:灸|针刺|针|按压).{0,8}' + ACUPOINT_NAME_PATTERN.source + '.{0,10}(?:可以吗|能不能|行吗|吗)'
+);
+
+const STRONG_TREATMENT_INTENT_PATTERN = /(?:怎么办|怎么治|能治好吗|该吃什么|吃什么药|用什么方|用什么药|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|能吃吗|能用吗|什么药|什么方)/;
+const WEAK_TREATMENT_INTENT_PATTERN = /(?:比较好|有效|推荐|可以吗|可以用吗)/;
+const LEARNING_RECOMMENDATION_PATTERN = /(?:他|她).{0,8}推荐.{0,12}学习|(?:学习|经方学习).{0,24}(?:顺序|路径|从哪里|如何入手|怎么学|入手)|学习顺序|从哪里入手比较有效/;
+
+const EMERGENCY_PATTERN = /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/;
+const MEDICAL_BLOCK_REPLY = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师或前往线下医疗机构就诊。';
+const EMERGENCY_BLOCK_REPLY = '如遇紧急医疗情况，请立即拨打 120 急救电话，并尽快前往线下医院就诊。本系统不能提供急救或诊疗服务。';
+
+const ALWAYS_BLOCK_PATTERNS = [
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
-  /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
-  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
+  EMERGENCY_PATTERN,
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
-  /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症).{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐)/,
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐(?!经方).{0,5}(?:药|方)|建议(?!经方).{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂)|配(?!伍).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂))/,
+  /(?:根据|按照|针对).{0,12}(?:我的|他的|她的|症状|体质|情况).{0,20}(?:开|配|用|吃|服|方|药|汤)/,
 ];
 
+const CONTEXT_SENSITIVE_PATTERNS = [
+  /(?:剂量|用量|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
+  /(?:三两|二两|一两|半斤|一钱|二钱|三钱|四钱|五钱|六钱|七钱|八钱|九钱|几钱|几两).{0,15}(?:怎么|如何|多少|换算|服用|用)/,
+  new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐|怎么办|能吃吗|能吃)'),
+  /(?:针灸|艾灸|针刺|拔罐|刮痧).{0,20}(?:怎么|如何|能不能|可以吗|适合|灸哪|针哪)/,
+  /(?:艾灸|针刺|拔罐|刮痧).{0,20}(?:穴位|部位).{0,10}(?:可以吗|能不能|怎么|如何)/,
+  /(?:足三里|三阴交|合谷|关元|神阙|百会|太冲|穴位).{0,10}(?:可以灸|能灸|灸吗|可以针|能针|针吗)/,
+  /(?:怎么配|如何配|配在一起|合用|药对|(?:和|与).{0,20}(?:怎么|如何)配伍)/,
+  /(?:先煎|后下|包煎|烊化).{0,8}(?:吗|？|\?)/,
+  /(?:同用|合用|一起用|可以同用).{0,8}(?:吗|？|\?)/,
+];
+
+function hasSubstanceOrAcupointExecutableQuery(text) {
+  return SUBSTANCE_EXECUTABLE_PATTERN.test(text)
+    || ACUPOINT_EXECUTABLE_PATTERN.test(text)
+    || MOXIBUSTION_ACUPOINT_PATTERN.test(text);
+}
+
+function hasLearningContext(text) {
+  return LEARNING_CONTEXT_PATTERN.test(text);
+}
+
+function isLearningRecommendationStructure(text) {
+  return LEARNING_RECOMMENDATION_PATTERN.test(text);
+}
+
+function hasSymptomTreatmentQuery(text) {
+  return new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:怎么办|怎么治|能吃吗|能吃|可以吃吗|可以吃)').test(text)
+    || new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|什么药|什么方|用什么药|用什么方)').test(text);
+}
+
+function hasFeverTreatmentQuery(text) {
+  return /(?:发烧|发热).{0,20}(?:\d+[\.\d]*\s*度|38|39|40).{0,20}(?:怎么办|怎么治)/.test(text)
+    || /(?:\d+[\.\d]*\s*度).{0,15}(?:发烧|发热).{0,15}(?:怎么办|怎么治)/.test(text)
+    || (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text));
+}
+
+function hasTreatmentIntentInLearning(text) {
+  if (/怎么治/.test(text)) return true;
+  if (/用什么药|用什么方|吃什么药/.test(text)) return true;
+  if (/用什么方比较好|什么方比较好|用什么药比较好|什么药比较好/.test(text)) return true;
+  if (hasSymptomTreatmentQuery(text)) return true;
+  return false;
+}
+
+function hasPersonTreatmentQuery(text) {
+  if (!PERSON_PATTERN.test(text)) return false;
+  if (isLearningRecommendationStructure(text)) return false;
+
+  if (STRONG_TREATMENT_INTENT_PATTERN.test(text)) return true;
+
+  if (WEAK_TREATMENT_INTENT_PATTERN.test(text) && SYMPTOM_PATTERN.test(text)) return true;
+
+  if (SYMPTOM_PATTERN.test(text) && /(?:怎么办|怎么治|能吃|可以吃|能用|可以用)/.test(text)) return true;
+  if (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text)) return true;
+
+  return false;
+}
+
 function isMedicalRequest(text) {
-  return MEDICAL_PATTERNS.some((p) => p.test(text));
+  if (!text || typeof text !== 'string') return false;
+  const t = text.trim();
+
+  if (ALWAYS_BLOCK_PATTERNS.some((p) => p.test(t))) return true;
+
+  if (hasPersonTreatmentQuery(t)) return true;
+  if (hasFeverTreatmentQuery(t)) return true;
+  if (hasSymptomTreatmentQuery(t)) return true;
+
+  if (hasLearningContext(t)) {
+    if (hasTreatmentIntentInLearning(t)) return true;
+    if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+    return false;
+  }
+
+  if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+
+  return CONTEXT_SENSITIVE_PATTERNS.some((p) => p.test(t));
+}
+
+function getMedicalBlockReply(text) {
+  if (EMERGENCY_PATTERN.test(text)) return EMERGENCY_BLOCK_REPLY;
+  return MEDICAL_BLOCK_REPLY;
 }
 
 // ===========================================================================
@@ -301,6 +407,25 @@ Page({
     requestSeq: 0,
   },
 
+  onShow() {
+    const app = getApp();
+    app.guardPrivacy(() => {}).then((ok) => {
+      if (!ok) {
+        this._stopLoadingStage();
+        this._clearTypeTimer();
+        this._requestSeq = (this._requestSeq || 0) + 1;
+        this.setData({
+          messages: [],
+          loading: false,
+          inputValue: '',
+          canSend: false,
+          lastFailedQuestion: '',
+          requestSeq: this._requestSeq,
+        });
+      }
+    });
+  },
+
   onLoad(options) {
     this._requestSeq = 0;
     this._destroyed = false;
@@ -319,20 +444,28 @@ Page({
     let mode = '';
 
     if (options && options.sessionId) {
-      // 从历史记录进入：加载已有会话
       sessionId = options.sessionId;
       mode = 'resume';
     } else if (options && options.mode === 'new') {
-      // 从主页"开始学习对话"进入：新会话
       sessionId = '';
       mode = 'new';
     } else {
-      // 默认进入：新会话
       mode = 'new';
     }
 
+    const app = getApp();
+    app.guardPrivacy(() => this._initSession(mode, sessionId)).then((ok) => {
+      if (!ok) {
+        this.setData({
+          messages: [],
+          sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+        });
+      }
+    });
+  },
+
+  _initSession(mode, sessionId) {
     if (mode === 'resume' && sessionId) {
-      // 过滤空 AI 占位，并按当前主题重新生成 html（勿复用浅色下缓存的内联色）
       const theme = this._theme || detectSystemTheme();
       const messages = loadMessages(sessionId)
         .filter((m) => m.role !== 'assistant' || m.content)
@@ -350,7 +483,6 @@ Page({
         scrollToView: messages.length > 0 ? 'msg-' + maxId : '',
       });
     } else {
-      // 新会话
       this.setData({
         sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
       });
@@ -424,11 +556,18 @@ Page({
 
   // 实际发送逻辑 — 接收已确认的文本，避免依赖 setData 时序
   async sendQuestion(text) {
+    const app = getApp();
+    const authorized = await app.ensurePrivacyAuthorized();
+    if (!authorized) {
+      app.showPrivacyBlockedModal();
+      return;
+    }
+
     // 客户端即时医疗提示（服务端是最终边界）
     if (isMedicalRequest(text)) {
       const warnId = this.data.msgIdCounter + 1;
       const base = this.data.messages.length;
-      const warnText = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。';
+      const warnText = getMedicalBlockReply(text);
       const update = {
         msgIdCounter: warnId + 1,
         inputValue: '',
@@ -488,6 +627,30 @@ Page({
       const idx = this.data.messages.findIndex(m => m.id === aiMsgId);
       if (idx < 0) {
         this._safeSetData({ loading: false });
+        return;
+      }
+
+      if (result.invalid_history) {
+        const update = { loading: false, inputValue: '', canSend: false, lastFailedQuestion: '' };
+        if (idx >= 0) {
+          update[`messages[${idx}].content`] = '对话历史格式无效，请开始新对话后继续。';
+          update[`messages[${idx}].html`] = formatContent('对话历史格式无效，请开始新对话后继续。', this._theme);
+          update[`messages[${idx}].provider`] = 'system';
+          update[`messages[${idx}].retryQuestion`] = '';
+        }
+        this._safeSetData(update);
+        wx.showModal({
+          title: '对话历史异常',
+          content: '当前对话历史格式无效，请开始新对话后继续。',
+          showCancel: false,
+          confirmText: '开始新对话',
+          confirmColor: '#b9362c',
+          success: (modalRes) => {
+            if (modalRes.confirm) {
+              this._startNewSessionAfterInvalidHistory();
+            }
+          },
+        });
         return;
       }
 
@@ -606,12 +769,19 @@ Page({
   _persist() {
     if (this._destroyed) return;
     if (!this.data.sessionId) return;
+    const app = getApp();
+    if (app.globalData.privacyAuthorized !== true) return;
     saveMessages(this.data.sessionId, this.data.messages);
     updateSessionMeta(this.data.sessionId, this.data.messages);
   },
 
   // 云函数调用 — 带超时；新对话后通过 requestSeq 丢弃过期响应
   _callCloudFunction(msg, history) {
+    const app = getApp();
+    if (app.globalData.privacyAuthorized !== true) {
+      return Promise.reject(new Error('需同意隐私协议后才能使用问答功能'));
+    }
+
     const TIMEOUT_MS = 55000;
     return new Promise((resolve, reject) => {
       let settled = false;
@@ -645,6 +815,24 @@ Page({
           reject(new Error(err.errMsg || '云函数调用失败'));
         },
       });
+    });
+  },
+
+  // 历史无效后重置会话，避免重复提交坏 history
+  _startNewSessionAfterInvalidHistory() {
+    this._stopLoadingStage();
+    this._clearTypeTimer();
+    this._requestSeq = (this._requestSeq || 0) + 1;
+    this.setData({
+      messages: [],
+      msgIdCounter: 0,
+      inputValue: '',
+      canSend: false,
+      loading: false,
+      lastFailedQuestion: '',
+      requestSeq: this._requestSeq,
+      sessionId: 'mp-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+      scrollToView: '',
     });
   },
 

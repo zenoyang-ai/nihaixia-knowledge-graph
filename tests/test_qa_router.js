@@ -5,6 +5,9 @@ const {
   buildYuanqiPayload,
   createRouter,
   normalizeRequest,
+  isMedicalRequest,
+  isMedicalOutput,
+  validateHistory,
 } = require('../cloudbase/functions/nihaixia-qa-router');
 
 const ENV = {
@@ -332,7 +335,7 @@ test('blocks executable medical requests before calling either provider', async 
   const response = await router.main(event({ message: '小柴胡汤怎么吃，剂量多少？' }));
   const body = JSON.parse(response.body);
   assert.equal(response.statusCode, 400);
-  assert.match(body.error, /医疗建议/);
+  assert.match(body.error, /学习研究/);
 });
 
 // Phase 2 Test: Both providers fail → 502
@@ -521,7 +524,7 @@ test('dangerous questions are intercepted with 400 medical advice', async () => 
     assert.equal(fetchCalled, false, `危险问法 "${question}" 不应调用主线路 fetch`);
     assert.equal(cbCalled, false, `危险问法 "${question}" 不应调用备用线路`);
     const body = JSON.parse(response.body);
-    assert.match(body.error, /医疗建议/);
+    assert.match(body.error, /学习研究/);
   }
 });
 
@@ -671,6 +674,90 @@ test('role-play bypass attempts are intercepted with 400 medical advice', async 
     );
     assert.equal(fetchCalled, false, `绕过问法 "${question}" 不应调用任何 provider`);
     const body = JSON.parse(response.body);
-    assert.match(body.error, /医疗建议/);
+    assert.match(body.error, /学习研究/);
   }
+});
+
+// ---------------------------------------------------------------------------
+// v5.5.0 医疗规则与 MP 对齐
+// ---------------------------------------------------------------------------
+test('v5.5.0 isMedicalRequest blocks substance and acupoint executable queries', () => {
+  assert.strictEqual(isMedicalRequest('酸枣仁能吃吗'), true);
+  assert.strictEqual(isMedicalRequest('涌泉可以灸吗'), true);
+  assert.strictEqual(isMedicalRequest('古籍中足三里可以灸吗'), true);
+  assert.strictEqual(isMedicalRequest('经典里涌泉能灸吗'), true);
+  assert.strictEqual(isMedicalRequest('酸枣仁泡水喝可以吗'), true);
+});
+
+test('v5.5.0 isMedicalRequest allows learning-oriented substance questions', () => {
+  assert.strictEqual(isMedicalRequest('经典里酸枣仁的作用是什么'), false);
+  assert.strictEqual(isMedicalRequest('古籍中涌泉穴的定位是什么'), false);
+  assert.strictEqual(isMedicalRequest('他推荐经方学习从哪里入手'), false);
+});
+
+test('v5.5.0 router blocks 酸枣仁能吃吗 before provider', async () => {
+  let fetchCalled = false;
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error('must not call provider');
+    },
+    cloudbaseSdk: cloudbaseWithText('must not reach here'),
+  });
+  const response = await router.main(event({ message: '酸枣仁能吃吗' }));
+  assert.equal(response.statusCode, 400);
+  assert.equal(fetchCalled, false);
+  const body = JSON.parse(response.body);
+  assert.match(body.error, /学习研究/);
+});
+
+test('v5.5.0 router blocks 涌泉可以灸吗 before provider', async () => {
+  let fetchCalled = false;
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      throw new Error('must not call provider');
+    },
+    cloudbaseSdk: cloudbaseWithText('must not reach here'),
+  });
+  const response = await router.main(event({ message: '涌泉可以灸吗' }));
+  assert.equal(response.statusCode, 400);
+  assert.equal(fetchCalled, false);
+});
+
+test('v5.5.0 router allows learning question 经典里酸枣仁的作用是什么', async () => {
+  let fetchCalled = false;
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => {
+      fetchCalled = true;
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          choices: [{ message: { content: '学习用答案' }, finish_reason: 'stop' }],
+        }),
+      };
+    },
+    cloudbaseSdk: mockSdk({ text: 'must not reach here' }),
+    searchFn: emptySearch,
+  });
+  const response = await router.main(event({ message: '经典里酸枣仁的作用是什么' }));
+  assert.equal(response.statusCode, 200);
+  assert.equal(fetchCalled, true);
+});
+
+test('v5.5.0 validateHistory rejects medical content in prior user messages', () => {
+  const result = validateHistory([
+    { role: 'user', content: '酸枣仁能吃吗' },
+    { role: 'assistant', content: '不能回答' },
+  ]);
+  assert.strictEqual(result.valid.length, 0);
+  assert.strictEqual(result.error, 'medical_in_history');
+});
+
+test('v5.5.0 isMedicalOutput allows original text dosage explanation without second person', () => {
+  assert.strictEqual(isMedicalOutput('原文记载分三次服即可'), false);
 });

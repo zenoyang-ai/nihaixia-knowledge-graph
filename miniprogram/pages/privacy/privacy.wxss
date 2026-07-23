@@ -1,0 +1,30 @@
+.privacy-page {
+  padding: 24px 20px 40px;
+  color: var(--text, #342d25);
+  background: var(--bg, #f7f1e8);
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+.privacy-title {
+  font-size: 22px;
+  font-weight: 600;
+  margin-bottom: 20px;
+  color: var(--accent, #b9362c);
+}
+
+.privacy-section {
+  margin-bottom: 20px;
+}
+
+.privacy-heading {
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+
+.privacy-text {
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text-light, #776b5f);
+}

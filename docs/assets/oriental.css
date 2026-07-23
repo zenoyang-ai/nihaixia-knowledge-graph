@@ -1110,7 +1110,7 @@ h1, h2, h3, .hero-title, .logo, .sidebar-title, .card-title, .oriental-serif {
 
 .main {
     margin-left: var(--sidebar-w);
-    padding: 24px 24px 48px;
+    padding: 24px 24px 72px;
     width: calc(100% - var(--sidebar-w));
 }
 
@@ -1129,7 +1129,7 @@ h1, h2, h3, .hero-title, .logo, .sidebar-title, .card-title, .oriental-serif {
     .sidebar-toggle { display: flex; }
     .sidebar { width: 280px; transform: translateX(-100%); }
     .sidebar.open { transform: translateX(0); }
-    .main { margin-left: 0 !important; width: 100%; padding: 16px 12px; }
+    .main { margin-left: 0 !important; width: 100%; padding: 16px 12px 72px; }
 }
 
 .poster-trigger-btn {

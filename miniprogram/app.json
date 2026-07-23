@@ -3,8 +3,10 @@
   "pages": [
     "pages/index/index",
     "pages/chat/chat",
-    "pages/history/history"
+    "pages/history/history",
+    "pages/privacy/privacy"
   ],
+  "__usePrivacyCheck__": true,
   "window": {
     "backgroundTextStyle": "light",
     "navigationBarBackgroundColor": "@navBg",

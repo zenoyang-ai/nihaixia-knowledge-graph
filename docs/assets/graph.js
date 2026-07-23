@@ -15,6 +15,7 @@ class ForceGraph {
         this.viewport = null;
         this.positionStorageKey = 'nihaixia_graph_positions_v1';
         this.transformKey = 'nihaixia_graph_transform_v1';
+        this._allowTransformPersist = true;
 
         // 标签显隐状态
         this.labelZoomThreshold = 1.5;
@@ -47,18 +48,16 @@ class ForceGraph {
         ];
 
         // 主题化：从 CSS 变量读取层级色，暗色模式下自动切换
-        const cssVar = (name, fallback) => {
-            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-            return v || fallback;
-        };
-        this.layerColor = {
-            '底层框架': cssVar('--layer-cosmology', '#b9362c'),
-            '辨证框架': cssVar('--layer-diagnosis', '#315d82'),
-            '方法工具': cssVar('--layer-treatment', '#2c705f'),
-            '案例研读': cssVar('--layer-cases', '#c7892b'),
-            '天纪体系': cssVar('--layer-tianji', '#7b5ea7'),
-            '学习路径': cssVar('--layer-path', '#7f8c8d'),
-        };
+        this.refreshLayerColors();
+
+        // 主题切换后重读 CSS 变量并更新节点色
+        if (!this._themeListenerBound) {
+            this._themeListenerBound = true;
+            document.documentElement.addEventListener('nihaixia-theme-change', () => {
+                this.refreshLayerColors();
+                this.recolorNodes();
+            });
+        }
         this.layerAngle = {
             '底层框架': -90, '辨证框架': -18, '方法工具': 54,
             '案例研读': 126, '天纪体系': 198, '学习路径': 270,
@@ -72,6 +71,34 @@ class ForceGraph {
                 if (!this.svg) return;
                 this.highlightSearchMatches(searchInput.value);
             });
+        }
+    }
+
+    refreshLayerColors() {
+        const cssVar = (name, fallback) => {
+            const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+            return v || fallback;
+        };
+        this.layerColor = {
+            '底层框架': cssVar('--layer-cosmology', '#b9362c'),
+            '辨证框架': cssVar('--layer-diagnosis', '#315d82'),
+            '方法工具': cssVar('--layer-treatment', '#2c705f'),
+            '案例研读': cssVar('--layer-cases', '#c7892b'),
+            '天纪体系': cssVar('--layer-tianji', '#7b5ea7'),
+            '学习路径': cssVar('--layer-path', '#7f8c8d'),
+        };
+    }
+
+    recolorNodes() {
+        if (!this.nodeEls) return;
+        this.nodeEls.querySelectorAll('.graph-node').forEach((ng) => {
+            const layer = ng.dataset.layer || '';
+            const color = this.layerColor[layer] || '#999';
+            const circle = ng.querySelector('circle');
+            if (circle) circle.setAttribute('fill', color);
+        });
+        if (this.selectedNode) {
+            this.detailPanel.style.setProperty('--panel-accent', this.layerColor[this.selectedNode.layer] || '#b9362c');
         }
     }
 
@@ -206,7 +233,7 @@ class ForceGraph {
                 }
             })
             .on('end', (event) => {
-                // 记住缩放状态，从详情页返回时恢复视野
+                if (!this._allowTransformPersist) return;
                 try { sessionStorage.setItem(this.transformKey, JSON.stringify(event.transform)); } catch (e) {}
             });
 
@@ -405,7 +432,17 @@ class ForceGraph {
         this.simulation.stop();
         for (let i = 0; i < 140; i++) this.simulation.tick();
         ticked();
-        // 轻量重启保留一点有机感，随后自然冷却至静止
+        // 轻量重启保留一点有机感，随后自然冷却至静止；稳定后再 fit，避免错误 transform 被持久化
+        this._initialFitPending = true;
+        this.simulation.on('end', () => {
+            if (!this._initialFitPending) return;
+            this._initialFitPending = false;
+            const appliedSaved = this._isNarrow ? false : this.restoreSavedTransform();
+            if (!appliedSaved) {
+                this.fitToView({ animate: false, persist: false });
+            }
+            this.updateLabelVisibility();
+        });
         this.simulation.alpha(0.22).restart();
 
         // 顶部大概念框（HTML overlay）
@@ -414,19 +451,33 @@ class ForceGraph {
         // 缩放工具条（＋ － ⌂ + 缩放百分比）
         this.renderToolbar();
 
-        // 视野：窄屏始终 fit（避免恢复的旧 transform 把节点裁出屏外）；
-        // 宽屏优先恢复用户上次缩放，否则 fit 全局。
-        const appliedSaved = this._isNarrow ? false : this.restoreSavedTransform();
-        if (!appliedSaved) {
-            this.fitToView({ animate: false });
-        }
-
-        // 初始化标签可见性
+        // 初始化标签可见性（fit 完成后会再更新一次）
         this.updateLabelVisibility();
+
+        // 窗口尺寸变化时更新图谱视口参数
+        if (!this._resizeBound) {
+            this._resizeBound = true;
+            this._onResize = () => {
+                if (!this.container || !this.svg) return;
+                const rect = this.container.getBoundingClientRect();
+                const w = Math.max(1, rect.width);
+                const h = Math.max(1, rect.height);
+                const wasNarrow = this._isNarrow;
+                this._graphWidth = w;
+                this._graphHeight = h;
+                this._isNarrow = w <= 768;
+                this.svg.setAttribute('width', w);
+                this.svg.setAttribute('height', h);
+                if (wasNarrow !== this._isNarrow) {
+                    this.fitToView({ animate: false, persist: false });
+                }
+            };
+            window.addEventListener('resize', this._onResize);
+        }
     }
 
     /** 计算节点包围盒并缩放到可见安全区内（避开概念栏/图例/缩放条） */
-    fitToView({ animate = true } = {}) {
+    fitToView({ animate = true, persist = true } = {}) {
         if (!this.svg || !this.zoomBehavior || !this.nodes.length) return;
         const width = this._graphWidth || this.container.getBoundingClientRect().width || 800;
         const height = this._graphHeight || this.container.getBoundingClientRect().height || 600;
@@ -459,14 +510,20 @@ class ForceGraph {
         const ty = padT + availH / 2 - midY * k;
         const transform = d3.zoomIdentity.translate(tx, ty).scale(k);
         const sel = d3.select(this.svg);
+        const prevPersist = this._allowTransformPersist;
+        this._allowTransformPersist = persist;
         if (animate) {
-            sel.transition().duration(420).call(this.zoomBehavior.transform, transform);
+            sel.transition().duration(420).call(this.zoomBehavior.transform, transform)
+                .on('end', () => { this._allowTransformPersist = prevPersist; });
         } else {
             sel.call(this.zoomBehavior.transform, transform);
+            this._allowTransformPersist = prevPersist;
         }
         this.currentZoomScale = k;
         if (this.zoomLabelEl) this.zoomLabelEl.textContent = Math.round(k * 100) + '%';
-        try { sessionStorage.setItem(this.transformKey, JSON.stringify(transform)); } catch (e) {}
+        if (persist) {
+            try { sessionStorage.setItem(this.transformKey, JSON.stringify(transform)); } catch (e) {}
+        }
     }
 
     restoreSavedTransform() {

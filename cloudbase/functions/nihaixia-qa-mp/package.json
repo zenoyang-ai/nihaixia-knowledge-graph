@@ -1,6 +1,6 @@
 {
   "name": "nihaixia-qa-mp",
-  "version": "5.2.0",
+  "version": "5.5.0",
   "description": "经典中医学习问答小程序云函数 — 混合 RAG v2（BM25 检索 + generateText）",
   "main": "index.js",
   "dependencies": {

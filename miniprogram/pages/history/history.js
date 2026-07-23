@@ -6,7 +6,10 @@ Page({
   },
 
   onShow() {
-    this.loadSessions();
+    const app = getApp();
+    app.guardPrivacy(() => {
+      this.loadSessions();
+    });
   },
 
   loadSessions() {
@@ -31,8 +34,11 @@ Page({
   onContinueSession(e) {
     const sessionId = e.currentTarget.dataset.sessionId;
     if (!sessionId) return;
-    wx.navigateTo({
-      url: '/pages/chat/chat?sessionId=' + sessionId,
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.navigateTo({
+        url: '/pages/chat/chat?sessionId=' + sessionId,
+      });
     });
   },
 
@@ -40,74 +46,80 @@ Page({
     const sessionId = e.currentTarget.dataset.sessionId;
     if (!sessionId) return;
 
-    wx.showModal({
-      title: '删除对话',
-      content: '确定删除这条对话记录吗？删除后不可恢复。',
-      confirmText: '删除',
-      confirmColor: '#b9362c',
-      success: (res) => {
-        if (!res.confirm) return;
-        let ok = false;
-        try {
-          const sessions = wx.getStorageSync('chat_sessions') || [];
-          const filtered = (Array.isArray(sessions) ? sessions : [])
-            .filter((s) => s.sessionId !== sessionId);
-          wx.setStorageSync('chat_sessions', filtered);
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.showModal({
+        title: '删除对话',
+        content: '确定删除这条对话记录吗？删除后不可恢复。',
+        confirmText: '删除',
+        confirmColor: '#b9362c',
+        success: (res) => {
+          if (!res.confirm) return;
+          let ok = false;
           try {
-            wx.removeStorageSync('chat_messages_' + sessionId);
-          } catch (e) {
-            // 消息清理失败不阻断会话列表更新
+            const sessions = wx.getStorageSync('chat_sessions') || [];
+            const filtered = (Array.isArray(sessions) ? sessions : [])
+              .filter((s) => s.sessionId !== sessionId);
+            wx.setStorageSync('chat_sessions', filtered);
+            try {
+              wx.removeStorageSync('chat_messages_' + sessionId);
+            } catch (err) {
+              // 消息清理失败不阻断会话列表更新
+            }
+            ok = true;
+          } catch (err) {
+            ok = false;
           }
-          ok = true;
-        } catch (err) {
-          ok = false;
-        }
 
-        this.loadSessions();
-        wx.showToast({
-          title: ok ? '已删除' : '删除失败，请重试',
-          icon: ok ? 'success' : 'none',
-          duration: 1800,
-        });
-      },
+          this.loadSessions();
+          wx.showToast({
+            title: ok ? '已删除' : '删除失败，请重试',
+            icon: ok ? 'success' : 'none',
+            duration: 1800,
+          });
+        },
+      });
     });
   },
 
   onClearAll() {
     if (this.data.sessions.length === 0) return;
-    wx.showModal({
-      title: '清空所有对话',
-      content: '确定清空全部对话记录吗？此操作不可恢复。',
-      confirmText: '清空',
-      confirmColor: '#b9362c',
-      success: (res) => {
-        if (!res.confirm) return;
-        let ok = false;
-        try {
-          let sessions = [];
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.showModal({
+        title: '清空所有对话',
+        content: '确定清空全部对话记录吗？此操作不可恢复。',
+        confirmText: '清空',
+        confirmColor: '#b9362c',
+        success: (res) => {
+          if (!res.confirm) return;
+          let ok = false;
           try {
-            sessions = wx.getStorageSync('chat_sessions') || [];
-          } catch (e) {
-            sessions = [];
-          }
-          (Array.isArray(sessions) ? sessions : []).forEach((s) => {
+            let sessions = [];
             try {
-              wx.removeStorageSync('chat_messages_' + s.sessionId);
-            } catch (e) {}
-          });
-          wx.removeStorageSync('chat_sessions');
-          ok = true;
-        } catch (err) {
-          ok = false;
-        }
+              sessions = wx.getStorageSync('chat_sessions') || [];
+            } catch (err) {
+              sessions = [];
+            }
+            (Array.isArray(sessions) ? sessions : []).forEach((s) => {
+              try {
+                wx.removeStorageSync('chat_messages_' + s.sessionId);
+              } catch (err) {}
+            });
+            wx.removeStorageSync('chat_sessions');
+            ok = true;
+          } catch (err) {
+            ok = false;
+          }
 
-        this.loadSessions();
-        wx.showToast({
-          title: ok ? '已清空' : '清空失败，请重试',
-          icon: ok ? 'success' : 'none',
-          duration: 1800,
-        });
-      },
+          this.loadSessions();
+          wx.showToast({
+            title: ok ? '已清空' : '清空失败，请重试',
+            icon: ok ? 'success' : 'none',
+            duration: 1800,
+          });
+        },
+      });
     });
   },
 

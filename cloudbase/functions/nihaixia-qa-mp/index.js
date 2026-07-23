@@ -62,16 +62,16 @@ function getOpenId(event, context) {
         }));
         return wxCtx.OPENID;
       }
-      // 调试：记录 getWXContext 返回但无 OPENID 的情况
+      // 调试：仅记录字段存在性与脱敏状态，不写 APPID/UNIONID/OPENID 原文
       console.log(JSON.stringify({
         event: 'openid_missing',
         source: 'wx-server-sdk',
-        wxctx_keys: wxCtx ? Object.keys(wxCtx) : [],
-        wxctx_values: wxCtx ? {
-          OPENID: wxCtx.OPENID || null,
-          APPID: wxCtx.APPID || null,
-          UNIONID: wxCtx.UNIONID || null,
-        } : null,
+        wxctx_key_count: wxCtx ? Object.keys(wxCtx).length : 0,
+        fields: {
+          OPENID: { present: !!(wxCtx && wxCtx.OPENID), masked: '***' },
+          APPID: { present: !!(wxCtx && wxCtx.APPID), masked: '***' },
+          UNIONID: { present: !!(wxCtx && wxCtx.UNIONID), masked: '***' },
+        },
       }));
     } catch (err) {
       console.log(JSON.stringify({
@@ -111,7 +111,7 @@ function getOpenId(event, context) {
   return null;
 }
 
-const VERSION = '5.3.0';
+const VERSION = '5.5.0';
 
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY_LENGTH = 2000; // 单条 history 消息长度
@@ -122,32 +122,143 @@ const RATE_COLLECTION = 'qa_rate_limit';
 const MAX_CONTEXT_CHARS = 30000; // 上下文总量上限
 
 // ---------------------------------------------------------------------------
-// 医疗可执行请求检测 — 仅拦截可执行医疗意图，放行学习问法
+// 医疗可执行请求检测 — 意图结构优先，学习语境豁免
 //
-// 拦截标准：处方、剂量、服法、个体化诊疗、医疗程序、急救、疾病用药咨询
-// 放行标准：经典讲什么病、方剂治什么、概念解释、组成与禁忌
+// 拦截：人称+症状+求助 / 怎么治怎么办 / 能吃吗 / 开方剂量 / 急救
+// 放行：原文/归经/原则/学习/伤寒论 等教学语境
 // ---------------------------------------------------------------------------
-const MEDICAL_PATTERNS = [
-  // 1. 剂量/用量/服法 — 请求具体用药信息
-  /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
-  // 2. 处方/开药请求（含简短表达"配个方/开个方/抓个方"）
-  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:配|开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方))/,
-  // 3. 医疗程序
+const LEARNING_CONTEXT_PATTERN = /(?:学习|原文|归经|原则|意义|类型|有哪些|是什么|如何理解|讲解|论述|在学习|经方学习|配伍原则|穴位归经|承担什么作用|经典|古籍|定位|伤寒论|金匮|内经|神农|治什么病|组成是什么|对应什么)/;
+
+const PERSON_PATTERN = /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女|本人|老公|老婆|妻子|丈夫|先生|太太|爱人|老伴|父亲|母亲|爷爷|奶奶|外公|外婆|他|她)/;
+
+const SYMPTOM_PATTERN = /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症)/;
+
+// 药物/穴位 + 能否服用/施灸 等可执行问法（学习语境在上游豁免）
+const HERB_SUBSTANCE_PATTERN = /(?:酸枣仁|川贝|当归|黄芪|党参|枸杞|茯苓|白术|甘草|附子|桂枝|白芍|生姜|大枣|半夏|陈皮|天麻|人参|熟地|川芎|柴胡|黄芩|黄连|黄柏|山药|麦冬|五味子|丹参|红花|桃仁|麻黄|细辛|独活|防风|连翘|金银花|薄荷|菊花|桑叶|杏仁|桔梗|厚朴|枳实|香附|远志|龙骨|牡蛎|阿胶|肉桂|吴茱萸|干姜|薏苡仁|车前子|泽泻|猪苓|石膏|知母|栀子|大黄|蜂蜜)/;
+const ACUPOINT_NAME_PATTERN = /(?:涌泉|足三里|三阴交|合谷|关元|神阙|百会|太冲|内关|风池|肩井|曲池|天枢|膻中|命门|肾俞|脾俞|肺俞|太溪|照海|申脉|阳陵泉|阴陵泉|承山|委中|丰隆|公孙|厉兑|迎香|印堂|风门|大椎|身柱|曲泽|地机|血海|睛明|攒竹)/;
+const SUBSTANCE_EXECUTABLE_PATTERN = new RegExp(
+  HERB_SUBSTANCE_PATTERN.source + '.{0,10}(?:能吃|能吃吗|可以吃|可以吃吗|能服用|服用吗|能用|能用吗|泡水喝|天天吃|一起吃|适合我吗|适合吃|适合吃吗)'
+);
+const ACUPOINT_EXECUTABLE_PATTERN = new RegExp(
+  ACUPOINT_NAME_PATTERN.source + '.{0,12}(?:可以灸|能灸|灸吗|可以针|能针|针吗|可以按|能按|可以吗)'
+);
+const MOXIBUSTION_ACUPOINT_PATTERN = new RegExp(
+  '(?:灸|针刺|针|按压).{0,8}' + ACUPOINT_NAME_PATTERN.source + '.{0,10}(?:可以吗|能不能|行吗|吗)'
+);
+
+const STRONG_TREATMENT_INTENT_PATTERN = /(?:怎么办|怎么治|能治好吗|该吃什么|吃什么药|用什么方|用什么药|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|能吃吗|能用吗|什么药|什么方)/;
+const WEAK_TREATMENT_INTENT_PATTERN = /(?:比较好|有效|推荐|可以吗|可以用吗)/;
+const LEARNING_RECOMMENDATION_PATTERN = /(?:他|她).{0,8}推荐.{0,12}学习|(?:学习|经方学习).{0,24}(?:顺序|路径|从哪里|如何入手|怎么学|入手)|学习顺序|从哪里入手比较有效/;
+
+const EMERGENCY_PATTERN = /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/;
+const MEDICAL_BLOCK_REPLY = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师或前往线下医疗机构就诊。';
+const EMERGENCY_BLOCK_REPLY = '如遇紧急医疗情况，请立即拨打 120 急救电话，并尽快前往线下医院就诊。本系统不能提供急救或诊疗服务。';
+
+// 始终拦截（不受学习语境豁免）
+const ALWAYS_BLOCK_PATTERNS = [
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
-  // 4. 急救/危重
-  /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
-  // 5. 个体化诊疗：个人代词 + 治疗请求（含"适合吃吗""能不能用""可以吗"等）
-  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
-  // 6. 角色扮演绕过 + 可执行医疗请求
+  EMERGENCY_PATTERN,
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
-  // 7. 指令绕过 + 可执行医疗请求
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
-  // 8. 疾病用药咨询 — 针对具体疾病的用药建议（非学习问法）
-  /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症).{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐)/,
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐(?!经方).{0,5}(?:药|方)|建议(?!经方).{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂)|配(?!伍).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂))/,
+  /(?:根据|按照|针对).{0,12}(?:我的|他的|她的|症状|体质|情况).{0,20}(?:开|配|用|吃|服|方|药|汤)/,
 ];
 
+// 仅在没有学习语境时拦截（学习语境下若仍有诊疗意图则在上游已拦截）
+const CONTEXT_SENSITIVE_PATTERNS = [
+  /(?:剂量|用量|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
+  /(?:三两|二两|一两|半斤|一钱|二钱|三钱|四钱|五钱|六钱|七钱|八钱|九钱|几钱|几两).{0,15}(?:怎么|如何|多少|换算|服用|用)/,
+  new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐|怎么办|能吃吗|能吃)'),
+  /(?:针灸|艾灸|针刺|拔罐|刮痧).{0,20}(?:怎么|如何|能不能|可以吗|适合|灸哪|针哪)/,
+  /(?:艾灸|针刺|拔罐|刮痧).{0,20}(?:穴位|部位).{0,10}(?:可以吗|能不能|怎么|如何)/,
+  /(?:足三里|三阴交|合谷|关元|神阙|百会|太冲|穴位).{0,10}(?:可以灸|能灸|灸吗|可以针|能针|针吗)/,
+  /(?:怎么配|如何配|配在一起|合用|药对|(?:和|与).{0,20}(?:怎么|如何)配伍)/,
+  /(?:先煎|后下|包煎|烊化).{0,8}(?:吗|？|\?)/,
+  /(?:同用|合用|一起用|可以同用).{0,8}(?:吗|？|\?)/,
+];
+
+function hasSubstanceOrAcupointExecutableQuery(text) {
+  return SUBSTANCE_EXECUTABLE_PATTERN.test(text)
+    || ACUPOINT_EXECUTABLE_PATTERN.test(text)
+    || MOXIBUSTION_ACUPOINT_PATTERN.test(text);
+}
+
+function hasLearningContext(text) {
+  return LEARNING_CONTEXT_PATTERN.test(text);
+}
+
+function isLearningRecommendationStructure(text) {
+  return LEARNING_RECOMMENDATION_PATTERN.test(text);
+}
+
+function hasSymptomTreatmentQuery(text) {
+  return new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:怎么办|怎么治|能吃吗|能吃|可以吃吗|可以吃)').test(text)
+    || new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|什么药|什么方|用什么药|用什么方)').test(text);
+}
+
+function hasFeverTreatmentQuery(text) {
+  return /(?:发烧|发热).{0,20}(?:\d+[\.\d]*\s*度|38|39|40).{0,20}(?:怎么办|怎么治)/.test(text)
+    || /(?:\d+[\.\d]*\s*度).{0,15}(?:发烧|发热).{0,15}(?:怎么办|怎么治)/.test(text)
+    || (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text));
+}
+
+function hasTreatmentIntentInLearning(text) {
+  if (/怎么治/.test(text)) return true;
+  if (/用什么药|用什么方|吃什么药/.test(text)) return true;
+  if (/用什么方比较好|什么方比较好|用什么药比较好|什么药比较好/.test(text)) return true;
+  if (hasSymptomTreatmentQuery(text)) return true;
+  return false;
+}
+
+function hasPersonTreatmentQuery(text) {
+  if (!PERSON_PATTERN.test(text)) return false;
+  if (isLearningRecommendationStructure(text)) return false;
+
+  if (STRONG_TREATMENT_INTENT_PATTERN.test(text)) return true;
+
+  if (WEAK_TREATMENT_INTENT_PATTERN.test(text) && SYMPTOM_PATTERN.test(text)) return true;
+
+  if (SYMPTOM_PATTERN.test(text) && /(?:怎么办|怎么治|能吃|可以吃|能用|可以用)/.test(text)) return true;
+  if (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text)) return true;
+
+  return false;
+}
+
 function isMedicalRequest(text) {
-  return MEDICAL_PATTERNS.some((p) => p.test(text));
+  if (!text || typeof text !== 'string') return false;
+  const t = text.trim();
+
+  if (ALWAYS_BLOCK_PATTERNS.some((p) => p.test(t))) return true;
+
+  if (hasPersonTreatmentQuery(t)) return true;
+  if (hasFeverTreatmentQuery(t)) return true;
+  if (hasSymptomTreatmentQuery(t)) return true;
+
+  if (hasLearningContext(t)) {
+    if (hasTreatmentIntentInLearning(t)) return true;
+    if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+    return false;
+  }
+
+  if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+
+  return CONTEXT_SENSITIVE_PATTERNS.some((p) => p.test(t));
+}
+
+function getMedicalBlockReply(text) {
+  if (EMERGENCY_PATTERN.test(text)) return EMERGENCY_BLOCK_REPLY;
+  return MEDICAL_BLOCK_REPLY;
+}
+
+function getMedicalBlockReplyFromContext(history, currentMsg) {
+  const parts = [];
+  if (Array.isArray(history)) {
+    for (const h of history) {
+      if (h && h.role === 'user' && typeof h.content === 'string') parts.push(h.content);
+    }
+  }
+  if (typeof currentMsg === 'string') parts.push(currentMsg);
+  return getMedicalBlockReply(parts.join('\n'));
 }
 
 // ---------------------------------------------------------------------------
@@ -162,6 +273,15 @@ const MEDICAL_OUTPUT_PATTERNS = [
   /(?:每日|每天|每次).{0,5}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
   // 明确的"你应该服用"类建议
   /(?:你应该|你需要|你可以服用|建议你).{0,20}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
+  // 个体化可执行服法建议（排除经典讲解/学习语境中的"温服"等术语）
+  /(?:建议|推荐|应该|需要)(?:你|您).{0,15}(?:服法|服用方法|饭前服|饭后服|温服|分.{0,3}次服)/,
+  /(?:建议|推荐|应该|需要)(?:你|您).{0,12}(?:服用方法|饭前服|饭后服|分.{0,3}次服)/,
+  /(?:你|您).{0,8}(?:饭前服|饭后服|分.{0,3}次服).{0,12}(?:即可|为宜|较好)/,
+  // 穴位/针灸操作建议（区分"针灸"教学表述）
+  /(?:建议|推荐|可以).{0,10}(?:艾灸|针刺|按压|刺激).{0,15}(?:穴|处|部位)/,
+  /(?:建议|推荐|可以)针(?!灸).{0,15}(?:穴|处|部位)/,
+  // 个体化开方（不因"经方"误伤）
+  /(?:根据你的|针对你的|适合你|为你).{0,20}(?:处方|药方|汤方|配.{0,8}(?:药|方|汤)|用.{0,4}药)/,
 ];
 
 function isMedicalOutput(text) {
@@ -256,7 +376,7 @@ function hashOpenId(openId) {
 // 改进（v5.2.0）：
 //   - 使用原子操作（db.command.inc + push）避免竞态
 //   - 时区改为 UTC+8（北京时间）
-//   - 连续 DB 错误时 fail-closed（熔断）
+//   - 连续 DB 错误时 fail-closed（熔断后直接拒服，不做内存降级）
 //   - TTL 自动过期（文档 7 天后自动删除）
 //   - 缺 OpenID 时拒绝（不绕过限流）
 //   - 熔断后冷却恢复（60 秒后半开探测）
@@ -266,9 +386,14 @@ function hashOpenId(openId) {
 // ---------------------------------------------------------------------------
 let _dbErrorCount = 0;
 let _circuitBreakUntil = 0;
-const DB_ERROR_THRESHOLD = 5; // 连续 5 次 DB 错误后 fail-closed
+const DB_ERROR_THRESHOLD = 5; // 连续 5 次 DB 错误后熔断拒服
 const CIRCUIT_BREAK_COOLDOWN_MS = 60000; // 熔断冷却 60 秒
 const DOC_TTL_SECONDS = 7 * 24 * 3600; // 文档 7 天后自动过期
+
+function resetRateLimitState() {
+  _dbErrorCount = 0;
+  _circuitBreakUntil = 0;
+}
 
 async function checkRateLimit(db, userHash) {
   // 缺 OpenID 时拒绝（不绕过限流）
@@ -276,21 +401,24 @@ async function checkRateLimit(db, userHash) {
     return { allowed: false, reason: 'missing_user_id' };
   }
 
-  // 熔断检查：连续 DB 错误后 fail-closed
+  // 熔断检查：DB 不可用时 fail-closed，直接拒服
   const nowMs = Date.now();
   if (_dbErrorCount >= DB_ERROR_THRESHOLD) {
-    // 冷却期内：直接拒绝
     if (nowMs < _circuitBreakUntil) {
       console.log(JSON.stringify({
-        event: 'rate_limit_circuit_break',
+        event: 'rate_limit_circuit_open',
         error_count: _dbErrorCount,
         cooldown_remaining: Math.round((_circuitBreakUntil - nowMs) / 1000) + 's',
       }));
-      return { allowed: false, reason: 'circuit_break' };
+      return {
+        allowed: false,
+        reason: 'rate_limit_unavailable',
+        remaining: 0,
+        reset_at: '稍后',
+      };
     }
-    // 冷却期已过：进入半开探测，允许一次请求试探
+    // 冷却期已过：进入半开探测，允许一次请求试探 DB
     console.log(JSON.stringify({ event: 'rate_limit_half_open_probe' }));
-    // 不重置计数，如果这次成功，_dbErrorCount 会在 try 块中被重置
   }
 
   // 使用 UTC+8（北京时间）
@@ -351,12 +479,18 @@ async function checkRateLimit(db, userHash) {
     const record = result.data && result.data[0];
 
     if (!record) {
-      // upsert 后应该有记录，如果没有说明创建失败
       _dbErrorCount++;
       if (_dbErrorCount >= DB_ERROR_THRESHOLD) {
         _circuitBreakUntil = nowMs + CIRCUIT_BREAK_COOLDOWN_MS;
       }
-      return { allowed: false, reason: 'db_create_failed' };
+      console.log(JSON.stringify({ event: 'rate_limit_db_create_failed' }));
+      // DB 可能已自增但读取为空，不再回落内存计数，避免双重放行
+      return {
+        allowed: false,
+        reason: 'rate_limit_unavailable',
+        remaining: 0,
+        reset_at: '稍后',
+      };
     }
 
     // 重置错误计数和熔断状态（成功恢复）
@@ -402,8 +536,13 @@ async function checkRateLimit(db, userHash) {
       error: err.message ? err.message.slice(0, 100) : 'unknown',
       error_count: _dbErrorCount,
     }));
-    // fail-closed：DB 错误时拒绝（安全优先）
-    return { allowed: false, reason: 'db_error_fallback' };
+    // 写入阶段失败时宁可短暂拒服，避免与可能已成功的 DB 自增叠加内存计数
+    return {
+      allowed: false,
+      reason: 'rate_limit_unavailable',
+      remaining: 0,
+      reset_at: '稍后',
+    };
   }
 }
 
@@ -504,7 +643,7 @@ ${context}`;
       text_length: text.length,
     }));
     return {
-      text: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+      text: MEDICAL_BLOCK_REPLY,
       knowledgeBase: [],
       hasError: false,
       errorMsg: 'output_blocked',
@@ -577,7 +716,7 @@ exports.main = async (event, context) => {
       elapsed,
     }));
     return {
-      reply: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+      reply: getMedicalBlockReply(trimmedMsg),
       provider: 'system',
       blocked: true,
       request_id: requestId,
@@ -620,7 +759,9 @@ exports.main = async (event, context) => {
         : rateLimit.reason === 'circuit_break'
         ? '服务暂时繁忙，请稍后再试。'
         : rateLimit.reason === 'missing_user_id'
-        ? '无法验证用户身份，请通过小程序重新进入。'
+        ? '无法验证用户身份，请关闭小程序后重新打开；若仍失败，请检查微信登录状态。'
+        : rateLimit.reason === 'rate_limit_unavailable'
+        ? '服务暂时繁忙，请稍后再试。'
         : `提问过于频繁，请${rateLimit.reset_at || '稍后'}再试。`,
       provider: 'system',
       rate_limited: true,
@@ -632,18 +773,33 @@ exports.main = async (event, context) => {
   let history = [];
   if (Array.isArray(event.history)) {
     const result = validateHistory(event.history, requestId);
-    if (result.error === 'medical_in_history') {
+    if (result.error) {
+      if (result.error === 'medical_in_history') {
+        const elapsed = Date.now() - startTime;
+        console.log(JSON.stringify({
+          request_id: requestId,
+          status: 400,
+          reason: 'medical_in_history',
+          elapsed,
+        }));
+        return {
+          reply: getMedicalBlockReplyFromContext(result.valid, trimmedMsg),
+          provider: 'system',
+          blocked: true,
+          request_id: requestId,
+        };
+      }
       const elapsed = Date.now() - startTime;
       console.log(JSON.stringify({
         request_id: requestId,
         status: 400,
-        reason: 'medical_in_history',
+        reason: 'invalid_history',
+        detail: result.error,
         elapsed,
       }));
       return {
-        reply: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
-        provider: 'system',
-        blocked: true,
+        error: '对话历史格式无效，请开始新对话',
+        invalid_history: true,
         request_id: requestId,
       };
     }
@@ -745,7 +901,9 @@ exports.main = async (event, context) => {
 exports.VERSION = VERSION;
 exports.isMedicalRequest = isMedicalRequest;
 exports.isMedicalOutput = isMedicalOutput;
-exports.MEDICAL_PATTERNS = MEDICAL_PATTERNS;
+exports.hasLearningContext = hasLearningContext;
+exports.ALWAYS_BLOCK_PATTERNS = ALWAYS_BLOCK_PATTERNS;
+exports.CONTEXT_SENSITIVE_PATTERNS = CONTEXT_SENSITIVE_PATTERNS;
 exports.MEDICAL_OUTPUT_PATTERNS = MEDICAL_OUTPUT_PATTERNS;
 exports.hashOpenId = hashOpenId;
 exports.validateHistory = validateHistory;
@@ -754,3 +912,7 @@ exports.MAX_HISTORY_LENGTH = MAX_HISTORY_LENGTH;
 exports.MAX_HISTORY_ITEMS = MAX_HISTORY_ITEMS;
 exports.RATE_LIMIT_PER_MINUTE = RATE_LIMIT_PER_MINUTE;
 exports.RATE_LIMIT_PER_DAY = RATE_LIMIT_PER_DAY;
+exports.getMedicalBlockReply = getMedicalBlockReply;
+exports.getMedicalBlockReplyFromContext = getMedicalBlockReplyFromContext;
+exports.checkRateLimit = checkRateLimit;
+exports.resetRateLimitState = resetRateLimitState;

@@ -1,4 +1,6 @@
 // 主入口 — 初始化所有模块
+const ASSET_VERSION = document.querySelector('meta[name="asset-version"]')?.content || '20260723-v18';
+
 class NihaixiaApp {
     constructor() {
         this.data = null;
@@ -18,7 +20,7 @@ class NihaixiaApp {
 
         // 3. 加载图谱数据（失败不阻塞其他模块）
         try {
-            const response = await fetch('data/graph.json');
+            const response = await fetch(`data/graph.json?v=${ASSET_VERSION}`);
             this.data = await response.json();
         } catch (error) {
             console.error('加载图谱数据失败，部分功能不可用:', error);
@@ -37,7 +39,7 @@ class NihaixiaApp {
 
         // 5. 提示词工具包独立加载，不依赖 graph.json
         try {
-            const promptResponse = await fetch('data/prompts.json');
+            const promptResponse = await fetch(`data/prompts.json?v=${ASSET_VERSION}`);
             const promptData = await promptResponse.json();
             this.promptView = new PromptView(promptData);
         } catch(e) {
@@ -50,13 +52,7 @@ class NihaixiaApp {
         // 6. 再次根据 hash 切换（数据加载完成后，确保视图状态正确）
         this.switchViewFromHash();
 
-        // 直达深链接时，路由可能早于异步数据初始化；补一次当前页面的首次渲染。
         const currentPath = (window.location.hash || '#/').replace(/^#/, '') || '/';
-        if (currentPath === '/graph' && this.forceGraph) {
-            setTimeout(() => {
-                try { this.forceGraph.render(); } catch (e) { console.error('Initial graph render error:', e); }
-            }, 0);
-        }
         if (currentPath.startsWith('/note/') && this.noteDetail) {
             const title = decodeURIComponent(currentPath.slice('/note/'.length));
             this.noteDetail.render(title);
@@ -74,11 +70,7 @@ class NihaixiaApp {
 
         // 路由处理器只做视图特有的逻辑，视图切换统一由 switchViewFromHash 处理
         router.on('/graph', () => {
-            if (this.forceGraph) {
-                setTimeout(() => {
-                    try { this.forceGraph.render(); } catch(e) { console.error('Graph render error:', e); }
-                }, 50);
-            }
+            this._requestGraphRender();
         });
         router.on('/qa', () => {});
         router.on('/note/:title', (params) => {
@@ -95,6 +87,18 @@ class NihaixiaApp {
         const hash = window.location.hash || '#/';
         const path = hash.replace(/^#/, '') || '/';
 
+        const knownStatic = ['/', '/path', '/graph', '/prompts', '/qa'];
+        const isNote = path.startsWith('/note/') && path.length > '/note/'.length;
+        const isValid = knownStatic.includes(path) || isNote;
+
+        if (!isValid) {
+            history.replaceState(null, '', '#/');
+            this._showRouteNotice('页面不存在，已返回总览');
+            this.switchView('overview');
+            this.updateNav();
+            return;
+        }
+
         // 解析路由到视图名
         let viewName = 'overview';
         if (path === '/') viewName = 'overview';
@@ -102,11 +106,29 @@ class NihaixiaApp {
         else if (path === '/graph') viewName = 'graph';
         else if (path === '/prompts') viewName = 'prompts';
         else if (path === '/qa') viewName = 'qa';
-        else if (path.startsWith('/note/')) viewName = 'note';
-        else viewName = 'overview';
+        else if (isNote) viewName = 'note';
 
         this.switchView(viewName);
         this.updateNav();
+    }
+
+    _showRouteNotice(message) {
+        const main = document.getElementById('main-content');
+        if (!main) return;
+        let el = document.getElementById('route-notice');
+        if (!el) {
+            el = document.createElement('div');
+            el.id = 'route-notice';
+            el.className = 'route-notice';
+            el.setAttribute('role', 'status');
+            main.prepend(el);
+        }
+        el.textContent = message;
+        el.hidden = false;
+        clearTimeout(this._routeNoticeTimer);
+        this._routeNoticeTimer = setTimeout(() => {
+            if (el) el.hidden = true;
+        }, 4000);
     }
 
     switchView(view) {
@@ -123,6 +145,10 @@ class NihaixiaApp {
             target.style.display = 'block';
         }
 
+        if (view === 'graph') {
+            this._requestGraphRender();
+        }
+
         // 普通路由切换回到页面顶部；图谱内部缩放/拖拽由 graph.js sessionStorage 自行保留
         if (view !== 'graph') {
             window.scrollTo(0, 0);
@@ -134,6 +160,19 @@ class NihaixiaApp {
             // 进入图谱时也复位页面级滚动，避免外层偏移；图内 transform 另存
             window.scrollTo(0, 0);
         }
+    }
+
+    _requestGraphRender() {
+        if (!this.forceGraph) return;
+        if (this._graphRenderScheduled) return;
+        this._graphRenderScheduled = true;
+        requestAnimationFrame(() => {
+            this._graphRenderScheduled = false;
+            const view = document.getElementById('view-graph');
+            if (!view || !view.classList.contains('active')) return;
+            if (this.forceGraph.svg) return;
+            try { this.forceGraph.render(); } catch (e) { console.error('Graph render error:', e); }
+        });
     }
 
     updateNav() {
@@ -521,8 +560,20 @@ document.addEventListener('DOMContentLoaded', () => {
         if (el) el.remove();
     }
 
-    function buildErrorReply() {
-        return `抱歉，当前知识库暂时没有返回结果。请检查网络后点击“重新尝试”。`;
+    function buildErrorReply(detail) {
+        const hint = detail ? `（${detail}）` : '';
+        return `抱歉，当前无法连接问答服务${hint}。请检查网络或稍后重试；若持续失败，可能是服务未配置或浏览器跨域限制。`;
+    }
+
+    function describeQaFailure(res, data) {
+        if (data?.blocked) return null;
+        if (data?.rate_limited) return data.error || '提问过于频繁，请稍后再试';
+        if (data?.error) return data.error;
+        if (res && res.status === 403) return '服务拒绝访问：来源未授权（跨域未配置）';
+        if (res && res.status === 429) return '提问过于频繁，请稍后再试';
+        if (res && res.status >= 500) return '问答服务暂时不可用，请稍后重试';
+        if (res && !res.ok) return `服务返回错误（HTTP ${res.status}）`;
+        return '服务未返回有效回答';
     }
 
     async function sendMessage(message) {
@@ -555,7 +606,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ session_id: sessionId, messages }),
             });
-            const data = await res.json();
+
+            let data = {};
+            try {
+                data = await res.json();
+            } catch (parseErr) {
+                data = {};
+            }
 
             removeTyping();
 
@@ -568,17 +625,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 // 保存助手回复到历史
                 saveHistory([...requestMessages, { role: 'assistant', content: data.reply }]);
             } else {
+                const detail = describeQaFailure(res, data);
                 lastFailedMessage = trimmedMsg;
-                addMessage('assistant', buildErrorReply());
+                addMessage('assistant', buildErrorReply(detail));
                 if (retryBtn) retryBtn.hidden = false;
-                setStatus('问答服务返回错误', true);
+                setStatus(detail || '问答服务返回错误', true);
             }
         } catch (err) {
             removeTyping();
             lastFailedMessage = trimmedMsg;
-            addMessage('assistant', buildErrorReply());
+            const isNetwork = err instanceof TypeError || /fetch|network|CORS/i.test(String(err.message || ''));
+            const detail = isNetwork
+                ? '网络连接失败：服务未配置、跨域限制或地址不可达'
+                : (err.message || '未知错误');
+            addMessage('assistant', buildErrorReply(detail));
             if (retryBtn) retryBtn.hidden = false;
-            setStatus('网络连接失败，请检查网络后重试', true);
+            setStatus(detail, true);
         }
 
         isSending = false;

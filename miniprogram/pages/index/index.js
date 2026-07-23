@@ -6,7 +6,10 @@ Page({
   },
 
   onShow() {
-    this.loadRecentSessions();
+    const app = getApp();
+    app.guardPrivacy(() => {
+      this.loadRecentSessions();
+    });
   },
 
   // 加载最近的对话记录
@@ -30,8 +33,9 @@ Page({
 
   // 开始新对话
   onStartChat() {
-    wx.navigateTo({
-      url: '/pages/chat/chat?mode=new',
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.navigateTo({ url: '/pages/chat/chat?mode=new' });
     });
   },
 
@@ -39,16 +43,24 @@ Page({
   onContinueSession(e) {
     const sessionId = e.currentTarget.dataset.sessionId;
     if (!sessionId) return;
-    wx.navigateTo({
-      url: '/pages/chat/chat?sessionId=' + sessionId,
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.navigateTo({
+        url: '/pages/chat/chat?sessionId=' + sessionId,
+      });
     });
   },
 
   // 查看全部历史记录
   onViewAllHistory() {
-    wx.navigateTo({
-      url: '/pages/history/history',
+    const app = getApp();
+    app.guardPrivacy(() => {
+      wx.navigateTo({ url: '/pages/history/history' });
     });
+  },
+
+  onOpenPrivacy() {
+    wx.navigateTo({ url: '/pages/privacy/privacy' });
   },
 
   // 分享

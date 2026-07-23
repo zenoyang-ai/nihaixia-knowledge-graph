@@ -25,6 +25,19 @@
       "envVariables": {
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }
+    },
+    {
+      "name": "nihaixia-feedback",
+      "handler": "index.main",
+      "timeout": 15,
+      "runtime": "Nodejs18.15",
+      "memorySize": 128,
+      "installDependency": false,
+      "envVariables": {
+        "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765",
+        "FEISHU_APP_ID": "cli_aa9059f5d038dcd4",
+        "FEISHU_NOTIFY_OPEN_ID": "ou_1527d3dbbeae3c13a25cb0159a6bff94"
+      }
     }
   ]
 }

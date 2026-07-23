@@ -19,36 +19,146 @@
 const cloudbase = require('@cloudbase/node-sdk');
 const { searchDocuments } = require('./knowledge-search');
 
-const VERSION = '5.3.0';
+const VERSION = '5.5.0';
 const MAX_CONTEXT_CHARS = 30000; // 上下文总量上限
+const MAX_HISTORY_LENGTH = 2000;
+const MAX_HISTORY_ITEMS = 12;
 
 // ---------------------------------------------------------------------------
-// 医疗可执行请求检测 — 仅拦截可执行医疗意图，放行学习问法
+// 医疗可执行请求检测 — 意图结构优先，学习语境豁免
 //
-// 拦截标准：处方、剂量、服法、个体化诊疗、医疗程序、急救、疾病用药咨询
-// 放行标准：经典讲什么病、方剂治什么、概念解释、组成与禁忌
+// 拦截：人称+症状+求助 / 怎么治怎么办 / 能吃吗 / 开方剂量 / 急救
+// 放行：原文/归经/原则/学习/伤寒论 等教学语境
 // ---------------------------------------------------------------------------
-const MEDICAL_PATTERNS = [
-  // 1. 剂量/用量/服法 — 请求具体用药信息
-  /(?:剂量|用量|服法|用法|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
-  // 2. 处方/开药请求（含简短表达"配个方/开个方/抓个方"）
-  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐.{0,5}(?:药|方)|建议.{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:配|开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方))/,
-  // 3. 医疗程序
+const LEARNING_CONTEXT_PATTERN = /(?:学习|原文|归经|原则|意义|类型|有哪些|是什么|如何理解|讲解|论述|在学习|经方学习|配伍原则|穴位归经|承担什么作用|经典|古籍|定位|伤寒论|金匮|内经|神农|治什么病|组成是什么|对应什么)/;
+
+const PERSON_PATTERN = /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女|本人|老公|老婆|妻子|丈夫|先生|太太|爱人|老伴|父亲|母亲|爷爷|奶奶|外公|外婆|他|她)/;
+
+const SYMPTOM_PATTERN = /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症)/;
+
+const HERB_SUBSTANCE_PATTERN = /(?:酸枣仁|川贝|当归|黄芪|党参|枸杞|茯苓|白术|甘草|附子|桂枝|白芍|生姜|大枣|半夏|陈皮|天麻|人参|熟地|川芎|柴胡|黄芩|黄连|黄柏|山药|麦冬|五味子|丹参|红花|桃仁|麻黄|细辛|独活|防风|连翘|金银花|薄荷|菊花|桑叶|杏仁|桔梗|厚朴|枳实|香附|远志|龙骨|牡蛎|阿胶|肉桂|吴茱萸|干姜|薏苡仁|车前子|泽泻|猪苓|石膏|知母|栀子|大黄|蜂蜜)/;
+const ACUPOINT_NAME_PATTERN = /(?:涌泉|足三里|三阴交|合谷|关元|神阙|百会|太冲|内关|风池|肩井|曲池|天枢|膻中|命门|肾俞|脾俞|肺俞|太溪|照海|申脉|阳陵泉|阴陵泉|承山|委中|丰隆|公孙|厉兑|迎香|印堂|风门|大椎|身柱|曲泽|地机|血海|睛明|攒竹)/;
+const SUBSTANCE_EXECUTABLE_PATTERN = new RegExp(
+  HERB_SUBSTANCE_PATTERN.source + '.{0,10}(?:能吃|能吃吗|可以吃|可以吃吗|能服用|服用吗|能用|能用吗|泡水喝|天天吃|一起吃|适合我吗|适合吃|适合吃吗)'
+);
+const ACUPOINT_EXECUTABLE_PATTERN = new RegExp(
+  ACUPOINT_NAME_PATTERN.source + '.{0,12}(?:可以灸|能灸|灸吗|可以针|能针|针吗|可以按|能按|可以吗)'
+);
+const MOXIBUSTION_ACUPOINT_PATTERN = new RegExp(
+  '(?:灸|针刺|针|按压).{0,8}' + ACUPOINT_NAME_PATTERN.source + '.{0,10}(?:可以吗|能不能|行吗|吗)'
+);
+
+const STRONG_TREATMENT_INTENT_PATTERN = /(?:怎么办|怎么治|能治好吗|该吃什么|吃什么药|用什么方|用什么药|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|能吃吗|能用吗|什么药|什么方)/;
+const WEAK_TREATMENT_INTENT_PATTERN = /(?:比较好|有效|推荐|可以吗|可以用吗)/;
+const LEARNING_RECOMMENDATION_PATTERN = /(?:他|她).{0,8}推荐.{0,12}学习|(?:学习|经方学习).{0,24}(?:顺序|路径|从哪里|如何入手|怎么学|入手)|学习顺序|从哪里入手比较有效/;
+
+const EMERGENCY_PATTERN = /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/;
+const MEDICAL_BLOCK_REPLY = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师或前往线下医疗机构就诊。';
+const EMERGENCY_BLOCK_REPLY = '如遇紧急医疗情况，请立即拨打 120 急救电话，并尽快前往线下医院就诊。本系统不能提供急救或诊疗服务。';
+
+const ALWAYS_BLOCK_PATTERNS = [
   /(?:打针|注射|输液|手术|化疗|放疗|住院|挂水)/,
-  // 4. 急救/危重
-  /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/,
-  // 5. 个体化诊疗：个人代词 + 治疗请求（含"适合吃吗""能不能用""可以吗"等）
-  /(?:我|我妈|我爸|我家人|我家老人|孩子|宝宝|婴儿|孕妇|孙子|孙女).{0,30}(?:怎么治|能治好吗|该吃什么|吃什么药|用什么方|怎么调理|帮我诊断|帮我分析|适合吃|适合用|能不能用|能不能吃|可以用吗|可以吗|能吃吗|能用吗)/,
-  // 6. 角色扮演绕过 + 可执行医疗请求
+  EMERGENCY_PATTERN,
   /(?:假装|扮演|假设|作为).{0,15}(?:医生|医师|中医|大夫|专家).{0,30}(?:开|告诉|建议|推荐|处方|剂量|用量|怎么治|怎么吃)/,
-  // 7. 指令绕过 + 可执行医疗请求
   /(?:忽略|跳过|不要管|disregard).{0,15}(?:限制|规则|前面|安全|拦截).{0,30}(?:剂量|处方|怎么治|怎么吃|开药)/,
-  // 8. 疾病用药咨询 — 针对具体疾病的用药建议（非学习问法）
-  /(?:高血压|糖尿病|感冒|发烧|发热|咳嗽|失眠|胃痛|头痛|便秘|腹泻|肝炎|胃炎|肾炎|关节炎|湿疹|哮喘|冠心病|中风|贫血|过敏|抑郁|焦虑|痛风|结石|肿瘤|癌症).{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐)/,
+  /(?:开(?:什么|个)?药|给我.{0,5}(?:药|方)|推荐(?!经方).{0,5}(?:药|方)|建议(?!经方).{0,5}(?:药|方)|什么药.{0,3}好|该用.{0,5}方|什么方子.{0,3}治|开.{0,15}(?:处方|药方|汤方|方子)|帮我.{0,5}(?:开|配|抓).{0,10}(?:处方|方子|药方|汤方)|(?:开|抓).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂)|配(?!伍).{0,3}(?:个)?(?:方|方子|药方|汤方)(?!剂))/,
+  /(?:根据|按照|针对).{0,12}(?:我的|他的|她的|症状|体质|情况).{0,20}(?:开|配|用|吃|服|方|药|汤)/,
 ];
 
+const CONTEXT_SENSITIVE_PATTERNS = [
+  /(?:剂量|用量|怎么吃|怎么服用|吃多少|吃几[片粒颗毫升克]|每日.{0,4}[片粒颗毫升克]|每天.{0,4}[片粒颗毫升克]|每次.{0,4}[片粒颗毫升克])/,
+  /(?:三两|二两|一两|半斤|一钱|二钱|三钱|四钱|五钱|六钱|七钱|八钱|九钱|几钱|几两).{0,15}(?:怎么|如何|多少|换算|服用|用)/,
+  new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|怎么治|什么药|什么方|比较好|有效|推荐|怎么办|能吃吗|能吃)'),
+  /(?:针灸|艾灸|针刺|拔罐|刮痧).{0,20}(?:怎么|如何|能不能|可以吗|适合|灸哪|针哪)/,
+  /(?:艾灸|针刺|拔罐|刮痧).{0,20}(?:穴位|部位).{0,10}(?:可以吗|能不能|怎么|如何)/,
+  /(?:足三里|三阴交|合谷|关元|神阙|百会|太冲|穴位).{0,10}(?:可以灸|能灸|灸吗|可以针|能针|针吗)/,
+  /(?:怎么配|如何配|配在一起|合用|药对|(?:和|与).{0,20}(?:怎么|如何)配伍)/,
+  /(?:先煎|后下|包煎|烊化).{0,8}(?:吗|？|\?)/,
+  /(?:同用|合用|一起用|可以同用).{0,8}(?:吗|？|\?)/,
+];
+
+function hasSubstanceOrAcupointExecutableQuery(text) {
+  return SUBSTANCE_EXECUTABLE_PATTERN.test(text)
+    || ACUPOINT_EXECUTABLE_PATTERN.test(text)
+    || MOXIBUSTION_ACUPOINT_PATTERN.test(text);
+}
+
+function hasLearningContext(text) {
+  return LEARNING_CONTEXT_PATTERN.test(text);
+}
+
+function isLearningRecommendationStructure(text) {
+  return LEARNING_RECOMMENDATION_PATTERN.test(text);
+}
+
+function hasSymptomTreatmentQuery(text) {
+  return new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:怎么办|怎么治|能吃吗|能吃|可以吃吗|可以吃)').test(text)
+    || new RegExp(SYMPTOM_PATTERN.source + '.{0,15}(?:用什么|吃什么|什么药|什么方|用什么药|用什么方)').test(text);
+}
+
+function hasFeverTreatmentQuery(text) {
+  return /(?:发烧|发热).{0,20}(?:\d+[\.\d]*\s*度|38|39|40).{0,20}(?:怎么办|怎么治)/.test(text)
+    || /(?:\d+[\.\d]*\s*度).{0,15}(?:发烧|发热).{0,15}(?:怎么办|怎么治)/.test(text)
+    || (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text));
+}
+
+function hasTreatmentIntentInLearning(text) {
+  if (/怎么治/.test(text)) return true;
+  if (/用什么药|用什么方|吃什么药/.test(text)) return true;
+  if (/用什么方比较好|什么方比较好|用什么药比较好|什么药比较好/.test(text)) return true;
+  if (hasSymptomTreatmentQuery(text)) return true;
+  return false;
+}
+
+function hasPersonTreatmentQuery(text) {
+  if (!PERSON_PATTERN.test(text)) return false;
+  if (isLearningRecommendationStructure(text)) return false;
+
+  if (STRONG_TREATMENT_INTENT_PATTERN.test(text)) return true;
+
+  if (WEAK_TREATMENT_INTENT_PATTERN.test(text) && SYMPTOM_PATTERN.test(text)) return true;
+
+  if (SYMPTOM_PATTERN.test(text) && /(?:怎么办|怎么治|能吃|可以吃|能用|可以用)/.test(text)) return true;
+  if (/(?:发烧|发热)/.test(text) && /(?:怎么办|怎么治)/.test(text)) return true;
+
+  return false;
+}
+
 function isMedicalRequest(text) {
-  return MEDICAL_PATTERNS.some((p) => p.test(text));
+  if (!text || typeof text !== 'string') return false;
+  const t = text.trim();
+
+  if (ALWAYS_BLOCK_PATTERNS.some((p) => p.test(t))) return true;
+
+  if (hasPersonTreatmentQuery(t)) return true;
+  if (hasFeverTreatmentQuery(t)) return true;
+  if (hasSymptomTreatmentQuery(t)) return true;
+
+  if (hasLearningContext(t)) {
+    if (hasTreatmentIntentInLearning(t)) return true;
+    if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+    return false;
+  }
+
+  if (hasSubstanceOrAcupointExecutableQuery(t)) return true;
+
+  return CONTEXT_SENSITIVE_PATTERNS.some((p) => p.test(t));
+}
+
+function getMedicalBlockReply(text) {
+  if (EMERGENCY_PATTERN.test(text)) return EMERGENCY_BLOCK_REPLY;
+  return MEDICAL_BLOCK_REPLY;
+}
+
+function getMedicalBlockReplyFromContext(history, currentMsg) {
+  const parts = [];
+  if (Array.isArray(history)) {
+    for (const h of history) {
+      if (h && h.role === 'user' && typeof h.content === 'string') parts.push(h.content);
+    }
+  }
+  if (typeof currentMsg === 'string') parts.push(currentMsg);
+  return getMedicalBlockReply(parts.join('\n'));
 }
 
 // ---------------------------------------------------------------------------
@@ -60,11 +170,74 @@ const MEDICAL_OUTPUT_PATTERNS = [
   /(?:建议(?:服用|用量|剂量)|推荐(?:服用|用量|剂量)|处方[:：]|我的建议是).{0,30}\d/,
   /(?:每日|每天|每次).{0,5}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
   /(?:你应该|你需要|你可以服用|建议你).{0,20}\d+(?:\.\d+)?.{0,5}(?:克|g|mg|毫升|ml|片|粒|颗)/,
+  /(?:建议|推荐|应该|需要)(?:你|您).{0,15}(?:服法|服用方法|饭前服|饭后服|温服|分.{0,3}次服)/,
+  /(?:建议|推荐|应该|需要)(?:你|您).{0,12}(?:服用方法|饭前服|饭后服|分.{0,3}次服)/,
+  /(?:你|您).{0,8}(?:饭前服|饭后服|分.{0,3}次服).{0,12}(?:即可|为宜|较好)/,
+  /(?:建议|推荐|可以).{0,10}(?:艾灸|针刺|按压|刺激).{0,15}(?:穴|处|部位)/,
+  /(?:建议|推荐|可以)针(?!灸).{0,15}(?:穴|处|部位)/,
+  /(?:根据你的|针对你的|适合你|为你).{0,20}(?:处方|药方|汤方|配.{0,8}(?:药|方|汤)|用.{0,4}药)/,
 ];
 
 function isMedicalOutput(text) {
   if (!text) return false;
   return MEDICAL_OUTPUT_PATTERNS.some((p) => p.test(text));
+}
+
+// ---------------------------------------------------------------------------
+// history 校验 — 与 MP 云函数语义对齐
+// ---------------------------------------------------------------------------
+function validateHistory(history) {
+  if (!Array.isArray(history)) return { valid: [], error: null };
+  if (history.length === 0) return { valid: [], error: null };
+
+  const filtered = [];
+  for (const h of history) {
+    if (!h || typeof h !== 'object') {
+      return { valid: [], error: 'invalid_history_format' };
+    }
+    if (typeof h.role !== 'string') {
+      return { valid: [], error: 'invalid_role' };
+    }
+    const role = h.role === 'bot' ? 'assistant' : h.role;
+    if (role !== 'user' && role !== 'assistant') {
+      return { valid: [], error: 'illegal_role:' + h.role };
+    }
+    if (typeof h.content !== 'string') {
+      return { valid: [], error: 'invalid_content_type' };
+    }
+    if (!h.content.trim()) {
+      return { valid: [], error: 'empty_content' };
+    }
+    if (h.content.length > MAX_HISTORY_LENGTH) {
+      return { valid: [], error: 'content_too_long' };
+    }
+    filtered.push({ role, content: h.content.trim() });
+  }
+
+  if (filtered.length === 0) return { valid: [], error: null };
+
+  for (let i = 1; i < filtered.length; i++) {
+    if (filtered[i].role === filtered[i - 1].role) {
+      return { valid: [], error: 'non_alternating' };
+    }
+  }
+
+  let result = filtered;
+  if (result.length > 0 && result[result.length - 1].role === 'user') {
+    result = result.slice(0, -1);
+  }
+
+  if (result.length > MAX_HISTORY_ITEMS) {
+    result = result.slice(result.length - MAX_HISTORY_ITEMS);
+  }
+
+  for (const h of result) {
+    if (h.role === 'user' && isMedicalRequest(h.content)) {
+      return { valid: [], error: 'medical_in_history' };
+    }
+  }
+
+  return { valid: result, error: null };
 }
 
 // ---------------------------------------------------------------------------
@@ -153,7 +326,7 @@ function buildYuanqiPayload({ assistantId, userId, messages }) {
 // CORS / 响应构建
 // ---------------------------------------------------------------------------
 function parseAllowedOrigins(env) {
-  const raw = (env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765');
+  const raw = (env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765');
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
@@ -447,7 +620,7 @@ ${context}`;
         providerHealth.hybrid.last_success = new Date().toISOString();
         console.log(JSON.stringify({ request_id: requestId, provider: 'hybrid', status: 200, reason: 'output_blocked', elapsed }));
         return buildResponse(200, {
-          reply: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师。',
+          reply: MEDICAL_BLOCK_REPLY,
           provider: 'system',
           blocked: true,
           knowledge_sources: [],
@@ -626,11 +799,28 @@ ${context}`;
     }
 
     try {
-      // 医疗可执行请求拦截
+      // 医疗可执行请求拦截（含 history 中 user 消息）
+      const historyOnly = normalized.messages.slice(0, -1);
+      const historyCheck = validateHistory(historyOnly);
+      if (historyCheck.error) {
+        if (historyCheck.error === 'medical_in_history') {
+          const lastMessage = normalized.messages[normalized.messages.length - 1].content;
+          return buildResponse(400, {
+            error: getMedicalBlockReplyFromContext(historyCheck.valid, lastMessage),
+            blocked: true,
+          }, origin, allowedOrigins);
+        }
+        return buildResponse(400, {
+          error: '对话历史格式无效，请开始新对话',
+          invalid_history: true,
+        }, origin, allowedOrigins);
+      }
+
       const lastMessage = normalized.messages[normalized.messages.length - 1].content;
       if (isMedicalRequest(lastMessage)) {
         return buildResponse(400, {
-          error: '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议等医疗建议。如有健康问题，请咨询专业医师。',
+          error: getMedicalBlockReply(lastMessage),
+          blocked: true,
         }, origin, allowedOrigins);
       }
 
@@ -678,13 +868,19 @@ const defaultRouter = createRouter({
     YUANQI_APP_KEY: process.env.YUANQI_APP_KEY,
     CLOUDBASE_BOT_ID: process.env.CLOUDBASE_BOT_ID,
     PRIMARY_PROVIDER: process.env.PRIMARY_PROVIDER || 'cloudbase-hybrid',
-    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,http://localhost:8765,http://127.0.0.1:8765',
+    ALLOWED_ORIGINS: process.env.ALLOWED_ORIGINS || 'https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765',
   },
 });
 
 exports.main = defaultRouter.main;
 
 // 导出供测试使用
+exports.VERSION = VERSION;
 exports.buildYuanqiPayload = buildYuanqiPayload;
 exports.createRouter = createRouter;
 exports.normalizeRequest = normalizeRequest;
+exports.isMedicalRequest = isMedicalRequest;
+exports.isMedicalOutput = isMedicalOutput;
+exports.validateHistory = validateHistory;
+exports.getMedicalBlockReply = getMedicalBlockReply;
+exports.getMedicalBlockReplyFromContext = getMedicalBlockReplyFromContext;

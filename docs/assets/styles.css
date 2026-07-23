@@ -632,8 +632,8 @@ body {
     background: #fffaf1;
     display: flex;
     flex-direction: column;
-    height: calc(100vh - var(--header-h) - 48px);
-    margin: -24px -24px -48px;
+    height: calc(100vh - var(--header-h) - 72px);
+    margin: -24px -24px -72px;
     padding: 0;
 }
 
@@ -698,6 +698,29 @@ body {
     flex-shrink: 0;
     transition: transform var(--transition-fast);
     transition: transform var(--transition-fast);
+}
+
+.graph-legend-dot--core {
+    width: 14px;
+    height: 14px;
+    background: var(--on-surface-faint, #999);
+}
+
+.graph-legend-dot--standard {
+    width: 7px;
+    height: 7px;
+    background: var(--on-surface-faint, #999);
+}
+
+.route-notice {
+    margin: 0 0 16px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: rgba(192, 57, 43, 0.08);
+    border: 1px solid rgba(192, 57, 43, 0.2);
+    color: var(--accent, #b9362c);
+    font-size: 14px;
+    text-align: center;
 }
 
 .graph-legend-divider {
@@ -2362,6 +2385,10 @@ body {
 
     .qa-chat-empty { min-height: 220px; padding: 18px; }
     .main { padding-bottom: 62px; }
+    .graph-view {
+        height: calc(100vh - var(--header-h) - 62px);
+        margin-bottom: -62px;
+    }
     .graph-legend {
         left: 10px;
         bottom: 46px;

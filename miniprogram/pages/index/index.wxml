@@ -55,4 +55,8 @@
     </view>
   </view>
 
+  <view class="index-privacy-link" bindtap="onOpenPrivacy">
+    <text>隐私保护说明</text>
+  </view>
+
 </view>

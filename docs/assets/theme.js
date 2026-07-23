@@ -38,6 +38,7 @@
         document.documentElement.setAttribute('data-theme', next);
         try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
         updateSwitchState(next);
+        document.documentElement.dispatchEvent(new CustomEvent('nihaixia-theme-change', { detail: { theme: next } }));
     }
 
     /* ---- 3. 单图标切换按钮（浅色 ⇄ 暖棕，太阳/月亮） ---- */

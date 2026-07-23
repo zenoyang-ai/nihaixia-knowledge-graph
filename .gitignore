@@ -1,5 +1,6 @@
 # 原始资料（不提交）
 倪海厦资料/
+archive/
 
 # 待审资料和构建中间产物（不提交）
 sources-review/
@@ -63,5 +64,7 @@ HANDOFF_TENCENT_QA.md
 # 临时图标文件（选定一份正式图标后再提交）
 miniprogram-icon*
 
-# 归档的旧路线代码（仅保留参考，不部署）
-archive/
+# 本地演示/备份目录（不提交）
+docs-demo/
+backup-*/
+miniprogram-ui-demo/

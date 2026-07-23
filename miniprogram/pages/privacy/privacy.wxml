@@ -1,0 +1,23 @@
+<view class="privacy-page">
+  <view class="privacy-title">隐私保护说明</view>
+
+  <view class="privacy-section">
+    <view class="privacy-heading">我们收集的信息</view>
+    <view class="privacy-text">为提供问答服务，小程序会通过微信云开发获取您的 OpenID（用于限流与安全校验，经哈希处理后存储，不记录聊天原文）。对话记录默认保存在您的设备本地。</view>
+  </view>
+
+  <view class="privacy-section">
+    <view class="privacy-heading">信息用途</view>
+    <view class="privacy-text">仅用于：问答请求处理、访问频率限制、服务安全与稳定性保障。不会用于广告推送或出售给第三方。</view>
+  </view>
+
+  <view class="privacy-section">
+    <view class="privacy-heading">您的权利</view>
+    <view class="privacy-text">您可在「历史记录」中删除本地对话，或卸载小程序清除本地数据。如需了解更多，请参阅微信公众平台《用户隐私保护指引》中本小程序的说明。</view>
+  </view>
+
+  <view class="privacy-section">
+    <view class="privacy-heading">开发者说明</view>
+    <view class="privacy-text">首次使用涉及本地存储或云函数调用前，微信会弹出隐私授权提示。若未在公众平台完成隐私指引配置，部分功能可能无法使用——请在微信公众平台 → 设置 → 服务内容声明 → 用户隐私保护指引 中完成勾选。</view>
+  </view>
+</view>

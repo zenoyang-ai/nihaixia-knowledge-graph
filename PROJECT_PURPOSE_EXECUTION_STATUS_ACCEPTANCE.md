@@ -2,6 +2,7 @@
 
 > 文档用途：交给其他模型继续检查、修复和验收。
 > 生成时间：2026-07-21（Asia/Shanghai）
+> 路径/测试数修订：2026-07-23（以仓库真源路径与本地 `node --test` 为准）
 > 本文档不含任何 AppKey、API Key、私钥或 Token。
 > 以本地最新代码为准，同时明确区分本地、GitHub、CloudBase 与微信后台状态。
 
@@ -9,13 +10,15 @@
 
 ## 0. 当前结论（TL;DR）
 
-- 小程序代码本地最新版本 **v5.2.0**，已上传到微信后台开发版本，已设为体验版可用。
-- 微信小程序正在 **备案审核中**（2026-07-19 提交备案，未通过前不能提交审核上线）。
-- 线上正式版仍是 **v3.1.1**（旧版 direct LLM 体验版），因为备案未通过无法提交审核。
-- 体验版扫码可进入新版（含主页、历史记录、段落复制、返回导航）。
-- CloudBase 云函数 `nihaixia-qa-mp` 与 `nihaixia-qa-router` 均已部署 v5.1.0 混合 RAG 版本。
-- 代码已提交本地 Git，远端 GitHub 是否同步需用户自行 push。
-- **待办**：备案通过后 → 提交审核 → 审核通过 → 发布上线 → 正式版更新为新版界面。
+> **2026-07-23 修订**：以下仅列出仓库内可客观核对项；微信备案/审核/正式版、CloudBase 线上部署、GitHub 远端同步等标为 **待人工确认**。
+
+- 本地 `scripts/upload.js` 版本号为 **5.3.0**（`upload.js` 内 `VERSION` 常量）。
+- 本地 Git HEAD：`1269e50` — feat: 网页与小程序前端改版进入体验版候选。
+- 工作区有未提交改动（含 `miniprogram/`、`docs/`、`cloudbase/`、`tests/` 等）；**待人工确认**是否已 push 到 GitHub。
+- 本地自动化测试（2026-07-23 实测）：MP **98/98**、Router **24/24** 通过。
+- 知识库语料：`knowledge-base.json` 含 **4852** 个分块（生成于 2026-07-21）。
+- **待人工确认**：微信小程序备案/审核/正式版与体验版状态、是否已上传 5.3.0、CloudBase 两云函数线上版本、CI 远端是否全绿。
+- **待办（若备案已通过）**：提交审核 → 发布上线 → 正式版更新为新版界面。
 
 ---
 
@@ -45,7 +48,7 @@
         ▼
 CloudBase 云函数 nihaixia-qa-mp（小程序专用）
    ├── knowledge-search.js    ← BM25 检索器（阈值 18.0）
-   ├── knowledge-base.json   ← 4837 分块语料（12.3 MB）
+   ├── knowledge-base.json   ← 4852 分块语料（约 8.6 MB）
    └── generateText()         ← 混合 RAG 生成
         │
         │ （备用线路，未启用）
@@ -73,7 +76,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 
 ### 3.2 混合 RAG 版本（v5.0.0 → v5.1.0）
 - v5.0.0：实现混合 RAG 架构，4 部经典 20 个分块
-- v5.1.0：语料扩展到完整 11 组上传包（4837 分块，12.3 MB），BM25 + 最低分阈值 18.0，医疗拦截扩充，history 严格校验，原子限流
+- v5.1.0：语料扩展到完整 11 组上传包（4852 分块，约 8.6 MB），BM25 + 最低分阈值 18.0，医疗拦截扩充，history 严格校验，原子限流
 
 ### 3.3 UI 优化与 Bug 修复（v5.1.1）
 - 修复 WXML `inputValue.trim()` 表达式 → 改用 `canSend` 布尔字段
@@ -98,7 +101,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 ### 3.5 代码上传记录
 - 2026-07-19 19:06:53 — v5.1.1 上传成功（31656 字节）
 - 2026-07-19 19:17:39 — v5.2.0 上传成功（51775 字节）
-- 上传方式：`miniprogram-ci` + `private.wx11826bcc1883aa28.key`（IP 已在白名单）
+- 上传方式：`miniprogram-ci` + `private.<appid>.key`（权限 `chmod 600`，勿入库；**待人工确认** IP 白名单与上传记录）
 - 两次上传均自动设为体验版
 
 ---
@@ -107,7 +110,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 
 ### 4.1 项目根目录
 ```
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
+/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
 ```
 
 ### 4.2 小程序前端代码
@@ -135,7 +138,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 |------|------|------|
 | `cloudbase/functions/nihaixia-qa-mp/index.js` | 746 | 小程序专用云函数 v5.1.0：混合 RAG + OpenID + 限流 + 医疗拦截 |
 | `cloudbase/functions/nihaixia-qa-mp/knowledge-search.js` | - | BM25 检索器（阈值 18.0） |
-| `cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 12.3 MB | 4837 分块语料 |
+| `cloudbase/functions/nihaixia-qa-mp/knowledge-base.json` | 约 8.6 MB | 4852 分块语料 |
 | `cloudbase/functions/nihaixia-qa-mp/inverted-index.json` | - | 倒排索引 |
 | `cloudbase/functions/nihaixia-qa-mp/package.json` | - | 依赖：@cloudbase/node-sdk + wx-server-sdk |
 | `cloudbase/functions/nihaixia-qa-router/index.js` | 680 | 网站/外部调用云函数（同架构 + CORS） |
@@ -154,7 +157,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 ### 4.5 测试文件
 | 文件 | 说明 |
 |------|------|
-| `tests/test_qa_mp.js` | MP 云函数测试（56 个用例） |
+| `tests/test_qa_mp.js` | MP 云函数测试（98 个用例） |
 | `tests/test_qa_router.js` | Router 云函数测试（24 个用例） |
 | `tests/fixtures/knowledge-base.json` | 测试用知识库夹具 |
 | `tests/fixtures/inverted-index.json` | 测试用倒排索引夹具 |
@@ -162,7 +165,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 ### 4.6 脚本与工具
 | 文件 | 说明 |
 |------|------|
-| `scripts/upload.js` | miniprogram-ci 上传脚本（当前版本 v5.2.0） |
+| `scripts/upload.js` | miniprogram-ci 上传脚本（当前版本 5.3.0） |
 | `scripts/generate-knowledge-base.js` | 知识库生成脚本 |
 | `scripts/build_qa_corpus.py` | QA 语料构建脚本 |
 | `scripts/build_site_data.py` | 网站数据构建脚本 |
@@ -190,36 +193,36 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 ## 5. 当前状态
 
 ### 5.1 代码状态
-- **本地 Git HEAD**：`aedc672` — fix: 同步 MP lockfile、修复悬空图谱链接并对齐发布口径
-- **工作区状态**：干净（无未提交改动）
-- **最近 5 次提交**：
-  1. `aedc672` fix: 同步 MP lockfile、修复悬空图谱链接并对齐发布口径
-  2. `e38aecf` feat: v5.2.0 新增主页/历史记录/段落复制/返回导航
-  3. `e533587` feat(mp): 优化对话排版 + 长按复制消息
-  4. `3e4b298` fix(mp): 移除 upsert 调用，改为 get+set/update 兼容 @cloudbase/node-sdk
-  5. `f6425c2` fix(mp): 用 wx-server-sdk 获取 OPENID + 详细诊断日志
+- **本地 Git HEAD**：`1269e50` — feat: 网页与小程序前端改版进入体验版候选
+- **工作区状态**：有未提交改动（`miniprogram/`、`docs/`、`cloudbase/`、`tests/` 等）
+- **最近 5 次提交**（截至 2026-07-23 本地核对）：
+  1. `1269e50` feat: 网页与小程序前端改版进入体验版候选
+  2. `aedc672` fix: 同步 MP lockfile、修复悬空图谱链接并对齐发布口径
+  3. `e38aecf` feat: v5.2.0 新增主页/历史记录/段落复制/返回导航
+  4. `e533587` feat(mp): 优化对话排版 + 长按复制消息
+  5. `3e4b298` fix(mp): 移除 upsert 调用，改为 get+set/update 兼容 @cloudbase/node-sdk
 
-### 5.2 微信小程序状态
+### 5.2 微信小程序状态（**待人工确认** — 以下摘自 2026-07-21 记录，线上状态需登录微信公众平台核对）
 - **AppID**：wx11826bcc1883aa28
 - **项目名**：wendu-classic-qa
 - **基础库版本**：3.7.1
-- **线上正式版**：v3.1.1（2026-07-19 15:01:11 发布，旧版 direct LLM）
-- **开发版本**：v5.2.0（2026-07-19 19:17:39 上传，新版混合 RAG + UI 优化）
-- **体验版**：v5.2.0（扫码可用）
-- **备案状态**：**未备案，备案审核中**（2026-07-19 提交，2026-10-08 前不备案将无法打开）
-- **审核版本**：无（备案未通过，无法提交审核）
+- **线上正式版**：v3.1.1（2026-07-19 15:01:11 发布，旧版 direct LLM）— **待人工确认**
+- **开发版本**：v5.2.0（2026-07-19 19:17:39 上传）— **待人工确认**是否已有 5.3.0 上传
+- **体验版**：v5.2.0（扫码可用）— **待人工确认**
+- **备案状态**：**待人工确认**（文档记录为 2026-07-19 提交备案审核中）
+- **审核版本**：**待人工确认**
 
-### 5.3 CloudBase 部署状态
+### 5.3 CloudBase 部署状态（**待人工确认**）
 - **环境 ID**：zeno-d9g0gdvw4a57635c0
-- **nihaixia-qa-mp**：已部署 v5.1.0（混合 RAG + wx-server-sdk + 原子限流）
-- **nihaixia-qa-router**：已部署 v3.0.0（混合 RAG + CORS）
-- **数据库**：`qa_rate_limit` 集合，带 `ttl_idx` 索引（expireAfterSeconds=0）
+- **nihaixia-qa-mp**：文档记录为 v5.1.0 — **待人工确认**线上实际版本
+- **nihaixia-qa-router**：文档记录为 v3.0.0 — **待人工确认**线上实际版本
+- **数据库**：`qa_rate_limit` 集合，带 `ttl_idx` 索引（expireAfterSeconds=0）— **待人工确认**
 - **Agent**：ibot-nihaixiazhi-pdcdi9（备用线路，未启用）
 
 ### 5.4 测试状态
-- Router 测试：24/24 通过
-- MP 测试：56/56 通过
-- CI：5 个 job 全绿（Static Validation, Router 24, MP 56, Secret Scan, Mobile Smoke）
+- Router 测试：24/24 通过（本地 2026-07-23 实测）
+- MP 测试：98/98 通过（本地 2026-07-23 实测）
+- CI：5 个 job（Static Validation, Router 24, MP 98, Secret Scan, Mobile Smoke）— **待人工确认**远端 GitHub Actions 是否全绿
 
 ---
 
@@ -275,7 +278,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 
 ```
 项目根目录:
-/Users/zeno/AI/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
+/Users/zeno/Workspace/20_领域/人生知识库/80_项目输出/nihaixia-knowledge-graph-open/
 
 小程序前端:
   miniprogram/app.js                              ← 云开发初始化
@@ -287,7 +290,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 云函数:
   cloudbase/functions/nihaixia-qa-mp/index.js     ← 小程序专用云函数
   cloudbase/functions/nihaixia-qa-mp/knowledge-search.js  ← BM25 检索器
-  cloudbase/functions/nihaixia-qa-mp/knowledge-base.json   ← 语料（12.3 MB）
+  cloudbase/functions/nihaixia-qa-mp/knowledge-base.json   ← 语料（约 8.6 MB，4852 分块）
   cloudbase/functions/nihaixia-qa-router/index.js ← 网站云函数
   cloudbase/cloudbaserc.json                      ← CloudBase 配置
 
@@ -297,7 +300,7 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
   .github/workflows/ci.yml                        ← CI 配置
 
 测试:
-  tests/test_qa_mp.js                             ← MP 测试（56 用例）
+  tests/test_qa_mp.js                             ← MP 测试（98 用例）
   tests/test_qa_router.js                         ← Router 测试（24 用例）
 
 脚本:
@@ -363,8 +366,8 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 
 | 级别 | 问题 | 状态 | 说明 |
 |------|------|------|------|
-| P0 | 小程序未备案 | 待解决 | 2026-10-08 前不备案将无法打开 |
-| P0 | 正式版仍是旧版 v3.1.1 | 待解决 | 需备案通过 → 提交审核 → 发布上线 |
+| P0 | 小程序备案/审核 | **待人工确认** | 文档记录 2026-07-19 提交备案；2026-10-08 前不备案将无法打开 |
+| P0 | 正式版版本 | **待人工确认** | 文档记录仍为 v3.1.1；需备案通过 → 提交审核 → 发布上线 |
 | P1 | 网站只有 CloudBase Hybrid RAG 主线路 | 已知 | 无有效备用接口 |
 | P1 | 公众号仍关联旧腾讯元器小程序 | 待解决 | 旧小程序已停服，需关联新小程序 |
 | P2 | 上下文切块较大 | 已知 | 当前 600-2000 字符/片段，可优化为 600-1200 |
@@ -375,11 +378,11 @@ CloudBase 云函数 nihaixia-qa-router（网站/外部调用）
 ## 11. 给接手模型的建议
 
 1. **先验证本地代码可运行**：`node -c miniprogram/pages/chat/chat.js` 等语法检查
-2. **跑测试**：`cd tests && node test_qa_mp.js && node test_qa_router.js`
+2. **跑测试**：`node --test tests/test_qa_mp.js && node --test tests/test_qa_router.js`
 3. **不要覆盖 02/05 金标**（如有相关数据）
 4. **不要删除 .key 文件**，但确保它在 .gitignore 中
 5. **修改云函数后需要重新部署**到 CloudBase
-6. **修改小程序代码后需要重新上传**到微信后台（使用 `node scripts/upload.js private.wx11826bcc1883aa28.key`）
+6. **修改小程序代码后需要重新上传**到微信后台（使用 `node scripts/upload.js private.<appid>.key`；私钥权限 `chmod 600`，勿入库）
 7. **不要在日志、文档或对话总结中包含 API Key、Token 或 .key 文件内容**
 
 ---

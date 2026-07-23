@@ -7,8 +7,8 @@ const path = require('path');
 
 const PROJECT_PATH = path.resolve(__dirname, '..');
 const APP_ID = 'wx11826bcc1883aa28';
-const VERSION = '5.2.0';
-const DESC = 'v5.2.0 新增主页+历史记录+段落复制+返回导航';
+const VERSION = '5.5.0';
+const DESC = 'v5.5.0 医疗拦截+限流fail-closed+隐私授权阻断';
 
 async function main() {
   const keyPath = process.argv[2];
