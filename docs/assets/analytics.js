@@ -9,7 +9,8 @@
 
   function detectSite() {
     const host = (location.hostname || '').toLowerCase();
-    if (host.includes('tcloudbaseapp.com') || host.includes('tcloudbase.com')) return 'cn';
+    if (host.includes('tcloudbaseapp.com') || host.includes('tcloudbase.com')
+      || host === 'www.nihaixia-knowledge.xyz' || host === 'nihaixia-knowledge.xyz') return 'cn';
     if (host.includes('github.io')) return 'overseas';
     if (host === 'localhost' || host === '127.0.0.1') return 'local';
     return 'cn';

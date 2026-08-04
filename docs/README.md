@@ -1,8 +1,9 @@
 # 倪海厦知识图谱网站
 
 > 本目录是网站源码与部署根（`docs/`）。
-> 国内主站（推荐）：https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com
-> 海外备份：https://zenoyang-ai.github.io/nihaixia-knowledge-graph/
+> 国内主站（推荐）：[https://www.nihaixia-knowledge.xyz/](https://www.nihaixia-knowledge.xyz/)
+> 腾讯云直连备用：[CloudBase 原始地址](https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com/)
+> 海外备份：[GitHub Pages](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/)
 
 倪海厦公开教学资料的结构化知识图谱网站，包含交互式力导向图、知识卡片和学习路径。
 
@@ -43,6 +44,8 @@ docs/
 ├── sources-public/      # 公开原文（3 个可读章节 + 1 个目录索引）
 └── README.md            # 本文件
 ```
+
+国内主站使用自定义域名，网站资源仍由腾讯云 CloudBase 静态托管；腾讯云原始地址保留作备用入口。自定义域名的 ICP 备案走**腾讯云**。
 
 ## 免责声明
 

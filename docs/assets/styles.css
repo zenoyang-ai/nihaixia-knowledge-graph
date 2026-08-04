@@ -2081,6 +2081,26 @@ body {
 
 .footer-brand:hover { opacity: 0.7; }
 
+.footer-skill-link,
+.footer-feedback {
+    color: var(--accent);
+    font: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}
+
+.footer-skill-link { font-size: 12px; }
+
+.footer-feedback {
+    border: none;
+    background: none;
+    cursor: pointer;
+    padding: 0;
+}
+
+.footer-skill-link:hover,
+.footer-feedback:hover { opacity: 0.7; }
+
 .footer-popover {
     position: fixed;
     bottom: 52px;
@@ -2124,7 +2144,8 @@ body {
 #view-graph .graph-view { padding-bottom: 0; }
 
 @media (max-width: 768px) {
-    .site-footer { left: 0; font-size: 11px; height: 36px; }
+    .site-footer { left: 0; min-height: 36px; height: auto; padding: 6px 12px; line-height: 1.35; flex-wrap: wrap; }
+    .footer-skill-link { font-size: 11px; }
     .footer-popover { bottom: 44px; left: 16px; right: 16px; transform: none; }
     .footer-popover-card { min-width: auto; }
     .footer-popover-qr { width: 140px; height: 140px; }

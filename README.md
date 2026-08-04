@@ -2,15 +2,28 @@
 
 #### 把倪海厦公开教学资料整理成一张能走进去的知识地图
 
-🌐 **国内主站（推荐）**：[https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com](https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com)
-🌏 **海外备份**：[https://zenoyang-ai.github.io/nihaixia-knowledge-graph/](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/) · [内容声明](./CONTENT_NOTICE.md)
+## 访问入口
+
+| 入口 | 地址 | 说明 |
+|---|---|---|
+| 国内主站（推荐） | [nihaixia-knowledge.xyz](https://www.nihaixia-knowledge.xyz/) | 自定义域名，当前对外使用 |
+| 腾讯云直连备用 | [CloudBase 原始地址](https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com/) | 域名到期或解析异常时仍可访问 |
+| 海外备份 | [GitHub Pages](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/) | 海外访问和源码预览 |
+
+[内容声明](./CONTENT_NOTICE.md)
 
 ![License](https://img.shields.io/badge/license-MIT-blue)
 ![Nodes](https://img.shields.io/badge/nodes-69-purple)
-![CloudBase](https://img.shields.io/badge/CloudBase-国内主站-blue)
+![Custom Domain](https://img.shields.io/badge/Custom%20Domain-%E5%9B%BD%E5%86%85%E4%B8%BB%E7%AB%99-blue)
 ![GitHub Pages](https://img.shields.io/badge/GitHub-Pages-海外备份-brightgreen)
 
 这不是原文资料仓库，而是一个面向学习者的知识入口：用图谱、学习路径和知识卡片，把倪海厦的人纪、天纪、经方、针灸、本草、案例研读串起来。
+
+## 配套工具
+
+如果你希望在支持 Skill 的 AI 工具中使用天纪提示词，可以安装配套项目：[nihaixia-tianji-skill](https://github.com/zenoyang-ai/nihaixia-tianji-skill)。
+
+两个项目分开维护，但用途相互配合：本网站适合浏览知识结构、学习路径和提示词；配套工具适合安装后按固定步骤使用这些提示词。本网站不要求安装配套工具，也不包含个人资料或完整的私有知识库。
 
 ---
 
@@ -54,12 +67,15 @@
 
 ## 访问入口与部署架构
 
-本项目采用**双线部署**，一份代码、两处托管：
+本项目使用同一份 `docs/` 文件，同时保留三个访问入口：
 
 | 角色 | 地址 | 说明 |
 |---|---|---|
-| 国内主站 | https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com | 腾讯云 CloudBase 静态托管，国内访问稳定，推荐 |
+| 国内主站 | https://www.nihaixia-knowledge.xyz/ | 自定义域名，指向腾讯云 CloudBase 静态托管 |
+| 腾讯云直连备用 | https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com/ | 不依赖自定义域名，保留作备用入口 |
 | 海外备份 | https://zenoyang-ai.github.io/nihaixia-knowledge-graph/ | GitHub Pages，海外与开发者友好 |
+
+自定义域名只是对外访问地址，网站文件仍由腾讯云 CloudBase 托管。因此，即使以后域名到期，腾讯云直连地址仍然可以继续使用。
 
 - **静态站点**（`docs/`）：推送 `main` 分支后，GitHub Action（`.github/workflows/deploy.yml`）自动部署到 CloudBase；同时 GitHub Pages 自动从 `docs/` 发布。
 - **云端函数**（AI 问答 RAG）：由 `cloudbaserc.json` 定义，单独部署。
