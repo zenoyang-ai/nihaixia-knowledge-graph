@@ -23,9 +23,9 @@ class PromptView {
             </div>
             <div class="prompt-skill-card">
                 <div class="prompt-skill-copy">
-                    <div class="prompt-skill-kicker">可安装的提示词工具</div>
-                    <h2>把天纪提示词装进你的 AI 工具</h2>
-                    <p>适合正在使用 Codex 等支持此类工具的软件。安装后，可以按八字、紫微、易经三才或小六壬的固定步骤提问。</p>
+                    <div class="prompt-skill-kicker">Agent Skill 版本</div>
+                    <h2>一行命令安装天纪提示词 Skill</h2>
+                    <p>适合已经在使用 Codex / Agent 的用户。安装后可直接让 Agent 按八字、紫微、易经三才或小六壬流程调用这套提示词。</p>
                 </div>
                 <div class="prompt-skill-install">
                     <div class="prompt-terminal">
@@ -34,7 +34,7 @@ class PromptView {
                     </div>
                     <div class="prompt-skill-actions">
                         <button class="prompt-copy-btn skill-copy-btn" type="button">复制安装命令</button>
-                        <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-tianji-skill" target="_blank" rel="noopener">查看工具说明</a>
+                        <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-tianji-skill" target="_blank" rel="noopener">查看 GitHub</a>
                     </div>
                 </div>
             </div>
