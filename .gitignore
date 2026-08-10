@@ -57,6 +57,13 @@ cloudbase/functions/*/inverted-index.json
 
 # 交接文档（含本机路径）
 HANDOFF_TENCENT_QA.md
+/PROJECT_PURPOSE_EXECUTION_STATUS_ACCEPTANCE.md
+/RAG_OPTIMIZATION_HANDOFF.md
+/AGENTS.md
+/CLAUDE.md
+
+# 本机浏览器/自动化运行产物（可能含 Cookie、历史记录和会话）
+/output/
 
 # 测试截图和缓存（不提交）
 .playwright-cli/

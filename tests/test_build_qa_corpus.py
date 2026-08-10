@@ -48,8 +48,10 @@ class CorpusBuilderTest(unittest.TestCase):
         self.input_dir = self.base / "input"
         self.output_dir = self.base / "output"
         self.input_dir.mkdir()
+        example_home = "/".join(("", "Users", "example"))
+        source_root = "/".join(("AI", "倪海厦-IMA上传包"))
         for group in GROUPS:
-            body = f"# {group}\n\n来源：/Users/zeno/AI/倪海厦-IMA上传包/{group}\n\n[[资料/核心概念|核心概念]]"
+            body = f"# {group}\n\n来源：{example_home}/{source_root}/{group}\n\n[[资料/核心概念|核心概念]]"
             (self.input_dir / f"{group}.txt").write_text(body, encoding="utf-8")
 
     def tearDown(self):
@@ -98,8 +100,9 @@ class CorpusBuilderTest(unittest.TestCase):
     def test_sanitizes_paths_wikilinks_and_personal_identifiers_without_echoing_them(self):
         secret_phone = "13812345678"
         sample = self.input_dir / "01_知识卡片.txt"
+        example_path = "/".join(("", "Users", "example", "Workspace", "知识库", "资料", "测试.md"))
         sample.write_text(
-            "# 测试\n\n/Users/zeno/AI/人生知识库/资料/测试.md\n"
+            f"# 测试\n\n{example_path}\n"
             "[[资料/阴阳|阴阳]] ![[资料/五行.md]]\n"
             f"联系方式：{secret_phone}\n",
             encoding="utf-8",
@@ -111,7 +114,7 @@ class CorpusBuilderTest(unittest.TestCase):
         report_text = (self.output_dir / "privacy-report.json").read_text(encoding="utf-8")
         report = json.loads(report_text)
 
-        self.assertNotIn("/Users/zeno", content)
+        self.assertNotIn("/".join(("", "Users", "")), content)
         self.assertNotIn("[[", content)
         self.assertIn("阴阳", content)
         self.assertIn("五行", content)

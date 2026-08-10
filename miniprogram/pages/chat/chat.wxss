@@ -97,7 +97,7 @@
  * =========================== */
 .chat-messages {
   flex: 1;
-  padding: 16rpx 24rpx 0;
+  padding: 16rpx 36rpx 0;
   overflow-y: auto;
 }
 
@@ -187,8 +187,8 @@
 .question-strip {
   width: 100%;
   white-space: nowrap;
-  margin: 0 -24rpx;
-  padding: 0 24rpx;
+  margin: 0 -36rpx;
+  padding: 0 36rpx;
 }
 
 .question-strip-inner {
@@ -454,7 +454,7 @@
  * 输入区（紧凑）
  * =========================== */
 .chat-input-area {
-  padding: 10rpx 24rpx;
+  padding: 10rpx 36rpx;
   padding-bottom: calc(10rpx + env(safe-area-inset-bottom));
   background: var(--surface-glass);
   border-top: 1rpx solid var(--border-color);

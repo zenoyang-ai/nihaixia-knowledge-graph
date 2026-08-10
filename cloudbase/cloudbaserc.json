@@ -10,7 +10,7 @@
       "memorySize": 1024,
       "installDependency": true,
       "envVariables": {
-        "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765",
+        "ALLOWED_ORIGINS": "https://www.nihaixia-knowledge.xyz,https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765",
         "PRIMARY_PROVIDER": "cloudbase-hybrid",
         "CLOUDBASE_BOT_ID": "ibot-nihaixiazhi-pdcdi9"
       }
@@ -34,7 +34,7 @@
       "memorySize": 128,
       "installDependency": false,
       "envVariables": {
-        "ALLOWED_ORIGINS": "https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765"
+        "ALLOWED_ORIGINS": "https://www.nihaixia-knowledge.xyz,https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765"
       }
     },
     {
@@ -48,7 +48,7 @@
         {
           "name": "dailyVisitReport",
           "type": "timer",
-          "config": "0 15 16 * * * *"
+          "config": "0 15 0 * * * *"
         }
       ]
     }

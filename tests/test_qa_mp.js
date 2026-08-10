@@ -17,7 +17,7 @@ const searchPath = path.join(__dirname, '..', 'cloudbase', 'functions', 'nihaixi
 
 // 由于云函数依赖 @cloudbase/node-sdk，在测试环境中可能不可用
 // 我们只测试导出的纯函数（isMedicalRequest, hashOpenId, isMedicalOutput, validateHistory 等）
-let isMedicalRequest, hashOpenId, isMedicalOutput, validateHistory, searchDocuments, getMedicalBlockReply, getMedicalBlockReplyFromContext;
+let isMedicalRequest, hashOpenId, isMedicalOutput, validateHistory, searchDocuments, getMedicalBlockReply, getMedicalBlockReplyFromContext, normalizeOrderedListMarkers;
 let checkRateLimit, resetRateLimitState;
 let MEDICAL_OUTPUT_PATTERNS, MAX_MESSAGE_LENGTH;
 
@@ -29,6 +29,7 @@ try {
   hashOpenId = mod.hashOpenId;
   getMedicalBlockReply = mod.getMedicalBlockReply;
   getMedicalBlockReplyFromContext = mod.getMedicalBlockReplyFromContext;
+  normalizeOrderedListMarkers = mod.normalizeOrderedListMarkers;
   checkRateLimit = mod.checkRateLimit;
   resetRateLimitState = mod.resetRateLimitState;
   MEDICAL_OUTPUT_PATTERNS = mod.MEDICAL_OUTPUT_PATTERNS;
@@ -138,6 +139,8 @@ try {
     if (!text) return false;
     return MEDICAL_OUTPUT_PATTERNS.some((p) => p.test(text));
   };
+
+  normalizeOrderedListMarkers = (text) => text || '';
 
   // 简化版 validateHistory（用于 catch 兜底测试）— 与 index.js 严格语义对齐
   validateHistory = (history) => {
@@ -633,6 +636,30 @@ test('v5.1.0 输出检查：放行引用原文"桂枝三两"', () => {
 
 test('v5.1.0 输出检查：放行概念解释', () => {
   assert.strictEqual(isMedicalOutput('太阳病是伤寒论中的概念，指外感风寒初起'), false);
+});
+
+test('v5.6.0 输出编号：跨解释段保持连续且不改代码块', () => {
+  const input = [
+    '一、二者各自的核心定位',
+    '',
+    '1. **天纪**：属于天道研究范畴。',
+    '- 天机道：研究天命规律',
+    '核心是研究天地运行规律如何影响人。',
+    '1. **人纪**：属于人体医道研究范畴。',
+    '',
+    '二、核心关联点',
+    '1. 新章节中的第一项。',
+    '',
+    '```md',
+    '1. 示例一',
+    '1. 示例二',
+    '```',
+  ].join('\n');
+
+  const output = normalizeOrderedListMarkers(input);
+  assert.match(output, /^2、 \*\*人纪\*\*/m);
+  assert.match(output, /^1\. 新章节中的第一项。$/m);
+  assert.match(output, /```md\n1\. 示例一\n1\. 示例二\n```/);
 });
 
 // ===========================================================================

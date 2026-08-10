@@ -66,7 +66,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '倪师智慧学习问答',
+      title: '倪师智慧经典研习',
       path: '/pages/index/index',
     };
   },

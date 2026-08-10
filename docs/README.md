@@ -26,23 +26,23 @@ python3 -m http.server 8765 --directory docs
 
 ```
 docs/
-├── index.html           # 主页面
+├── index.html           # 主页面（asset 版本见 meta asset-version）
 ├── assets/
-│   ├── styles.css       # 样式
+│   ├── styles.css / theme.css / oriental.css / fonts.css
 │   ├── app.js           # 主入口
-│   ├── router.js        # hash 路由
-│   ├── sidebar.js       # 左侧目录
-│   ├── graph.js         # 力导向图
-│   ├── detail.js        # 知识卡片
-│   ├── overview.js      # 首页
-│   ├── path.js          # 学习路径
-│   ├── search.js        # 搜索
-│   └── prompts.js       # 天纪提示词工具包
+│   ├── router.js / sidebar.js / graph.js / detail.js
+│   ├── overview.js / path.js / search.js / prompts.js
+│   ├── feedback.js      # 飞书反馈（见 FEEDBACK_REAL_API.md）
+│   ├── analytics.js     # 访问埋点（见 ANALYTICS.md）
+│   ├── poster.js / enhance.js / theme.js
+│   └── …
 ├── data/
 │   └── graph.json       # 图谱数据（64 节点 + 5 篇文章 = 69 项 / 338 条有向关系）
 ├── vendor/              # 本地化第三方库（D3、marked）
 ├── sources-public/      # 公开原文（3 个可读章节 + 1 个目录索引）
-└── README.md            # 本文件
+├── FEEDBACK_REAL_API.md
+├── ANALYTICS.md
+└── README.md
 ```
 
 国内主站使用自定义域名，网站资源仍由腾讯云 CloudBase 静态托管；腾讯云原始地址保留作备用入口。自定义域名的 ICP 备案走**腾讯云**。

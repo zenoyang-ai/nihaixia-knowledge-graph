@@ -23,7 +23,7 @@ GROUP_QUALITY = {
     "11_玄学体系": "verified",
 }
 
-LOCAL_PATH_RE = re.compile(r"/Users/zeno(?:/[^\s\]\[()<>\"'，。；：、]+)+")
+LOCAL_PATH_RE = re.compile(r"/(?:Users|home)/[^\s\]\[()<>\"'，。；：、]+(?:/[^\s\]\[()<>\"'，。；：、]+)*")
 WIKILINK_RE = re.compile(r"!?\[\s*\[\s*(.*?)\s*\]\s*\]")
 BROKEN_WIKILINK_OPEN_RE = re.compile(r"(!?)\[\s*\[")
 MOBILE_RE = re.compile(r"(?<!\d)1[3-9]\d{9}(?!\d)")
@@ -97,7 +97,7 @@ MEDIUM_RISK_PATTERNS = {
 
 
 def logical_path(match):
-    path = match.group(0).removeprefix("/Users/zeno/")
+    path = re.sub(r"^/(?:Users|home)/[^/]+/", "", match.group(0))
     for prefix in ("AI/人生知识库/", "AI/"):
         if path.startswith(prefix):
             path = path[len(prefix) :]

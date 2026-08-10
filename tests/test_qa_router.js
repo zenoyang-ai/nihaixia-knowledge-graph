@@ -7,6 +7,7 @@ const {
   normalizeRequest,
   isMedicalRequest,
   isMedicalOutput,
+  normalizeOrderedListMarkers,
   validateHistory,
 } = require('../cloudbase/functions/nihaixia-qa-router');
 
@@ -124,6 +125,28 @@ test('builds Yuanqi payload with documented content array shape', () => {
     stream: false,
     messages: [{ role: 'user', content: [{ type: 'text', text: '你好' }] }],
   });
+});
+
+test('normalizes repeated ordered markers without changing fenced code', () => {
+  const input = [
+    '一、核心定位',
+    '',
+    '1. 天纪',
+    '解释段落',
+    '1. 人纪',
+    '',
+    '二、下一节',
+    '1. 第一项',
+    '',
+    '```md',
+    '1. 示例一',
+    '1. 示例二',
+    '```',
+  ].join('\n');
+  const output = normalizeOrderedListMarkers(input);
+  assert.match(output, /^2、 人纪$/m);
+  assert.match(output, /^1\. 第一项$/m);
+  assert.match(output, /```md\n1\. 示例一\n1\. 示例二\n```/);
 });
 
 // Mock searchFn：返回空结果，hybrid 返回 200 "知识库暂无"（用于测试 hybrid 无结果场景）
@@ -570,6 +593,21 @@ test('hybrid RAG success: docs found + generateText returns text → 200 with pr
   assert.equal(body.knowledge_sources.length, 1);
   assert.equal(body.knowledge_sources[0].source_group, '伤寒论');
   assert.equal(body.knowledge_sources[0].evidence, '太阳病，发热，汗出，恶风');
+});
+
+test('hybrid RAG normalizes repeated list markers before returning the reply', async () => {
+  const reply = '一、核心定位\n\n1. 天纪\n解释段落\n1. 人纪';
+  const router = createRouter({
+    env: ENV,
+    fetchImpl: async () => { throw new Error('fetch should not be called'); },
+    cloudbaseSdk: hybridSdk({ hybridText: reply }),
+    searchFn: mockSearchFn(MOCK_DOCS),
+    randomUUID: () => 'hybrid-list-normalized',
+  });
+  const response = await router.main(event({ message: '什么是太阳病' }));
+  const body = JSON.parse(response.body);
+  assert.equal(response.statusCode, 200);
+  assert.match(body.reply, /^2、 人纪$/m);
 });
 
 // 测试 H2：hybrid 零结果 — 检索无文档 → 200 + "知识库中暂无"

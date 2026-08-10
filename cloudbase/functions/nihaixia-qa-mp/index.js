@@ -111,7 +111,8 @@ function getOpenId(event, context) {
   return null;
 }
 
-const VERSION = '5.5.0';
+const VERSION = '5.6.1';
+const MODEL_TEMPERATURE = 0.1;
 
 const MAX_MESSAGE_LENGTH = 1000;
 const MAX_HISTORY_LENGTH = 2000; // 单条 history 消息长度
@@ -287,6 +288,118 @@ const MEDICAL_OUTPUT_PATTERNS = [
 function isMedicalOutput(text) {
   if (!text) return false;
   return MEDICAL_OUTPUT_PATTERNS.some((p) => p.test(text));
+}
+
+// 小程序端的轻量 Markdown 渲染器会在解释段落或项目符号后结束 <ol>。
+// 对同一章节中继续出现的有序项目使用可见编号，避免下一个列表又从 1 开始。
+function normalizeOrderedListMarkers(text) {
+  if (typeof text !== 'string' || !text) return text || '';
+
+  const lines = text.split('\n');
+  const states = new Map();
+  let inFence = false;
+
+  const reset = () => states.clear();
+  const isHeading = (line) => /^(?:#{1,6}\s+|[一二三四五六七八九十百]+[、．.：:]\s*)/.test(line);
+
+  for (let i = 0; i < lines.length; i += 1) {
+    const line = lines[i];
+    const trimmed = line.trim();
+
+    if (/^```/.test(trimmed)) {
+      inFence = !inFence;
+      reset();
+      continue;
+    }
+    if (inFence) continue;
+    if (isHeading(trimmed)) {
+      reset();
+      continue;
+    }
+
+    const match = line.match(/^(\s*)(\d+)\.\s+(.+)$/);
+    if (!match) {
+      if (states.size > 0) {
+        for (const state of states.values()) state.hasBridge = true;
+      }
+      continue;
+    }
+
+    const indent = match[1].replace(/\t/g, '    ').length;
+    for (const depth of states.keys()) {
+      if (depth > indent) states.delete(depth);
+    }
+
+    const number = Number(match[2]);
+    const state = states.get(indent);
+    if (!state) {
+      states.set(indent, { lastNumber: number, hasBridge: false });
+      continue;
+    }
+
+    const nextNumber = number <= state.lastNumber ? state.lastNumber + 1 : number;
+    if (state.hasBridge) {
+      // 不再让小程序把它识别成一个全新的 <ol>，直接保留可见编号。
+      lines[i] = `${match[1]}${nextNumber}、 ${match[3]}`;
+    } else if (number <= state.lastNumber) {
+      lines[i] = `${match[1]}${nextNumber}. ${match[3]}`;
+    }
+
+    state.lastNumber = nextNumber;
+    state.hasBridge = false;
+  }
+
+  return lines.join('\n');
+}
+
+const DETAILED_QUESTION_PATTERN = /(?:分别|各自|作用|承担|关系|关联|区别|比较|学习路径|学习顺序|如何入门|核心定位|组合关系)/;
+const CONCEPT_GROUPS = [
+  ['经方', '针灸', '本草'],
+  ['人纪', '天纪'],
+  ['伤寒论', '金匮要略'],
+  ['阴阳', '五行'],
+];
+
+function getExpectedConcepts(query) {
+  if (typeof query !== 'string') return [];
+  return CONCEPT_GROUPS.find((group) => group.filter((term) => query.includes(term)).length >= 2) || [];
+}
+
+function buildAnswerStyleInstruction(query) {
+  const expected = getExpectedConcepts(query);
+  const isDetailed = expected.length > 0 || (typeof query === 'string' && DETAILED_QUESTION_PATTERN.test(query));
+  const base = [
+    '统一回答契约：',
+    '- 当前问题必须独立、完整回答；历史消息只用于必要上下文，不得因此省略本轮解释。',
+    '- 只使用知识库能够支持的内容；资料不足时明确说明，不用未经资料支持的常识补齐。',
+    '- 只讨论学习定位、经典依据、理论关系和学习方法，不输出针对个人的诊断、处方、剂量、服法或治疗决策。',
+    '- 严禁把“急症优先使用”“慢性病适合”“治疗效果”“综合治疗”等写成建议；资料出现这类说法时只能标注为资料观点，并明确不是实际治疗建议，优先改写为学习模块和理论关系。',
+    '- 输出前自检：是否覆盖用户点名的每个概念，是否给出总括和总结，是否所有关键判断都能在资料中找到依据；不满足时先补全再输出。',
+    '- 一级分段使用“一、二、三”，同级项目使用“1、2、3”，每个小节之间留空行，避免重复编号和混杂多层列表。',
+  ];
+  if (!isDetailed) return base.join('\n');
+
+  base.push(
+    '- 本题属于多概念学习问题：先用 1-2 句给出总括结论。',
+    '- 为每个概念分别设置小节；每节至少说明“学习定位、核心学习重点、与其他概念的关系”。',
+    '- 最后增加“组合关系”或“学习路径”小节，解释这些概念如何互相衔接。',
+    '- 复杂问题目标篇幅约 500-900 个中文字符；宁可明确标注资料未覆盖，也不要只给目录式摘要。',
+  );
+  if (expected.length > 0) {
+    base.push(`- 本题必须分别覆盖：${expected.join('、')}。`);
+  }
+  return base.join('\n');
+}
+
+function normalizeLearningClaims(text) {
+  if (typeof text !== 'string' || !text) return text || '';
+  return text
+    .replace(/资料(?:中)?提及“资料中的相关应用(?:讨论|内容)[^。！？\n]*[。！？]?/g, '资料中的相关应用内容仅作学习讨论，不构成实际治疗建议。')
+    .replace(/资料(?:中)?提及“[^”\n]*(?:急症|慢症|慢性病)[^”\n]*”[^。！？\n]*[。！？]?/g, '资料中的相关应用内容仅作学习讨论，不构成实际治疗建议。')
+    .replace(/资料(?:中)?提及“[^。！？\n]*(?:急症|慢症|慢性病)[^。！？\n]*[。！？]?/g, '资料中的相关应用内容仅作学习讨论，不构成实际治疗建议。')
+    .replace(/(?:明确|建议|认为)?\s*急症(?:优先|先用|使用|外治)[^，。；;\n]*/g, '资料中的相关学习观点')
+    .replace(/(?:明确|建议|认为)?\s*慢症(?:优先|先用|使用|用)[^，。；;\n]*/g, '资料中的相关学习观点')
+    .replace(/(?:明确|建议|认为)?\s*慢性病(?:适合|可用|用)[^，。；;\n]*/g, '资料中的相关学习观点');
 }
 
 // ---------------------------------------------------------------------------
@@ -608,7 +721,9 @@ async function callHybridRAG(ai, msg, history) {
 - 回答星曜问题时，请专注于：星曜的身份定位（如帝星、南斗星君）、五行属性、性格特征、核心作用（如领导、守成）、关键功能（如解厄制化、官运）、组合意义（如府相会命、左辅右弼配合）、注意事项等。
 - 回答结构建议：按星曜分点说明，每颗星包含"身份/核心作用/关键特性/注意事项"四个维度。
 - 当问题一次点名多颗星曜时，先逐一回答每颗星，再补充上下文中与它们直接相关的辅星或组合关系；不要用目录、表格或资料清单替代正文解释。
+- 同一层级的并列项目请使用连续编号（1、2、3……），不要重复使用 1；即使中间有解释段落，后续项目也要保持编号连续。
 - 引用时使用知识卡片的章节名，而非原始资料文件名或排盘表格名。
+${buildAnswerStyleInstruction(msg)}
 回答应保持学术严谨，用通俗语言解释复杂概念。
 本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。
 
@@ -631,10 +746,10 @@ ${context}`;
   const result = await model.generateText({
     model: 'hy3-preview',
     messages,
-    temperature: 0.3,
+    temperature: MODEL_TEMPERATURE,
   });
 
-  const text = (result && result.text) || '';
+  const text = normalizeOrderedListMarkers(normalizeLearningClaims((result && result.text) || '')).trim();
 
   // 6. 生成结果二次安全检查
   if (isMedicalOutput(text)) {
@@ -727,7 +842,8 @@ exports.main = async (event, context) => {
   let app, ai, db;
   try {
     const envId = process.env.SCF_NAMESPACE || 'zeno-d9g0gdvw4a57635c0';
-    app = cloudbase.init({ env: envId });
+    // AI 生成常超过 SDK 默认 15s，不设长超时会抛 request timeout → hybrid_rag_error
+    app = cloudbase.init({ env: envId, timeout: 55000 });
     ai = app.ai();
     db = app.database();
   } catch (err) {
@@ -901,6 +1017,11 @@ exports.main = async (event, context) => {
 exports.VERSION = VERSION;
 exports.isMedicalRequest = isMedicalRequest;
 exports.isMedicalOutput = isMedicalOutput;
+exports.normalizeOrderedListMarkers = normalizeOrderedListMarkers;
+exports.getExpectedConcepts = getExpectedConcepts;
+exports.buildAnswerStyleInstruction = buildAnswerStyleInstruction;
+exports.normalizeLearningClaims = normalizeLearningClaims;
+exports.MODEL_TEMPERATURE = MODEL_TEMPERATURE;
 exports.hasLearningContext = hasLearningContext;
 exports.ALWAYS_BLOCK_PATTERNS = ALWAYS_BLOCK_PATTERNS;
 exports.CONTEXT_SENSITIVE_PATTERNS = CONTEXT_SENSITIVE_PATTERNS;

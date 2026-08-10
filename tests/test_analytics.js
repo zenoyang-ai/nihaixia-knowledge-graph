@@ -64,7 +64,7 @@ test('GET health does not leak secrets', async () => {
     env: {
       FEISHU_APP_ID: 'cli_test',
       FEISHU_APP_SECRET: 'super-secret',
-      FEISHU_NOTIFY_OPEN_ID: 'ou_test',
+      FEISHU_NOTIFY_OPEN_ID: 'recipient_test',
       ALLOWED_ORIGINS: 'https://zenoyang-ai.github.io',
     },
   });

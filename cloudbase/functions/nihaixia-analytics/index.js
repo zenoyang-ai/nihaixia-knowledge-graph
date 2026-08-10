@@ -17,14 +17,13 @@ const cloudbase = require('@cloudbase/node-sdk');
 
 const VERSION = '0.1.1';
 const COLLECTION = 'site_daily_stats';
-const DEFAULT_NOTIFY_OPEN_ID = 'ou_1527d3dbbeae3c13a25cb0159a6bff94';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_IM_URL = 'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id';
 const SITES = new Set(['cn', 'overseas', 'local']);
 
 function parseAllowedOrigins(env) {
   const raw = (env.ALLOWED_ORIGINS
-    || 'https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765');
+    || 'https://www.nihaixia-knowledge.xyz,https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765');
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
@@ -194,7 +193,7 @@ function buildDailyReportText(day, bySite) {
 function resolveFeishu(env = {}) {
   const appId = env.FEISHU_APP_ID;
   const appSecret = env.FEISHU_APP_SECRET;
-  const notifyOpenId = env.FEISHU_NOTIFY_OPEN_ID || DEFAULT_NOTIFY_OPEN_ID;
+  const notifyOpenId = env.FEISHU_NOTIFY_OPEN_ID;
   if (appId && appSecret && notifyOpenId) {
     return { configured: true, appId, appSecret, notifyOpenId };
   }

@@ -51,7 +51,7 @@ App({
   showPrivacyBlockedModal(onSuccess) {
     wx.showModal({
       title: '需要同意隐私协议',
-      content: '使用问答与本地记录功能前，需同意《用户隐私保护指引》。',
+      content: '使用研习与本地记录功能前，需同意《用户隐私保护指引》。',
       confirmText: '重新授权',
       cancelText: '查看隐私协议',
       confirmColor: '#b9362c',

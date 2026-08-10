@@ -300,7 +300,7 @@ function saveSessions(sessions) {
     return true;
   } catch (e) {
     console.error('saveSessions failed', e);
-    wx.showToast({ title: '对话未能保存到本地', icon: 'none', duration: 2500 });
+    wx.showToast({ title: '研习未能保存到本地', icon: 'none', duration: 2500 });
     return false;
   }
 }
@@ -347,7 +347,7 @@ function updateSessionMeta(sessionId, messages) {
 
   // 生成标题：取第一条 user 消息的前 30 字
   const firstUserMsg = messages.find(m => m.role === 'user' && m.content);
-  const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : '未命名对话';
+  const title = firstUserMsg ? firstUserMsg.content.slice(0, 30) : '未命名研习';
 
   // 预览：取最后一条 AI 消息的前 50 字
   const lastAiMsg = [...messages].reverse().find(m => m.role === 'assistant' && m.content);
@@ -633,17 +633,17 @@ Page({
       if (result.invalid_history) {
         const update = { loading: false, inputValue: '', canSend: false, lastFailedQuestion: '' };
         if (idx >= 0) {
-          update[`messages[${idx}].content`] = '对话历史格式无效，请开始新对话后继续。';
-          update[`messages[${idx}].html`] = formatContent('对话历史格式无效，请开始新对话后继续。', this._theme);
+          update[`messages[${idx}].content`] = '研习记录格式无效，请开始新研习后继续。';
+          update[`messages[${idx}].html`] = formatContent('研习记录格式无效，请开始新研习后继续。', this._theme);
           update[`messages[${idx}].provider`] = 'system';
           update[`messages[${idx}].retryQuestion`] = '';
         }
         this._safeSetData(update);
         wx.showModal({
-          title: '对话历史异常',
-          content: '当前对话历史格式无效，请开始新对话后继续。',
+          title: '研习记录异常',
+          content: '当前研习记录格式无效，请开始新研习后继续。',
           showCancel: false,
-          confirmText: '开始新对话',
+          confirmText: '开始新研习',
           confirmColor: '#b9362c',
           success: (modalRes) => {
             if (modalRes.confirm) {
@@ -695,7 +695,7 @@ Page({
   // 分阶段等待提示：检索 → 组织 → 即将完成
   _startLoadingStage() {
     this._stopLoadingStage();
-    const stages = ['正在检索学习资料…', '正在组织回答…', '即将完成…'];
+    const stages = ['正在检索学习资料…', '正在整理资料…', '即将完成…'];
     let i = 0;
     this._safeSetData({ loadingStage: stages[0] });
     this._stageTimer = setInterval(() => {
@@ -779,7 +779,7 @@ Page({
   _callCloudFunction(msg, history) {
     const app = getApp();
     if (app.globalData.privacyAuthorized !== true) {
-      return Promise.reject(new Error('需同意隐私协议后才能使用问答功能'));
+      return Promise.reject(new Error('需同意隐私协议后才能使用研习功能'));
     }
 
     const TIMEOUT_MS = 55000;
@@ -839,9 +839,9 @@ Page({
   // 清空对话 — 生成新的会话 ID，并作废进行中的请求
   onClearChat() {
     wx.showModal({
-      title: '新对话',
-      content: '确定开始新的学习对话吗？当前对话将保存到历史记录。',
-      confirmText: '开始新对话',
+      title: '新研习',
+      content: '确定开始新的研习吗？当前研习将保存到历史记录。',
+      confirmText: '开始新研习',
       confirmColor: '#b9362c',
       success: (res) => {
         if (res.confirm) {
@@ -962,7 +962,7 @@ Page({
   // 分享
   onShareAppMessage() {
     return {
-      title: '倪师智慧学习问答',
+      title: '倪师智慧经典研习',
       path: '/pages/index/index',
     };
   },

@@ -1,18 +1,18 @@
 <!--pages/chat/chat.wxml-->
 <view class="chat-container">
 
-  <!-- 对话状态栏（状态 + 历史入口 + 新对话） -->
+  <!-- 对话状态栏（状态 + 历史入口 + 新研习） -->
   <view class="chat-statusbar">
     <view class="chat-statusbar-left">
       <view class="chat-status-dot"></view>
-      <text class="chat-statusbar-text">学习对话</text>
+      <text class="chat-statusbar-text">经典研习</text>
     </view>
     <view class="chat-statusbar-right">
       <view class="chat-history-btn" bindtap="onViewHistory">
         <text>历史</text>
       </view>
       <view class="chat-clear-btn" wx:if="{{messages.length > 0}}" bindtap="onClearChat">
-        <text>新对话</text>
+        <text>新研习</text>
       </view>
     </view>
   </view>
@@ -32,8 +32,8 @@
         <view class="welcome-status-dot"></view>
         <text>学习资料库</text>
       </view>
-      <view class="welcome-title">倪师智慧学习问答</view>
-      <view class="welcome-subtitle">从经典、概念与学习路径开始提问</view>
+      <view class="welcome-title">倪师智慧经典研习</view>
+      <view class="welcome-subtitle">从经典、概念与学习路径开始研习</view>
       <view class="welcome-tag">仅供学习研究 · 不提供诊断、处方或剂量建议</view>
 
       <view class="welcome-section-title">
@@ -139,7 +139,7 @@
         value="{{inputValue}}"
         bindinput="onInput"
         bindconfirm="onSend"
-        placeholder="输入关于倪师智慧的学习问题…"
+        placeholder="输入想研习的经典概念或学习主题…"
         placeholder-class="chat-input-placeholder"
         confirm-type="send"
         maxlength="1000"

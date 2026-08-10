@@ -4,14 +4,14 @@
   <!-- 顶部操作栏 -->
   <view class="history-toolbar" wx:if="{{!isEmpty}}">
     <view class="history-toolbar-left">
-      <text class="history-toolbar-text">共 {{sessions.length}} 条对话记录</text>
+      <text class="history-toolbar-text">共 {{sessions.length}} 条研习记录</text>
     </view>
     <view class="history-clear-btn" bindtap="onClearAll">
       <text>清空全部</text>
     </view>
   </view>
 
-  <!-- 对话列表 -->
+  <!-- 研习列表 -->
   <scroll-view class="history-list" scroll-y wx:if="{{!isEmpty}}" enhanced show-scrollbar="{{false}}">
     <view
       class="history-card"
@@ -24,13 +24,13 @@
         data-session-id="{{item.sessionId}}"
       >
         <view class="history-card-title">
-          <text>{{item.title || '未命名对话'}}</text>
+          <text>{{item.title || '未命名研习'}}</text>
         </view>
         <view class="history-card-preview" wx:if="{{item.preview}}">
           <text>{{item.preview}}</text>
         </view>
         <view class="history-card-meta">
-          <text>{{item.messageCount}} 条消息 · {{item.updatedAtText}}</text>
+          <text>{{item.messageCount}} 条记录 · {{item.updatedAtText}}</text>
         </view>
       </view>
       <view
@@ -50,10 +50,10 @@
       <text>无</text>
     </view>
     <view class="history-empty-text">
-      <text>还没有学习对话记录</text>
+      <text>还没有研习记录</text>
     </view>
     <view class="history-empty-hint">
-      <text>从主页开始第一次对话</text>
+      <text>从主页开始第一次研习</text>
     </view>
     <view class="history-empty-btn" bindtap="onBackHome">
       <text>返回主页</text>

@@ -78,8 +78,9 @@
 自定义域名只是对外访问地址，网站文件仍由腾讯云 CloudBase 托管。因此，即使以后域名到期，腾讯云直连地址仍然可以继续使用。
 
 - **静态站点**（`docs/`）：推送 `main` 分支后，GitHub Action（`.github/workflows/deploy.yml`）自动部署到 CloudBase；同时 GitHub Pages 自动从 `docs/` 发布。
-- **云端函数**（AI 问答 RAG）：由 `cloudbaserc.json` 定义，单独部署。
+- **云函数**（`cloudbaserc.json`，单独部署）：`nihaixia-qa-router` / `nihaixia-qa-mp`（Hybrid RAG）、`nihaixia-feedback`（飞书反馈）、`nihaixia-analytics`（访问统计与飞书日报，见 `docs/ANALYTICS.md`）。
 - 部署凭证以 GitHub Secrets（`CLOUDBASE_SECRET_ID` / `CLOUDBASE_SECRET_KEY`）保存，为腾讯云 API 密钥（CAM）。
+- 部署配置使用环境变量和平台 Secrets，仓库不保存本机路径或个人凭证。
 
 ## 本地预览
 
@@ -97,10 +98,6 @@ python3 -m http.server 8765 --directory docs
 AI 问答由 CloudBase Hybrid RAG 承载，基于站内知识语料检索生成；资料不足时会明确说明，不使用无知识库依据的通用模型兜底。
 
 更完整说明见 [CONTENT_NOTICE.md](./CONTENT_NOTICE.md)。
-
-## 小程序上传密钥
-
-若本地存有 `private.wx*.key` 上传密钥，请确保文件权限为 `0600`（`chmod 600 private.wx*.key`），并优先移出 Git 仓库、仅在 CI 或本机安全目录保管。密钥不应提交到版本库。
 
 ## 许可
 

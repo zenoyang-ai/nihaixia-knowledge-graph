@@ -49,8 +49,8 @@ Page({
     const app = getApp();
     app.guardPrivacy(() => {
       wx.showModal({
-        title: '删除对话',
-        content: '确定删除这条对话记录吗？删除后不可恢复。',
+        title: '删除研习',
+        content: '确定删除这条研习记录吗？删除后不可恢复。',
         confirmText: '删除',
         confirmColor: '#b9362c',
         success: (res) => {
@@ -87,8 +87,8 @@ Page({
     const app = getApp();
     app.guardPrivacy(() => {
       wx.showModal({
-        title: '清空所有对话',
-        content: '确定清空全部对话记录吗？此操作不可恢复。',
+        title: '清空所有研习',
+        content: '确定清空全部研习记录吗？此操作不可恢复。',
         confirmText: '清空',
         confirmColor: '#b9362c',
         success: (res) => {
@@ -129,7 +129,7 @@ Page({
 
   onShareAppMessage() {
     return {
-      title: '倪师智慧学习问答',
+      title: '倪师智慧经典研习',
       path: '/pages/index/index',
     };
   },

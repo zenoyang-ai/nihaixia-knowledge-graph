@@ -8,15 +8,14 @@ const {
   resolveFeishuChannel,
   sendToFeishu,
   sendToFeishuApp,
-  DEFAULT_NOTIFY_OPEN_ID,
 } = require('../cloudbase/functions/nihaixia-feedback');
 
 const ALLOWED_ORIGIN = 'https://zenoyang-ai.github.io';
 
 const APP_ENV = {
-  FEISHU_APP_ID: 'cli_aa9059f5d038dcd4',
+  FEISHU_APP_ID: 'cli_test',
   FEISHU_APP_SECRET: 'test-secret',
-  FEISHU_NOTIFY_OPEN_ID: 'ou_1527d3dbbeae3c13a25cb0159a6bff94',
+  FEISHU_NOTIFY_OPEN_ID: 'recipient_test',
   ALLOWED_ORIGINS: ALLOWED_ORIGIN,
 };
 
@@ -103,15 +102,41 @@ test('buildFeishuText highlights content with compact metadata', () => {
   assert.equal(text.includes('UA：'), false);
 });
 
+test('buildFeishuText omits root hash page residue', () => {
+  const text = buildFeishuText({
+    category: 'Bug 报错',
+    content: '首页反馈',
+    time: '2026-07-23T08:19:00.000Z',
+    page: 'https://zenoyang-ai.github.io/nihaixia-knowledge-graph-open/#/',
+  });
+  assert.match(text, /【图谱反馈】Bug 报错/);
+  assert.match(text, /首页反馈/);
+  assert.match(text, /7月23日 16:19/);
+  assert.equal(text.includes('· #/'), false);
+  assert.equal(text.includes('#/'), false);
+});
+
+test('buildFeishuText omits bare # page', () => {
+  const text = buildFeishuText({
+    category: '其他',
+    content: '仅时间',
+    time: '2026-07-23T08:19:00.000Z',
+    page: '#',
+  });
+  assert.match(text, /7月23日 16:19/);
+  assert.equal(text.includes('·'), false);
+});
+
 test('resolveFeishuChannel prefers app_im when app credentials present', () => {
   const channel = resolveFeishuChannel({
     FEISHU_APP_ID: 'cli_test',
     FEISHU_APP_SECRET: 'secret',
+    FEISHU_NOTIFY_OPEN_ID: 'recipient_test',
     FEISHU_WEBHOOK: 'https://open.feishu.cn/hook/test',
   });
   assert.equal(channel.channel, 'app_im');
   assert.equal(channel.configured, true);
-  assert.equal(channel.notifyOpenId, DEFAULT_NOTIFY_OPEN_ID);
+  assert.equal(channel.notifyOpenId, 'recipient_test');
 });
 
 test('resolveFeishuChannel falls back to webhook', () => {
@@ -128,6 +153,15 @@ test('resolveFeishuChannel returns none when unconfigured', () => {
   assert.equal(channel.configured, false);
 });
 
+test('resolveFeishuChannel never falls back to a personal recipient', () => {
+  const channel = resolveFeishuChannel({
+    FEISHU_APP_ID: 'cli_test',
+    FEISHU_APP_SECRET: 'secret',
+  });
+  assert.equal(channel.channel, 'none');
+  assert.equal(channel.configured, false);
+});
+
 test('GET health check reports app_im without leaking secrets', async () => {
   const { main } = createFeedbackHandler({ env: APP_ENV });
   const res = await main(event('GET'));
@@ -136,10 +170,10 @@ test('GET health check reports app_im without leaking secrets', async () => {
   assert.equal(body.ok, true);
   assert.equal(body.feishu_configured, true);
   assert.equal(body.channel, 'app_im');
-  assert.equal(body.version, '1.1.1');
+  assert.equal(body.version, '1.1.2');
   const serialized = JSON.stringify(body);
   assert.equal(serialized.includes('test-secret'), false);
-  assert.equal(serialized.includes('ou_1527d3dbbeae3c13a25cb0159a6bff94'), false);
+  assert.equal(serialized.includes('recipient_test'), false);
 });
 
 test('GET health check reports webhook channel', async () => {

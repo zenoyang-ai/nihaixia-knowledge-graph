@@ -3,16 +3,15 @@
  * CloudBase HTTP 函数入口
  */
 
-const VERSION = '1.1.1';
+const VERSION = '1.1.2';
 const MAX_CONTENT_LENGTH = 2000;
 const ALLOWED_CATEGORIES = ['功能建议', 'Bug 报错', '知识补充', '知识点补充', '其他'];
-const DEFAULT_NOTIFY_OPEN_ID = 'ou_1527d3dbbeae3c13a25cb0159a6bff94';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_IM_URL = 'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id';
 
 function parseAllowedOrigins(env) {
   const raw = (env.ALLOWED_ORIGINS
-    || 'https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765');
+    || 'https://www.nihaixia-knowledge.xyz,https://zenoyang-ai.github.io,https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com,http://localhost:8765,http://127.0.0.1:8765');
   return raw.split(',').map((s) => s.trim()).filter(Boolean);
 }
 
@@ -98,13 +97,17 @@ function formatLocalTime(timeStr) {
 
 function shortenPage(page) {
   if (!page) return '';
+  const isRootHash = (hash) => !hash || hash === '#' || hash === '#/';
   try {
     const url = new URL(page);
-    if (url.hash) return url.hash;
+    // 首页 hash（#/）无信息量，不要拼进「时间 · 页面」造成「· #/」
+    if (url.hash && !isRootHash(url.hash)) return url.hash;
     if (url.pathname && url.pathname !== '/') return url.pathname;
     return '';
   } catch {
-    if (page.startsWith('#') || page.startsWith('/')) return page;
+    const trimmed = String(page).trim();
+    if (isRootHash(trimmed)) return '';
+    if (trimmed.startsWith('#') || trimmed.startsWith('/')) return trimmed;
     return '';
   }
 }
@@ -132,7 +135,7 @@ function buildFeishuText(payload) {
 function resolveFeishuChannel(env = {}) {
   const appId = env.FEISHU_APP_ID;
   const appSecret = env.FEISHU_APP_SECRET;
-  const notifyOpenId = env.FEISHU_NOTIFY_OPEN_ID || DEFAULT_NOTIFY_OPEN_ID;
+  const notifyOpenId = env.FEISHU_NOTIFY_OPEN_ID;
 
   if (appId && appSecret && notifyOpenId) {
     return {
@@ -328,7 +331,6 @@ const defaultHandler = createFeedbackHandler({
 
 exports.main = defaultHandler.main;
 exports.VERSION = VERSION;
-exports.DEFAULT_NOTIFY_OPEN_ID = DEFAULT_NOTIFY_OPEN_ID;
 exports.validateFeedback = validateFeedback;
 exports.buildFeishuText = buildFeishuText;
 exports.formatLocalTime = formatLocalTime;

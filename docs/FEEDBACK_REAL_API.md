@@ -18,14 +18,14 @@
 ### 1. 获取应用凭证
 
 1. 打开 [飞书开发者后台](https://open.feishu.cn/app)
-2. 进入目标应用（示例：`cli_aa9059f5d038dcd4`，杨圣旦的飞书 CLI）
+2. 进入用于接收通知的飞书应用
 3. 复制 **App ID** 与 **App Secret**
 
 ### 2. 确认应用权限与可用范围
 
 应用需具备发消息相关权限（如 `im:message`），且接收通知的用户须在应用**可用范围**内。
 
-接收人 open_id 示例：`ou_1527d3dbbeae3c13a25cb0159a6bff94`（可通过飞书 API 或 CLI 获取）。
+接收人 `open_id` 请在飞书后台或通过飞书 API 获取，并只在 CloudBase 控制台配置。
 
 ### 3. 部署云函数
 
@@ -33,6 +33,8 @@
 cd cloudbase
 tcb fn deploy nihaixia-feedback
 ```
+
+> **部署红线**：`cloudbaserc` 里不要用不含 `FEISHU_APP_SECRET` 的 `envVariables` 整表覆盖云端配置，否则会冲掉控制台已有 Secret。`FEISHU_APP_ID`、`FEISHU_APP_SECRET` 和 `FEISHU_NOTIFY_OPEN_ID` 均只在 CloudBase 控制台维护，仓库不保存它们的实际值。
 
 ### 4. 配置环境变量（控制台，勿写入仓库）
 
@@ -42,10 +44,10 @@ tcb fn deploy nihaixia-feedback
 |--------|------|
 | `FEISHU_APP_ID` | 飞书应用 App ID（**推荐必填**） |
 | `FEISHU_APP_SECRET` | 飞书应用 App Secret（**推荐必填**，仅控制台配置） |
-| `FEISHU_NOTIFY_OPEN_ID` | 接收通知用户的 open_id（默认 `ou_1527d3dbbeae3c13a25cb0159a6bff94`，可按需覆盖） |
+| `FEISHU_NOTIFY_OPEN_ID` | 接收通知用户的 open_id（仅在控制台配置） |
 | `ALLOWED_ORIGINS` | CORS 白名单（已在 `cloudbaserc.json` 预设，可按需覆盖） |
 
-> **安全提示**：`FEISHU_APP_SECRET` 具有应用调用权限，**绝不**写入前端代码或 Git 仓库明文。`APP_ID` / `OPEN_ID` 也建议仅在控制台配置。
+> **安全提示**：`FEISHU_APP_SECRET` 具有应用调用权限，**绝不**写入前端代码或 Git 仓库明文。`FEISHU_APP_ID` / `FEISHU_NOTIFY_OPEN_ID` 也仅在控制台配置。
 
 ### 5. 验证
 
@@ -66,7 +68,7 @@ curl -s -X POST \
 ```json
 {
   "ok": true,
-  "version": "1.1.0",
+  "version": "1.1.2",
   "feishu_configured": true,
   "channel": "app_im"
 }
@@ -90,7 +92,7 @@ curl -s -X POST \
 
 | 方法 | 说明 |
 |------|------|
-| `GET` | 健康检查 `{ ok:true, version:'1.1.0', feishu_configured: bool, channel: 'app_im'|'webhook'|'none' }` |
+| `GET` | 健康检查 `{ ok:true, version:'1.1.2', feishu_configured: bool, channel: 'app_im'|'webhook'|'none' }` |
 | `POST` | 接收 `{ category, content, contact?, page?, time?, userAgent? }` |
 | `OPTIONS` | CORS 预检 |
 
@@ -126,7 +128,7 @@ curl -s -X POST \
 站长在浏览器控制台：
 
 ```js
-getFeedbacks()      // 查看本机保存的反馈
+getFeedbacks()      // 查看浏览器本地保存的反馈
 exportFeedbacks()   // 下载 nihaixia-feedbacks.json
 ```
 
