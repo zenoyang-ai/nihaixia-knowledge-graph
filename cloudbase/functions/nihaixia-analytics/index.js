@@ -15,11 +15,12 @@
 const crypto = require('crypto');
 const cloudbase = require('@cloudbase/node-sdk');
 
-const VERSION = '0.1.1';
+const VERSION = '0.2.0';
 const COLLECTION = 'site_daily_stats';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_IM_URL = 'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id';
 const SITES = new Set(['cn', 'overseas', 'local']);
+const CLICK_SOURCES = new Set(['header', 'prompts', 'other']);
 
 function parseAllowedOrigins(env) {
   const raw = (env.ALLOWED_ORIGINS
@@ -154,16 +155,69 @@ async function recordPageview(db, { site, path, vid }) {
   return { day, site, docId };
 }
 
+function normalizeClickSource(raw) {
+  const src = typeof raw === 'string' ? raw.trim().toLowerCase() : '';
+  return CLICK_SOURCES.has(src) ? src : 'other';
+}
+
+async function recordGithubClick(db, { site, source, path }) {
+  const day = shanghaiDay();
+  const docId = `${day}_${site}`;
+  const col = db.collection(COLLECTION);
+  const _ = db.command;
+  const src = normalizeClickSource(source);
+
+  let row = null;
+  try {
+    const existing = await col.doc(docId).get();
+    const data = existing && existing.data;
+    if (Array.isArray(data)) row = data[0] || null;
+    else if (data && typeof data === 'object') row = data;
+  } catch (_) {
+    row = null;
+  }
+
+  if (row) {
+    const patch = {
+      githubClicks: _.inc(1),
+      lastGithubClickPath: path,
+      updatedAt: Date.now(),
+    };
+    if (src === 'header') patch.githubClicksHeader = _.inc(1);
+    else if (src === 'prompts') patch.githubClicksPrompts = _.inc(1);
+    await col.doc(docId).update(patch);
+  } else {
+    await col.doc(docId).set({
+      day,
+      site,
+      pv: 0,
+      uvids: [],
+      githubClicks: 1,
+      githubClicksHeader: src === 'header' ? 1 : 0,
+      githubClicksPrompts: src === 'prompts' ? 1 : 0,
+      lastGithubClickPath: path,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    });
+  }
+
+  return { day, site, docId, source: src };
+}
+
 async function loadDayStats(db, day) {
   const res = await db.collection(COLLECTION).where({ day }).limit(20).get();
   const rows = res.data || [];
-  const bySite = { cn: { pv: 0, uv: 0 }, overseas: { pv: 0, uv: 0 }, local: { pv: 0, uv: 0 } };
+  const empty = () => ({ pv: 0, uv: 0, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0 });
+  const bySite = { cn: empty(), overseas: empty(), local: empty() };
   for (const row of rows) {
     const site = normalizeSite(row.site);
     if (!site) continue;
     bySite[site] = {
       pv: Number(row.pv) || 0,
       uv: Array.isArray(row.uvids) ? row.uvids.length : 0,
+      githubClicks: Number(row.githubClicks) || 0,
+      githubClicksHeader: Number(row.githubClicksHeader) || 0,
+      githubClicksPrompts: Number(row.githubClicksPrompts) || 0,
     };
   }
   return bySite;
@@ -175,6 +229,9 @@ function buildDailyReportText(day, bySite) {
   const loc = bySite.local || { pv: 0, uv: 0 };
   const totalPv = cn.pv + ov.pv;
   const totalUv = cn.uv + ov.uv;
+  const totalGhClicks = (cn.githubClicks || 0) + (ov.githubClicks || 0);
+  const headerGhClicks = (cn.githubClicksHeader || 0) + (ov.githubClicksHeader || 0);
+  const promptsGhClicks = (cn.githubClicksPrompts || 0) + (ov.githubClicksPrompts || 0);
   const lines = [
     '【图谱访问日报】',
     `日期：${day}`,
@@ -183,6 +240,9 @@ function buildDailyReportText(day, bySite) {
     `国内站：UV ${cn.uv} · PV ${cn.pv}`,
     `海外站：UV ${ov.uv} · PV ${ov.pv}`,
   ];
+  if (totalGhClicks > 0) {
+    lines.push(`GitHub 导流点击：${totalGhClicks} 次（顶栏 ${headerGhClicks} · 提示词 ${promptsGhClicks}）`);
+  }
   if (loc.pv > 0) {
     lines.push(`本地调试：UV ${loc.uv} · PV ${loc.pv}`);
   }
@@ -409,6 +469,35 @@ function createAnalyticsHandler({ env = process.env, fetchImpl = fetch, dbFactor
         return buildResponse(status, { ...result, version: VERSION }, origin, allowedOrigins);
       } catch (err) {
         return buildResponse(500, { ok: false, error: 'report_failed', version: VERSION }, origin, allowedOrigins);
+      }
+    }
+
+    if (body.type === 'event' && body.event === 'github_click') {
+      const eventSite = normalizeSite(body.site || body.event_site);
+      const eventPath = normalizePath(body.path);
+      const eventVid = typeof body.vid === 'string' ? body.vid.trim().slice(0, 80) : '';
+      if (!eventSite || !eventVid || eventVid.length < 8) {
+        return buildResponse(400, { error: 'invalid_event' }, origin, allowedOrigins);
+      }
+      try {
+        const db = dbFactory();
+        const recorded = await recordGithubClick(db, {
+          site: eventSite,
+          source: body.source,
+          path: eventPath,
+        });
+        return buildResponse(200, { ok: true, event: 'github_click', ...recorded, version: VERSION }, origin, allowedOrigins);
+      } catch (err) {
+        console.log(JSON.stringify({
+          event: 'github_click_error',
+          error: err && err.message ? err.message.slice(0, 200) : 'unknown',
+        }));
+        return buildResponse(500, {
+          ok: false,
+          error: 'event_failed',
+          reason: err && err.message ? String(err.message).slice(0, 120) : 'unknown',
+          version: VERSION,
+        }, origin, allowedOrigins);
       }
     }
 

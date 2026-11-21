@@ -50,6 +50,9 @@ jobs:
       - name: Validate graph stats, medical_safety and node_links
         run: python3 scripts/build_site_data.py --validate
 
+      - name: Validate exported knowledge hub & skill assets
+        run: python3 scripts/export_knowledge_assets.py --validate
+
       - name: Validate docs/data/prompts.json
         run: node -e "JSON.parse(require('fs').readFileSync('./docs/data/prompts.json','utf8'))"
 
@@ -95,6 +98,9 @@ jobs:
             echo "tests/test_build_qa_corpus.py not found, skipping"
           fi
 
+      - name: Run knowledge asset export & validation tests
+        run: python3 tests/test_export_knowledge_assets.py
+
   # ===========================================================================
   # Job 2: 路由测试 + JS 语法检查
   # ===========================================================================
@@ -121,11 +127,20 @@ jobs:
         run: npm ci
         working-directory: cloudbase/functions/nihaixia-qa-mp
 
+      - name: Install analytics function dependencies
+        run: npm ci
+        working-directory: cloudbase/functions/nihaixia-analytics
+
       - name: Run QA router tests (38 tests)
         run: node --test tests/test_qa_router.js
 
       - name: Run shared QA answer policy tests
         run: node --test tests/test_qa_answer_policy.js
+
+      - name: Run analytics & feedback tests
+        run: |
+          node --test tests/test_analytics.js
+          node --test tests/test_feedback.js
 
       - name: Syntax check nihaixia-qa-router/index.js
         run: node --check cloudbase/functions/nihaixia-qa-router/index.js
@@ -139,14 +154,21 @@ jobs:
       - name: Syntax check nihaixia-qa-mp/knowledge-search.js
         run: node --check cloudbase/functions/nihaixia-qa-mp/knowledge-search.js
 
+      - name: Syntax check analytics & feedback cloud functions
+        run: |
+          node --check cloudbase/functions/nihaixia-analytics/index.js
+          node --check cloudbase/functions/nihaixia-feedback/index.js
+
       - name: Syntax check RAG corpus generator
         run: node --check scripts/generate-knowledge-base.js
 
-      - name: Syntax check docs/assets/app.js
-        run: node --check docs/assets/app.js
-
-      - name: Syntax check docs/assets/graph.js
-        run: node --check docs/assets/graph.js
+      - name: Syntax check all frontend JS files
+        run: |
+          set -e
+          for f in docs/assets/*.js; do
+            echo "node --check $f"
+            node --check "$f"
+          done
 
       - name: Git diff check (whitespace errors)
         run: git diff --check

@@ -26,6 +26,7 @@
                             保存图片
                         </button>
                     </div>
+                    <div class="poster-save-hint" id="poster-save-hint" hidden style="margin-top:8px;font-size:12px;line-height:1.5;color:var(--text-light);text-align:center;"></div>
                 </div>
             `;
             document.body.appendChild(overlay);
@@ -55,12 +56,27 @@
             });
             overlay.querySelector('#poster-download-btn').addEventListener('click', () => {
                 const canvas = document.getElementById('poster-canvas');
+                const hintEl = overlay.querySelector('#poster-save-hint');
                 const link = document.createElement('a');
                 const titleForFile = (window.currentNodeData && window.currentNodeData.title) || '节点';
                 link.download = `倪海厦知识图谱-${titleForFile}.png`;
-                link.href = canvas.toDataURL('image/png');
-                link.click();
+                try {
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    if (hintEl) hintEl.hidden = true;
+                } catch (_) {
+                    if (hintEl) {
+                        hintEl.textContent = '本地 file:// 直开受浏览器安全限制，请右键上方海报选择「图片另存为」，或通过本地服务 / 线上主站一键保存。';
+                        hintEl.hidden = false;
+                    }
+                }
             });
+        }
+
+        const saveHintEl = overlay.querySelector('#poster-save-hint');
+        if (saveHintEl) {
+            saveHintEl.textContent = '';
+            saveHintEl.hidden = true;
         }
 
         overlay._prevFocus = document.activeElement;
@@ -328,7 +344,9 @@
         ctx.stroke();
 
         const qrImg = new Image();
-        qrImg.crossOrigin = 'anonymous';
+        if (window.location.protocol !== 'file:') {
+            qrImg.crossOrigin = 'anonymous';
+        }
         qrImg.onload = function() {
             const qrSize = 76;
             const qrX = W - PADDING - qrSize;

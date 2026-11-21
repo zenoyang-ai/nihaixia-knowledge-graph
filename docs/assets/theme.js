@@ -1,6 +1,6 @@
 /* ============================================
    主题切换 — 浅色 / 暖棕深色
-   优先级：URL 参数 > localStorage > 系统偏好
+   优先级：URL 参数 > localStorage > 宿主主题 > 系统偏好
    ============================================ */
 (function () {
     'use strict';
@@ -23,6 +23,10 @@
             if (isValid(saved)) return saved;
         } catch (e) {}
 
+        if (isValid(window.__AGY_HOST_SCHEME__)) {
+            return window.__AGY_HOST_SCHEME__;
+        }
+
         if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
             return 'dark';
         }
@@ -32,14 +36,40 @@
     var theme = getInitialTheme();
     document.documentElement.setAttribute('data-theme', theme);
 
-    /* ---- 2. 切换 ---- */
-    function setTheme(next) {
+    function applyThemeVisual(next, persist) {
         if (!isValid(next)) return;
         document.documentElement.setAttribute('data-theme', next);
-        try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+        if (persist) {
+            try { localStorage.setItem(STORAGE_KEY, next); } catch (e) {}
+        }
         updateSwitchState(next);
         document.documentElement.dispatchEvent(new CustomEvent('nihaixia-theme-change', { detail: { theme: next } }));
     }
+
+    /* ---- 2. 切换 ---- */
+    function setTheme(next) {
+        applyThemeVisual(next, true);
+    }
+
+    /* 跟随宿主预览容器主题（仅当用户未在 URL 或本地手动指定主题时） */
+    function hasExplicitTheme() {
+        try {
+            var urlTheme = new URLSearchParams(window.location.search).get('theme');
+            if (isValid(urlTheme)) return true;
+        } catch (e) {}
+        try {
+            if (isValid(localStorage.getItem(STORAGE_KEY))) return true;
+        } catch (e) {}
+        return false;
+    }
+
+    window.addEventListener('agy-host-theme-change', function (ev) {
+        if (hasExplicitTheme()) return;
+        var scheme = ev && ev.detail && ev.detail.scheme;
+        if (isValid(scheme) && currentTheme() !== scheme) {
+            applyThemeVisual(scheme, false);
+        }
+    });
 
     /* ---- 3. 单图标切换按钮（浅色 ⇄ 暖棕，太阳/月亮） ---- */
     var ICON_SUN = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">'
@@ -80,11 +110,16 @@
         var headerContent = document.querySelector('.header-content');
         if (!headerContent) return;
         var sw = createSwitch();
-        var searchBox = headerContent.querySelector('.header-search');
-        if (searchBox && searchBox.nextSibling) {
-            headerContent.insertBefore(sw, searchBox.nextSibling);
+        var actionsBox = headerContent.querySelector('.header-actions');
+        if (actionsBox) {
+            actionsBox.appendChild(sw);
         } else {
-            headerContent.appendChild(sw);
+            var searchBox = headerContent.querySelector('.header-search');
+            if (searchBox && searchBox.nextSibling) {
+                headerContent.insertBefore(sw, searchBox.nextSibling);
+            } else {
+                headerContent.appendChild(sw);
+            }
         }
         updateSwitchState(document.documentElement.getAttribute('data-theme') || 'light');
     }

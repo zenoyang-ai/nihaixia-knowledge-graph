@@ -3,12 +3,8 @@ class PromptView {
     constructor(data) {
         this.data = data || [];
         this.filter = 'all';
-        this.skillInstallCommand = [
-            'python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py',
-            '  --repo zenoyang-ai/nihaixia-tianji-skill',
-            '  --path skills/nihaixia-tianji'
-        ].join(' \\\n');
-        this.skillInstallDisplay = 'python3 ~/.codex/skills/.system/skill-installer/scripts/install-skill-from-github.py --repo zenoyang-ai/nihaixia-tianji-skill --path skills/nihaixia-tianji';
+        this.skillInstallCommand = 'npx skills add zenoyang-ai/nihaixia-knowledge-graph --skill nihaixia-tianji';
+        this.skillInstallDisplay = this.skillInstallCommand;
         this.render();
     }
 
@@ -25,7 +21,7 @@ class PromptView {
                 <div class="prompt-skill-copy">
                     <div class="prompt-skill-kicker">Agent Skill 版本</div>
                     <h2>一行命令安装天纪提示词 Skill</h2>
-                    <p>适合已经在使用 Codex / Agent 的用户。安装后可直接让 Agent 按八字、紫微、易经三才或小六壬流程调用这套提示词。</p>
+                    <p>支持 Claude Code / Cursor / Codex / Antigravity 等主流 Agent 客户端。安装后可直接按八字、紫微、易经三才或小六壬流程调用这套提示词。</p>
                 </div>
                 <div class="prompt-skill-install">
                     <div class="prompt-terminal">
@@ -34,7 +30,7 @@ class PromptView {
                     </div>
                     <div class="prompt-skill-actions">
                         <button class="prompt-copy-btn skill-copy-btn" type="button">复制安装命令</button>
-                        <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-tianji-skill" target="_blank" rel="noopener">查看 GitHub</a>
+                        <a class="prompt-skill-link" href="https://github.com/zenoyang-ai/nihaixia-knowledge-graph/tree/main/skills/nihaixia-tianji" target="_blank" rel="noopener noreferrer">查看 GitHub</a>
                     </div>
                 </div>
             </div>

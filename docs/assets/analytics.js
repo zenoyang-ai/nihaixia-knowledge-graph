@@ -1,7 +1,7 @@
 /**
- * 图谱网页轻量访问埋点（国内站 / 海外站）
+ * 图谱网页轻量访问与出站点击埋点（国内站 / 海外站）
  * - 匿名 visitor id 存 localStorage
- * - 不阻塞主流程；失败静默忽略
+ * - 不阻塞主流程与外链跳转；失败静默忽略
  */
 (function () {
   const ENDPOINT = 'https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics';
@@ -34,14 +34,8 @@
     return hash.startsWith('#') ? hash.slice(1) || '/' : hash;
   }
 
-  function sendPageview() {
-    const payload = {
-      type: 'pageview',
-      site: detectSite(),
-      path: currentPath(),
-      vid: getVid(),
-      t: Date.now(),
-    };
+  function sendPayload(payload) {
+    if (window.location.protocol === 'file:') return;
     const body = JSON.stringify(payload);
     fetch(ENDPOINT, {
       method: 'POST',
@@ -60,6 +54,33 @@
     });
   }
 
+  function sendPageview() {
+    sendPayload({
+      type: 'pageview',
+      site: detectSite(),
+      path: currentPath(),
+      vid: getVid(),
+      t: Date.now(),
+    });
+  }
+
+  /**
+   * 上报 GitHub 导流点击事件。
+   * 使用 event_site 字段以兼容未升级前的 v0.1.1 云函数（旧版见无 site 会静默跳过而不误增 PV），
+   * 云函数升级至 v0.2.0 后自动计入 githubClicks 并在飞书日报展示。
+   */
+  function sendGithubClick(source) {
+    sendPayload({
+      type: 'event',
+      event: 'github_click',
+      source: source || 'other',
+      event_site: detectSite(),
+      path: currentPath(),
+      vid: getVid(),
+      t: Date.now(),
+    });
+  }
+
   let lastPath = '';
   function trackIfChanged() {
     const path = currentPath();
@@ -67,6 +88,15 @@
     lastPath = path;
     sendPageview();
   }
+
+  document.addEventListener('click', (e) => {
+    const target = e.target && e.target.closest
+      ? e.target.closest('#header-github-btn, .prompt-skill-link')
+      : null;
+    if (!target) return;
+    const source = target.id === 'header-github-btn' ? 'header' : 'prompts';
+    sendGithubClick(source);
+  }, { passive: true });
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', trackIfChanged);

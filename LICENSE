@@ -22,9 +22,8 @@ SOFTWARE.
 
 ---
 
-## 内容许可
+## 分层内容许可说明
 
-本仓库中的原创内容（知识图谱节点、学习路径、主题文章）采用
-[Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/)。
-
-第三方资料保留原来源说明，不声称拥有版权。
+1. **原创结构化内容（CC BY-SA 4.0）**：本仓库中由项目作者原创编写的知识图谱节点、学习路径、专题文章、AI 结构化语料与天纪现代化提示词工具，采用 [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/)。
+2. **公有领域古籍**：《针灸大成》（明·杨继洲）及古代医经原典正文属于公有领域（Public Domain）。
+3. **公开学习整理资料**：`knowledge/03-天纪学习资料/` 与 `knowledge/04-人纪学习资料/` 中涉及倪海厦先生著作、批注及课堂讲授思想的公开整理文本，其原著著作权归**倪海厦先生**及其权利继承人所有；本仓库完整保留原文原貌，仅作非商业学习排版与索引，不声称拥有原著版权，严禁任何商业使用。文中历史剂量与附方表述仅供文献学习，不构成用药指导。详见 [CONTENT_NOTICE.md](./CONTENT_NOTICE.md) 与 [knowledge/LICENSE.md](./knowledge/LICENSE.md)。

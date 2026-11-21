@@ -12,6 +12,10 @@ class Sidebar {
         this.bindEvents();
     }
 
+    resolveLayer(node) {
+        return (node && (node.layer || (node.node_type === 'topic' ? '深度专题' : ''))) || '其他';
+    }
+
     // 按 layer 分组构建目录
     build() {
         const layerColors = {
@@ -20,12 +24,14 @@ class Sidebar {
             '方法工具': 'var(--layer-treatment)',
             '案例研读': 'var(--layer-cases)',
             '天纪体系': 'var(--layer-tianji)',
+            '学习路径': 'var(--layer-path)',
+            '深度专题': 'var(--layer-topic)',
         };
 
         const groups = {};
         const allNodes = [...this.data.nodes, ...this.data.articles];
         allNodes.forEach(node => {
-            const layer = node.layer || '其他';
+            const layer = this.resolveLayer(node);
             if (!groups[layer]) groups[layer] = [];
             groups[layer].push(node);
         });
@@ -76,8 +82,13 @@ class Sidebar {
             header.setAttribute('aria-expanded', group.classList.contains('expanded') ? 'true' : 'false');
         };
 
-        // 目录组折叠/展开
+        // 点击节点后在抽屉模式下自动收起目录，避免遮挡内容
         this.nav.addEventListener('click', (e) => {
+            const item = e.target.closest('.sidebar-item');
+            if (item && window.innerWidth <= 1024) {
+                this.closeSidebar();
+                return;
+            }
             const header = e.target.closest('.sidebar-group-header');
             if (header) toggleGroup(header);
         });
@@ -89,14 +100,28 @@ class Sidebar {
                 toggleGroup(header);
             }
         });
+        if (window.matchMedia) {
+            const drawerMq = window.matchMedia('(max-width: 1024px)');
+            const resetOnBreakpoint = () => {
+                this.closeSidebar();
+                this.sidebar.classList.remove('collapsed');
+            };
+            if (drawerMq.addEventListener) {
+                drawerMq.addEventListener('change', resetOnBreakpoint);
+            } else if (drawerMq.addListener) {
+                drawerMq.addListener(resetOnBreakpoint);
+            }
+        }
     }
 
     toggleSidebar() {
-        const isMobile = window.innerWidth <= 768;
-        if (isMobile) {
+        const isDrawer = window.innerWidth <= 1024;
+        if (isDrawer) {
+            this.sidebar.classList.remove('collapsed');
             this.sidebar.classList.toggle('open');
             this.overlay.classList.toggle('show');
         } else {
+            this.closeSidebar();
             this.sidebar.classList.toggle('collapsed');
         }
     }
@@ -116,7 +141,7 @@ class Sidebar {
         if (title) {
             const node = [...this.data.nodes, ...this.data.articles].find(n => n.title === title);
             if (node) {
-                const group = this.nav.querySelector(`.sidebar-group[data-layer="${node.layer || '其他'}"]`);
+                const group = this.nav.querySelector(`.sidebar-group[data-layer="${this.resolveLayer(node)}"]`);
                 if (group) {
                     group.classList.add('expanded');
                     const header = group.querySelector('.sidebar-group-header');

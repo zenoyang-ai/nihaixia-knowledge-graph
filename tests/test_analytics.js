@@ -127,3 +127,79 @@ test('POST pageview writes through dbFactory', async () => {
   assert.equal(body.site, 'cn');
   assert.equal(store.size, 1);
 });
+
+test('POST github_click event increments click counters without inflating PV', async () => {
+  const store = new Map();
+  const dbFactory = () => ({
+    command: {
+      inc: (n) => ({ $inc: n }),
+    },
+    collection() {
+      return {
+        doc(id) {
+          return {
+            async get() {
+              return { data: store.has(id) ? [store.get(id)] : [] };
+            },
+            async update(data) {
+              const cur = store.get(id);
+              if (data.githubClicks && data.githubClicks.$inc) cur.githubClicks = (cur.githubClicks || 0) + data.githubClicks.$inc;
+              if (data.githubClicksHeader && data.githubClicksHeader.$inc) cur.githubClicksHeader = (cur.githubClicksHeader || 0) + data.githubClicksHeader.$inc;
+              if (data.githubClicksPrompts && data.githubClicksPrompts.$inc) cur.githubClicksPrompts = (cur.githubClicksPrompts || 0) + data.githubClicksPrompts.$inc;
+              cur.lastGithubClickPath = data.lastGithubClickPath;
+              store.set(id, cur);
+            },
+            async set(data) {
+              store.set(id, { ...data });
+            },
+          };
+        },
+      };
+    },
+  });
+
+  const { main } = createAnalyticsHandler({
+    env: { ALLOWED_ORIGINS: 'https://www.nihaixia-knowledge.xyz' },
+    dbFactory,
+  });
+
+  const r1 = await main({
+    httpMethod: 'POST',
+    headers: { origin: 'https://www.nihaixia-knowledge.xyz', 'x-forwarded-for': '2.2.2.2' },
+    body: JSON.stringify({
+      type: 'event',
+      event: 'github_click',
+      source: 'header',
+      event_site: 'cn',
+      path: '/graph',
+      vid: 'visitor-demo-002',
+    }),
+  });
+  assert.equal(r1.statusCode, 200);
+  const r2 = await main({
+    httpMethod: 'POST',
+    headers: { origin: 'https://www.nihaixia-knowledge.xyz', 'x-forwarded-for': '2.2.2.2' },
+    body: JSON.stringify({
+      type: 'event',
+      event: 'github_click',
+      source: 'prompts',
+      event_site: 'cn',
+      path: '/prompts',
+      vid: 'visitor-demo-002',
+    }),
+  });
+  assert.equal(r2.statusCode, 200);
+
+  const row = [...store.values()][0];
+  assert.equal(row.pv, 0);
+  assert.equal(row.githubClicks, 2);
+  assert.equal(row.githubClicksHeader, 1);
+  assert.equal(row.githubClicksPrompts, 1);
+
+  const report = buildDailyReportText('2026-11-20', {
+    cn: { uv: 5, pv: 12, githubClicks: 2, githubClicksHeader: 1, githubClicksPrompts: 1 },
+    overseas: { uv: 1, pv: 2, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0 },
+    local: { uv: 0, pv: 0, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0 },
+  });
+  assert.match(report, /GitHub 导流点击：2 次（顶栏 1 · 提示词 1）/);
+});

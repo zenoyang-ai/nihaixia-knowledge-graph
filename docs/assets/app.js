@@ -7,6 +7,24 @@ class NihaixiaApp {
         this.init();
     }
 
+    loadOfflineData() {
+        if (window.__NIHAIXIA_OFFLINE_DATA__) {
+            return Promise.resolve(window.__NIHAIXIA_OFFLINE_DATA__);
+        }
+        if (this._offlineDataPromise) {
+            return this._offlineDataPromise;
+        }
+        this._offlineDataPromise = new Promise((resolve) => {
+            const script = document.createElement('script');
+            script.src = `data/offline-data.js?v=${ASSET_VERSION}`;
+            script.async = true;
+            script.onload = () => resolve(window.__NIHAIXIA_OFFLINE_DATA__ || null);
+            script.onerror = () => resolve(null);
+            document.head.appendChild(script);
+        });
+        return this._offlineDataPromise;
+    }
+
     async init() {
         // 1. 先注册路由（必须最先执行，否则导航完全失效）
         try {
@@ -18,13 +36,29 @@ class NihaixiaApp {
         // 2. 根据当前 hash 立即切换视图（不等数据加载）
         this.switchViewFromHash();
 
-        // 3. 加载图谱数据（失败不阻塞其他模块）
+        // 3. 加载图谱数据（本地 file:// 直开按需加载 offline-data.js，线上走 fetch 不增加带宽）
+        const isFileProtocol = window.location.protocol === 'file:';
         try {
-            const response = await fetch(`data/graph.json?v=${ASSET_VERSION}`);
-            this.data = await response.json();
+            if (isFileProtocol) {
+                const offline = await this.loadOfflineData();
+                this.data = offline && offline.graph ? offline.graph : null;
+            } else {
+                const response = await fetch(`data/graph.json?v=${ASSET_VERSION}`);
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                this.data = await response.json();
+            }
         } catch (error) {
-            console.error('加载图谱数据失败，部分功能不可用:', error);
-            this.data = null;
+            const offline = await this.loadOfflineData();
+            if (offline && offline.graph) {
+                this.data = offline.graph;
+            } else {
+                console.error('加载图谱数据失败，部分功能不可用:', error);
+                this.data = null;
+            }
+        }
+
+        if (!this.data) {
+            this._showRouteNotice('知识图谱数据加载失败，请刷新页面或通过本地服务重新打开');
         }
 
         // 4. 初始化各模块（每个独立 try-catch，一个失败不影响其他）
@@ -39,14 +73,27 @@ class NihaixiaApp {
 
         // 5. 提示词工具包独立加载，不依赖 graph.json
         try {
-            const promptResponse = await fetch(`data/prompts.json?v=${ASSET_VERSION}`);
-            const promptData = await promptResponse.json();
+            let promptData = null;
+            if (isFileProtocol) {
+                const offline = await this.loadOfflineData();
+                promptData = offline && offline.prompts ? offline.prompts : null;
+            } else {
+                try {
+                    const promptResponse = await fetch(`data/prompts.json?v=${ASSET_VERSION}`);
+                    if (!promptResponse.ok) throw new Error(`HTTP ${promptResponse.status}`);
+                    promptData = await promptResponse.json();
+                } catch (_) {
+                    const offline = await this.loadOfflineData();
+                    promptData = offline && offline.prompts ? offline.prompts : null;
+                }
+            }
+            if (!promptData) throw new Error('Empty prompts data');
             this.promptView = new PromptView(promptData);
         } catch(e) {
             console.error('PromptView init error:', e);
             // 显示兜底错误提示
             const el = document.getElementById('prompts-view');
-            if (el) el.innerHTML = '<div class="prompt-notice" style="color:#c0392b">提示词数据加载失败，请刷新页面重试。</div>';
+            if (el) el.innerHTML = '<div class="prompt-notice prompt-error-notice">提示词数据加载失败，请刷新页面重试。</div>';
         }
 
         // 6. 再次根据 hash 切换（数据加载完成后，确保视图状态正确）
@@ -87,7 +134,7 @@ class NihaixiaApp {
         const hash = window.location.hash || '#/';
         const path = hash.replace(/^#/, '') || '/';
 
-        const knownStatic = ['/', '/path', '/graph', '/prompts', '/qa'];
+        const knownStatic = ['/', '/path', '/path/renji', '/path/tianji', '/graph', '/prompts', '/qa'];
         const isNote = path.startsWith('/note/') && path.length > '/note/'.length;
         const isValid = knownStatic.includes(path) || isNote;
 
@@ -102,13 +149,16 @@ class NihaixiaApp {
         // 解析路由到视图名
         let viewName = 'overview';
         if (path === '/') viewName = 'overview';
-        else if (path === '/path') viewName = 'path';
+        else if (path === '/path' || path === '/path/renji' || path === '/path/tianji') viewName = 'path';
         else if (path === '/graph') viewName = 'graph';
         else if (path === '/prompts') viewName = 'prompts';
         else if (path === '/qa') viewName = 'qa';
         else if (isNote) viewName = 'note';
 
         this.switchView(viewName);
+        if (viewName === 'path' && this.pathView) {
+            this.pathView.setActiveTab(path === '/path/tianji' ? 'tianji' : 'renji');
+        }
         this.updateNav();
     }
 
@@ -280,7 +330,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function setStatus(text, isError = false) {
         if (!statusEl) return;
         statusEl.textContent = text;
-        statusEl.style.color = isError ? '#b9362c' : '';
+        statusEl.style.color = isError ? 'var(--accent)' : '';
     }
 
     function clearStatus() {
@@ -636,7 +686,9 @@ document.addEventListener('DOMContentLoaded', () => {
             lastFailedMessage = trimmedMsg;
             const isNetwork = err instanceof TypeError || /fetch|network|CORS/i.test(String(err.message || ''));
             const detail = isNetwork
-                ? '网络连接失败：服务未配置、跨域限制或地址不可达'
+                ? (window.location.protocol === 'file:'
+                    ? '当前为本地离线文件（file://）直开，云端问答接口受跨域安全白名单保护，请前往线上主站 www.nihaixia-knowledge.xyz 或通过本地 http://127.0.0.1:8765 服务体验 AI 问答'
+                    : '网络连接失败：服务未配置、跨域限制或地址不可达')
                 : (err.message || '未知错误');
             addMessage('assistant', buildErrorReply(detail));
             if (retryBtn) retryBtn.hidden = false;

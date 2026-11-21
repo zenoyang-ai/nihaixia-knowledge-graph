@@ -2,19 +2,20 @@
 
 国内主站与海外站通过 `docs/assets/analytics.js` 上报 pageview；云函数 `nihaixia-analytics` 聚合后按日发飞书。
 
-- 前端：`docs/assets/analytics.js`（`index.html` asset 版本当前为 `20260723-v21`）
+- 前端：`docs/assets/analytics.js`（资源版本号见 `docs/index.html` 的 `meta[name="asset-version"]`）
 - HTTP：`https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics`
 - 集合：`site_daily_stats`（需在控制台已创建）
 - 定时触发器：`dailyVisitReport`，cron `0 15 0 * * * *`（本环境 CloudBase cron 按**北京时间**解释，即每天北京 00:15 汇总**前一自然日**）
-- 云函数路径：`cloudbase/functions/nihaixia-analytics/`（VERSION `0.1.1`）
+- 云函数路径：`cloudbase/functions/nihaixia-analytics/`（VERSION `0.2.0`，本地分支已更新；如需线上启用 GitHub 导流点击日报计数，请手动执行 `cd cloudbase && tcb fn deploy nihaixia-analytics`）
 
 ## 行为摘要
 
 | 方法 | 说明 |
 |------|------|
-| `POST` | 上报 `{ type:'pageview', site, path, vid, t }`；失败前端静默 |
+| `POST`（浏览） | 上报 `{ type:'pageview', site, path, vid, t }`；失败前端静默 |
+| `POST`（GitHub 导流点击） | 上报 `{ type:'event', event:'github_click', source:'header'\|'prompts', event_site, path, vid, t }`；独立计入 `githubClicks`（不虚增 PV，且向后兼容未升级前的 v0.1.1 云函数） |
 | `GET` | 健康检查 / 手工触发报表（以云函数实现为准） |
-| 定时器 | 按 `YYYY-MM-DD`（`formatToParts`，勿用 `toLocaleDateString` 默认美式）汇总前一自然日 UV/PV → 飞书 |
+| 定时器 | 按 `YYYY-MM-DD`（`formatToParts`，勿用 `toLocaleDateString` 默认美式）汇总前一自然日 UV/PV 与 GitHub 导流点击 → 飞书 |
 
 `site`：`cn`（CloudBase 静态托管）/ `overseas`（GitHub Pages）/ `local`。
 

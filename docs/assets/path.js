@@ -81,6 +81,7 @@ class PathView {
             <div class="path-stage">
                 <div class="path-stage-header">${stage.title}</div>
                 <div class="path-stage-content">
+                    ${stage.desc ? `<p class="path-stage-desc">${stage.desc}</p>` : ''}
                     <div class="path-node-list">
                         ${stage.nodes.map(name => {
                             const node = this.allNodes.find(n => n.title === name);
@@ -93,14 +94,25 @@ class PathView {
         `).join('');
     }
 
+    setActiveTab(tab) {
+        const key = tab === 'tianji' ? 'tianji' : 'renji';
+        document.querySelectorAll('.path-tab').forEach(t => {
+            t.classList.toggle('active', t.dataset.path === key);
+        });
+        document.querySelectorAll('.path-content').forEach(c => {
+            c.classList.toggle('active', c.id === `${key}-path`);
+        });
+    }
+
     bindEvents() {
         document.querySelectorAll('.path-tab').forEach(tab => {
             tab.addEventListener('click', () => {
-                document.querySelectorAll('.path-tab').forEach(t => t.classList.remove('active'));
-                tab.classList.add('active');
-                document.querySelectorAll('.path-content').forEach(c => c.classList.remove('active'));
-                const target = document.getElementById(`${tab.dataset.path}-path`);
-                if (target) target.classList.add('active');
+                const key = tab.dataset.path === 'tianji' ? 'tianji' : 'renji';
+                this.setActiveTab(key);
+                const targetHash = key === 'tianji' ? '#/path/tianji' : '#/path';
+                if (window.location.hash !== targetHash) {
+                    history.replaceState(null, '', targetHash);
+                }
             });
         });
     }

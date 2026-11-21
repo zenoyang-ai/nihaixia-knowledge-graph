@@ -1,0 +1,5 @@
+interface:
+  display_name: "天纪提示词"
+  short_description: "基于倪海厦天纪体系的命理分析与现实问题拆解助手"
+  brand_color: "#8e44ad"
+  default_prompt: "用倪海厦天纪体系帮我分析八字/紫微命盘/用易经拆解问题/小六壬看日常小事。"

@@ -86,7 +86,17 @@ class ForceGraph {
             '案例研读': cssVar('--layer-cases', '#c7892b'),
             '天纪体系': cssVar('--layer-tianji', '#7b5ea7'),
             '学习路径': cssVar('--layer-path', '#7f8c8d'),
+            '深度专题': cssVar('--layer-topic', '#8c6b53'),
         };
+    }
+
+    resolveNodeLayer(node) {
+        return (node && (node.layer || (node.node_type === 'topic' ? '深度专题' : ''))) || '';
+    }
+
+    formatNodeLabel(title) {
+        const s = String(title || '');
+        return s.length > 8 ? `${s.slice(0, 7)}…` : s;
     }
 
     recolorNodes() {
@@ -98,13 +108,15 @@ class ForceGraph {
             if (circle) circle.setAttribute('fill', color);
         });
         if (this.selectedNode) {
-            this.detailPanel.style.setProperty('--panel-accent', this.layerColor[this.selectedNode.layer] || '#b9362c');
+            const layer = this.resolveNodeLayer(this.selectedNode);
+            this.detailPanel.style.setProperty('--panel-accent', this.layerColor[layer] || 'var(--accent)');
         }
     }
 
     render(nodeList) {
         if (!nodeList) nodeList = [...this.data.nodes, ...this.data.articles];
         this.container.innerHTML = '';
+        if (this.container.parentElement) this.container.parentElement.classList.remove('panel-open');
         this.detailPanel.classList.remove('open');
         this.selectedNode = null;
         this.activeConcept = null;
@@ -260,22 +272,26 @@ class ForceGraph {
         this.nodeEls = document.createElementNS(NS, 'g');
         this.nodeEls.setAttribute('class', 'graph-nodes');
         this.nodes.forEach(n => {
+            const resolvedLayer = this.resolveNodeLayer(n);
             const ng = document.createElementNS(NS, 'g');
             ng.classList.add('graph-node');
             ng.classList.add(n.tier === 'core' ? 'tier-core' : 'tier-standard');
             ng.dataset.id = n.id;
             ng.dataset.tier = n.tier;
-            ng.dataset.layer = n.layer || '';
+            ng.dataset.layer = resolvedLayer;
             ng.__data__ = n;
 
             // 键盘可达性
             ng.setAttribute('tabindex', '0');
             ng.setAttribute('role', 'button');
             ng.setAttribute('aria-label',
-                `${n.title}，${this.typeLabel[n.node_type] || n.node_type || '节点'}，${n.layer || '未分类'}`);
+                `${n.title}，${this.typeLabel[n.node_type] || n.node_type || '节点'}，${resolvedLayer || '未分类'}`);
 
             const r = getRadius(n);
-            const color = this.layerColor[n.layer] || '#999';
+            const color = this.layerColor[resolvedLayer] || '#999';
+
+            const titleEl = document.createElementNS(NS, 'title');
+            titleEl.textContent = n.title;
 
             const circle = document.createElementNS(NS, 'circle');
             circle.setAttribute('r', r);
@@ -284,11 +300,15 @@ class ForceGraph {
             circle.setAttribute('stroke', n.tier === 'core' ? '#fff' : 'rgba(255,255,255,0.2)');
             circle.setAttribute('stroke-width', n.tier === 'core' ? '2' : '0.5');
 
+            const shortLabel = this.formatNodeLabel(n.title);
             const text = document.createElementNS(NS, 'text');
             text.setAttribute('text-anchor', 'middle');
             text.setAttribute('dy', -(r + 5));
-            text.textContent = n.title;
+            text.dataset.shortTitle = shortLabel;
+            text.dataset.fullTitle = n.title;
+            text.textContent = shortLabel;
 
+            ng.appendChild(titleEl);
             ng.appendChild(circle);
             ng.appendChild(text);
             this.nodeEls.appendChild(ng);
@@ -356,8 +376,12 @@ class ForceGraph {
         // hover 高亮
         d3.select(this.nodeEls).selectAll('.graph-node')
             .on('mouseenter', function(event, d) {
-                // 始终显示该节点的标签
+                // 始终显示该节点的完整标签
                 this.classList.add('hovered');
+                const labelEl = this.querySelector('text');
+                if (labelEl && labelEl.dataset.fullTitle) {
+                    labelEl.textContent = labelEl.dataset.fullTitle;
+                }
                 if (self.selectedNode) return;
                 const neighbors = new Set([d.id]);
                 self.links.forEach(l => {
@@ -375,8 +399,12 @@ class ForceGraph {
                     if (hit) line.style.stroke = self.getAccent();
                 });
             })
-            .on('mouseleave', function() {
+            .on('mouseleave', function(event, d) {
                 this.classList.remove('hovered');
+                const labelEl = this.querySelector('text');
+                if (labelEl && labelEl.dataset.shortTitle && (!self.selectedNode || self.selectedNode.id !== d.id)) {
+                    labelEl.textContent = labelEl.dataset.shortTitle;
+                }
                 if (self.selectedNode) return;
                 self.nodeEls.querySelectorAll('.graph-node').forEach(ng => { ng.style.opacity = ''; });
                 self.linkEls.querySelectorAll('line').forEach(line => { line.style.opacity = ''; line.style.stroke = ''; });
@@ -732,10 +760,17 @@ class ForceGraph {
     clearSelection() {
         this.selectedNode = null;
         this.detailPanel.classList.remove('open');
+        if (this.container && this.container.parentElement) {
+            this.container.parentElement.classList.remove('panel-open');
+        }
         if (this.viewport) {
             this.viewport.querySelectorAll('.graph-node').forEach(g => {
                 g.style.opacity = '';
                 g.classList.remove('selected');
+                const labelEl = g.querySelector('text');
+                if (labelEl && labelEl.dataset.shortTitle && !g.classList.contains('hovered')) {
+                    labelEl.textContent = labelEl.dataset.shortTitle;
+                }
             });
             this.viewport.querySelectorAll('.graph-link').forEach(l => { l.style.opacity = ''; l.style.stroke = ''; });
         }
@@ -752,8 +787,17 @@ class ForceGraph {
         });
 
         this.viewport.querySelectorAll('.graph-node').forEach(g => {
-            g.classList.toggle('selected', g.dataset.id === node.id);
+            const isSel = g.dataset.id === node.id;
+            g.classList.toggle('selected', isSel);
             g.style.opacity = connectedIds.has(g.dataset.id) ? '1' : '0.1';
+            const labelEl = g.querySelector('text');
+            if (labelEl) {
+                if (isSel && labelEl.dataset.fullTitle) {
+                    labelEl.textContent = labelEl.dataset.fullTitle;
+                } else if (!isSel && labelEl.dataset.shortTitle && !g.classList.contains('hovered')) {
+                    labelEl.textContent = labelEl.dataset.shortTitle;
+                }
+            }
         });
         this.viewport.querySelectorAll('.graph-link').forEach(line => {
             const hit = (line.dataset.source === node.id || line.dataset.target === node.id);
@@ -764,7 +808,7 @@ class ForceGraph {
         // 画布平滑居中到选中节点（为详情面板让出右侧空间）
         if (this.zoomBehavior && Number.isFinite(node.x) && Number.isFinite(node.y)) {
             const rect = this.container.getBoundingClientRect();
-            const panelW = (window.innerWidth > 1024) ? 340 : 0;
+            const panelW = (window.innerWidth > 768) ? 340 : 0;
             const k = Math.max(this.currentZoomScale || 1, 1.35);
             const t = d3.zoomIdentity
                 .translate((rect.width - panelW) / 2 - node.x * k, rect.height / 2 - node.y * k)
@@ -778,7 +822,8 @@ class ForceGraph {
 
     showDetail(node) {
         // 顶部色条标识节点所属层级
-        this.detailPanel.style.setProperty('--panel-accent', this.layerColor[node.layer] || '#b9362c');
+        const resolvedLayer = this.resolveNodeLayer(node);
+        this.detailPanel.style.setProperty('--panel-accent', this.layerColor[resolvedLayer] || 'var(--accent)');
 
         const all = [...this.data.nodes, ...this.data.articles];
         const up = (node.upstream || []).map(n => all.find(x => x.title === n)).filter(Boolean);
@@ -791,17 +836,27 @@ class ForceGraph {
 
         this.detailPanel.innerHTML = `
             <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-                <span style="font-size:11px;color:var(--muted);">${this.typeLabel[node.node_type]||''} · ${node.layer||''}</span>
-                <button onclick="document.getElementById('graph-detail-panel').classList.remove('open')" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--muted);">✕</button>
+                <span style="font-size:11px;color:var(--on-surface-faint);">${this.typeLabel[node.node_type]||''} · ${resolvedLayer || '未分类'}</span>
+                <button type="button" class="graph-detail-close" aria-label="关闭详情" style="border:none;background:none;cursor:pointer;font-size:16px;color:var(--on-surface-faint);padding:2px 6px;">✕</button>
             </div>
-            <h3 style="font-size:17px;font-weight:700;color:var(--ink);margin-bottom:6px;">${node.title}</h3>
-            <p style="font-size:13px;color:var(--text-light);line-height:1.6;margin-bottom:14px;">${node.definition||''}</p>
-            ${up.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">上游</div><div>${linkHtml(up)}</div></div>`:''}
-            ${down.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">下游</div><div>${linkHtml(down)}</div></div>`:''}
-            ${rel.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--text);margin-bottom:4px;">相关</div><div>${linkHtml(rel)}</div></div>`:''}
-            <a href="#/note/${encodeURIComponent(node.title)}" style="display:block;text-align:center;padding:9px;background:var(--accent);color:#fff;border-radius:6px;text-decoration:none;font-size:12px;font-weight:600;margin-top:14px;">查看完整内容 →</a>
+            <h3 style="font-size:17px;font-weight:700;color:var(--on-surface-strong);margin-bottom:6px;">${node.title}</h3>
+            <p style="font-size:13px;color:var(--on-surface-muted);line-height:1.6;margin-bottom:14px;">${node.definition||''}</p>
+            ${up.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--on-surface);margin-bottom:4px;">上游</div><div>${linkHtml(up)}</div></div>`:''}
+            ${down.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--on-surface);margin-bottom:4px;">下游</div><div>${linkHtml(down)}</div></div>`:''}
+            ${rel.length?`<div style="margin-bottom:10px;"><div style="font-size:11px;font-weight:700;color:var(--on-surface);margin-bottom:4px;">相关</div><div>${linkHtml(rel)}</div></div>`:''}
+            <a href="#/note/${encodeURIComponent(node.title)}" class="graph-detail-cta">查看完整内容 →</a>
         `;
+        const closeBtn = this.detailPanel.querySelector('.graph-detail-close');
+        if (closeBtn) {
+            closeBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.clearSelection();
+            });
+        }
         this.detailPanel.classList.add('open');
+        if (this.container && this.container.parentElement) {
+            this.container.parentElement.classList.add('panel-open');
+        }
     }
 }
 

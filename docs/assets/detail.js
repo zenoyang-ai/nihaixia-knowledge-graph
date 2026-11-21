@@ -34,11 +34,8 @@ class NoteDetail {
             <div class="note-meta">
                 <span class="note-tag">${this.typeLabel(node.node_type)}</span>
                 <span class="note-tag layer">${node.layer || '未分类'}</span>
-                ${node.importance === 'core' ? '<span class="note-tag" style="border-color:#c0392b;color:#c0392b;">核心节点</span>' : ''}
+                ${node.importance === 'core' ? '<span class="note-tag note-tag--core">核心节点</span>' : ''}
                 <button type="button" class="poster-trigger-btn"
-                    style="display:inline-flex;align-items:center;gap:4px;padding:3px 10px;font-size:12px;font-weight:600;color:#b9362c;background:transparent;border:1px solid #b9362c;border-radius:999px;cursor:pointer;font-family:inherit;transition:background .18s,color .18s;"
-                    onmouseover="this.style.background='#b9362c';this.style.color='#fff';"
-                    onmouseout="this.style.background='transparent';this.style.color='#b9362c';"
                     onclick="window.generatePoster && window.generatePoster(window.currentNodeData)">
                     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
                         <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>

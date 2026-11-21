@@ -17,11 +17,11 @@ class Overview {
         if (countEl) countEl.textContent = `${stats.nodes_total} 个节点`;
 
         this.stages = [
-            { num: '01', name: '底层框架', desc: '阴阳五行，天人关系', layers: ['底层框架'], color: '#b9362c' },
-            { num: '02', name: '辨证框架', desc: '八纲六经，脏腑经络', layers: ['辨证框架'], color: '#315d82' },
-            { num: '03', name: '方法工具', desc: '经方本草，针灸方剂', layers: ['方法工具'], color: '#2c705f' },
-            { num: '04', name: '案例研读', desc: '医案索引，望诊学习', layers: ['案例研读'], color: '#c7892b' },
-            { num: '05', name: '天纪体系', desc: '易经象数，三才贯通', layers: ['天纪体系'], color: '#7b5ea7' },
+            { num: '01', name: '底层框架', desc: '阴阳五行，天人关系', layers: ['底层框架'], color: 'var(--layer-cosmology)' },
+            { num: '02', name: '辨证框架', desc: '八纲六经，脏腑经络', layers: ['辨证框架'], color: 'var(--layer-diagnosis)' },
+            { num: '03', name: '方法工具', desc: '经方本草，针灸方剂', layers: ['方法工具'], color: 'var(--layer-treatment)' },
+            { num: '04', name: '案例研读', desc: '医案索引，望诊学习', layers: ['案例研读'], color: 'var(--layer-cases)' },
+            { num: '05', name: '天纪体系', desc: '易经象数，三才贯通', layers: ['天纪体系'], color: 'var(--layer-tianji)' },
         ];
 
         const stagesRow = document.getElementById('stages-row');
