@@ -1,0 +1,24 @@
+name: 内容勘误 / 古籍校勘
+description: 反馈错别字、OCR 残留、死链，或补充已校勘的《黄帝内经》《伤寒论》《金匮要略》章节
+title: "[勘误] "
+labels: ["documentation"]
+body:
+  - type: input
+    id: path
+    attributes:
+      label: 涉及页面或文件路径
+      placeholder: 例如：knowledge/04-人纪学习资料/神农本草经/01-上经.md 或 #/note/阴阳
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: 问题描述与修改建议
+      placeholder: 原文位置、哪里有错字/断行/死链，建议改成什么
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: 依据出处（选填）
+      placeholder: 例如：原典卷次、讲次或对照版本

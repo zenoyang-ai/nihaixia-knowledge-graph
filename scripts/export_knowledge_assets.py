@@ -16,6 +16,7 @@
 """
 
 import argparse
+import hashlib
 import json
 import re
 import shutil
@@ -60,6 +61,7 @@ FORBIDDEN_PATH_RE = re.compile(r"/(?:Users|home)/[^\s\"'<>]+|~/Workspace|staging
 FORBIDDEN_PRIVACY_RE = re.compile(
     r"杨圣旦|民间中医爱好者|英年早肥|pan\.baidu\.com|pan\.quark\.cn|aliyundrive\.com|(?<!\d)1[3-9]\d{9}(?!\d)"
 )
+FORBIDDEN_EDITOR_NOTE_RE = re.compile(r"^>\s*小编", re.M)
 FORBIDDEN_OCR_RE = re.compile(
     r"==>\s*picture|Start of picture text|End of picture text|INCLUDEPICTURE|\bHYPERLINK\b|\*\*\(\*\*"
 )
@@ -94,12 +96,71 @@ def write_clean(path: Path, content: str) -> None:
     path.write_text(normalize_text(content), encoding="utf-8")
 
 
+# 节点卡片（位于 01-知识图谱笔记/<层级>/）到本仓 03/04/05 原文分章的映射规则
+SOURCE_LIBRARY_LINKS = [
+    ("天机道笔记个人整理", "天机道听课与盘面笔记", "../../03-天纪学习资料/笔记与参考/天机道笔记.md"),
+    ("天机道终稿", "天机道", "../../03-天纪学习资料/01-天机道.md"),
+    ("地脉道听课笔记", "地脉道听课笔记", "../../03-天纪学习资料/笔记与参考/地脉道听课笔记.md"),
+    ("地脉道", "地脉道", "../../03-天纪学习资料/02-地脉道.md"),
+    ("人间道听课笔记", "人间道听课笔记", "../../03-天纪学习资料/笔记与参考/人间道听课笔记.md"),
+    ("人间道", "人间道（3 卷）", "../../03-天纪学习资料/03-人间道/README.md"),
+    ("易经64卦图", "易经64卦图", "../../03-天纪学习资料/04-易经64卦图.md"),
+    ("易经推命批法", "易经推命批法", "../../03-天纪学习资料/笔记与参考/易经推命批法.md"),
+    ("针灸大成", "针灸大成（十卷全本）", "../../04-人纪学习资料/针灸大成/README.md"),
+    ("人纪-简体针灸教程", "人纪·针灸篇（8 章）", "../../04-人纪学习资料/人纪-针灸篇/README.md"),
+    ("神农本草经", "神农本草经（5 卷）", "../../04-人纪学习资料/神农本草经/README.md"),
+    ("黄帝内经", "黄帝内经注解（节选）", "../../04-人纪学习资料/经方与内经节选/黄帝内经注解-节选.md"),
+    ("伤寒论", "伤寒论注解（节选）", "../../04-人纪学习资料/经方与内经节选/伤寒论注解-节选.md"),
+    ("金匮要略", "金匮要略注解（节选）", "../../04-人纪学习资料/经方与内经节选/金匮要略注解-节选.md"),
+    ("梁冬对话", "梁冬对话倪海厦（7 讲）", "../../05-公开讲座与访谈/01-梁冬对话倪海厦/README.md"),
+    ("仲景心法", "仲景心法（7 讲）", "../../05-公开讲座与访谈/02-仲景心法/README.md"),
+    ("扶阳论坛", "扶阳论坛演讲（经方与阴阳辨证）", "../../05-公开讲座与访谈/03-扶阳论坛演讲-经方与阴阳辨证.md"),
+    ("经方的妙用", "经方的妙用讲座", "../../05-公开讲座与访谈/04-经方的妙用讲座.md"),
+]
+
+
+def _resolve_source_link(raw_target: str, alias: str) -> str:
+    """若出处对应本仓已收录原文，转为可点击的跨目录相对 Markdown 链接；否则返回干净纯文本。"""
+    display = (alias or raw_target).strip().replace("天机道笔记个人整理", "天机道听课与盘面笔记")
+    combined = f"{raw_target} {alias}"
+    # 排除未收录的参考书或闭门/医案文档，避免误链
+    if any(skip in combined for skip in ("白话文", "黄帝外经", "桂林孤本", "记忆手册", "闭门课", "医案", "汉唐方剂", "扶阳摘记", "眼诊")):
+        return display
+    for keyword, label, rel_url in SOURCE_LIBRARY_LINKS:
+        if keyword in combined:
+            # 仅当目标文件在知识库中存在时才生成链接，避免单测或离线局部导出时出现死链
+            target_abs = (KNOWLEDGE_DIR / "01-知识图谱笔记" / "02-底层框架" / rel_url).resolve()
+            if target_abs.exists():
+                return f"[{label}]({rel_url})"
+            return label
+    return display
+
+
 def clean_source_section(text: str) -> str:
-    """将 graph.json 原始出处里的 vault 双链转为干净纯文本，避免死链与个人草稿文件名残留。"""
+    """将 graph.json 原始出处里的 vault 双链转为跨目录可点击链接或干净文本，并清除过时状态与本地 PDF 体积备注。"""
     if not text:
         return ""
-    cleaned = WIKILINK_RE.sub(lambda m: (m.group(2) or m.group(1)).strip(), text).strip()
-    return cleaned.replace("天机道笔记个人整理", "天机道听课与盘面笔记")
+    lines = []
+    seen = set()
+    for line in text.splitlines():
+        if "0B 空文件" in line:
+            continue
+        converted = WIKILINK_RE.sub(
+            lambda m: _resolve_source_link(m.group(1).strip(), (m.group(2) or "").strip()),
+            line,
+        )
+        converted = converted.replace("天机道笔记个人整理", "天机道听课与盘面笔记")
+        # 去掉历史本地文件体积/旧 PDF 状态后缀，保留有意义的内容说明
+        converted = re.sub(
+            r"\s*—\s*(?:原始\s*PDF（[^）]+）|已转换可检索版(?:（[^）]+）)?|可检索版|\d+(?:\.\d+)?\s*(?:KB|MB)(?:\s*完整合集)?)\s*$",
+            "",
+            converted,
+        ).rstrip()
+        key = converted.strip()
+        if key and key not in seen:
+            seen.add(key)
+            lines.append(converted)
+    return "\n".join(lines).strip()
 
 
 def export_offline_site_bundle(graph: dict, prompts: list) -> None:
@@ -475,6 +536,46 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
         ])
     write_clean(rag_dir / "nihaixia-corpus-all.md", "\n".join(corpus_parts))
 
+    # 6. 生成机器可读清单 MANIFEST.json（含 SHA-256 校验和与分层协议口径）
+    manifest_entries = []
+    file_specs = [
+        ("nihaixia-corpus-all.md", "markdown", len(all_items) + len(prompts), "合并单文件：64 节点 + 5 专题 + 学习路径 + 5 套天纪提示词"),
+        ("nodes.jsonl", "jsonl", len(nodes), "64 条图谱节点结构化数据（id/title/layer/definition/summary/quotes/misconceptions/safety_boundary）"),
+        ("articles.jsonl", "jsonl", len(articles), "5 篇深度专题结构化数据"),
+        ("edges.jsonl", "jsonl", len(edges_jsonl), "338 条有向知识关联边（source/source_title/target/target_title）"),
+        ("tianji-prompts.md", "markdown", len(prompts), "5 套天纪提示词完整版与简版"),
+    ]
+    for fname, fmt, records, desc in file_specs:
+        fpath = rag_dir / fname
+        raw_bytes = fpath.read_bytes()
+        manifest_entries.append({
+            "file": fname,
+            "format": fmt,
+            "records": records,
+            "bytes": len(raw_bytes),
+            "sha256_checksum": hashlib.sha256(raw_bytes).hexdigest(),
+            "description": desc,
+        })
+    manifest_payload = {
+        "schema_version": "1.0",
+        "dataset": "nihaixia-knowledge-graph-ai-pack",
+        "source_repo": "https://github.com/zenoyang-ai/nihaixia-knowledge-graph",
+        "license": {
+            "structured_cards_and_prompts": "CC BY-SA 4.0",
+            "code_and_scripts": "MIT",
+            "original_teachings_attribution": "倪海厦先生及其权利继承人（仅限个人非商业学习研究）",
+        },
+        "medical_safety": "learning_only",
+        "counts": {
+            "nodes": len(nodes),
+            "articles": len(articles),
+            "edges": len(edges_jsonl),
+            "prompts": len(prompts),
+        },
+        "files": manifest_entries,
+    }
+    write_clean(rag_dir / "MANIFEST.json", json.dumps(manifest_payload, ensure_ascii=False, indent=2))
+
     rag_readme = f"""# AI 知识库语料包
 
 与在线网站同步导出，用来直接喂给大模型或接入自己的知识库工具。
@@ -486,6 +587,7 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
 | [`articles.jsonl`](./articles.jsonl) | {len(articles)} 篇专题文章数据 | 补充长文检索 |
 | [`edges.jsonl`](./edges.jsonl) | {len(edges_jsonl)} 条节点关联边 | 搭 GraphRAG 或做图谱分析 |
 | [`tianji-prompts.md`](./tianji-prompts.md) | {len(prompts)} 套天纪提示词完整版 | 直接复制使用 |
+| [`MANIFEST.json`](./MANIFEST.json) | 机器可读数据清单、条数、许可口径与 SHA-256 校验和 | 给自动化脚本或 RAG 流水线核验版本 |
 
 如果想在 Claude Code、Cursor、Codex 里直接安装天纪提示词，看 [`skills/nihaixia-tianji/`](../../skills/nihaixia-tianji/README.md)。
 """
@@ -1077,16 +1179,154 @@ def export_library_texts(raw_ima_dir: Path, raw_ocr_dir: Path, sources_public_di
     ensure_library_sub_readmes()
 
 
+def clean_public_lecture_text(raw: str) -> str:
+    """剥离本地 YAML frontmatter 与第三方 `> 小编：` 评论行，完整保留倪师与主持人的公开讲授/访谈原话。"""
+    text = raw.replace("\r\n", "\n").replace("\r", "\n")
+    if text.startswith("---"):
+        end = text.find("\n---", 3)
+        if end > 0:
+            text = text[end + 4 :]
+    kept = []
+    for line in text.splitlines():
+        s = line.strip()
+        if re.match(r"^>\s*小编", s):
+            continue
+        if s == ">":
+            continue
+        kept.append(line.rstrip())
+    return "\n".join(kept).strip()
+
+
+def export_public_lectures(raw_lectures_dir: Path) -> None:
+    """从本地公开演讲与访谈目录清洗导出 knowledge/05-公开讲座与访谈/（剔除第三方小编注与临床案例分册）。"""
+    out_dir = KNOWLEDGE_DIR / "05-公开讲座与访谈"
+    if out_dir.exists():
+        shutil.rmtree(out_dir)
+
+    banner_dialogue = (
+        "> **著作与整理声明**：本访谈为 2009 年底《国学堂》公开播出的梁冬与倪海厦先生对话文字整理，"
+        "著作权归原权利方所有；已剔除无关第三方评论，完整保留对话原文，供个人非商业学习与传统文化研究。\n"
+        "> 文中涉及的中医方药与养生讨论仅为访谈原貌，不构成个人用药或医疗建议。如权利方有异议，请通过 GitHub Issues 联系，核实后 7 个工作日内移除。\n"
+    )
+    banner_lecture = (
+        "> **著作与整理声明**：本文件为倪海厦先生 2009 年公开学术讲座文字整理，讲授思想著作权归**倪海厦先生**及其权利继承人所有；"
+        "已剔除无关第三方评论，完整保留讲座原貌，供个人非商业学习研究。\n"
+        "> 文中涉及的经方、药物与剂量讨论仅为讲座文献原貌，严禁照方抓药或用于个人自诊自疗。如权利方有异议，请通过 GitHub Issues 联系，核实后 7 个工作日内移除。\n"
+    )
+
+    # 1. 梁冬对话倪海厦（7 讲）
+    ld_src = raw_lectures_dir / "梁冬对话倪海厦09年12月"
+    ld_out = out_dir / "01-梁冬对话倪海厦"
+    ld_rows = []
+    ld_files = [
+        ("1.第一讲.md", "01-第一讲.md", "第一讲"),
+        ("2.第二讲.md", "02-第二讲.md", "第二讲"),
+        ("3.第三讲.md", "03-第三讲.md", "第三讲"),
+        ("4.第四讲.md", "04-第四讲.md", "第四讲"),
+        ("5.第五讲.md", "05-第五讲.md", "第五讲"),
+        ("6.第六讲.md", "06-第六讲.md", "第六讲"),
+        ("7.第七讲.md", "07-第七讲.md", "第七讲"),
+    ]
+    for src_name, dst_name, label in ld_files:
+        body = clean_public_lecture_text((ld_src / src_name).read_text(encoding="utf-8"))
+        write_clean(ld_out / dst_name, f"# 梁冬对话倪海厦 — {label}\n\n" + banner_dialogue + "\n" + body)
+        ld_rows.append(f"| [{dst_name}](./{dst_name}) | {label} |")
+    write_clean(
+        ld_out / "README.md",
+        "# 梁冬对话倪海厦（2009 年 12 月 · 共 7 讲）\n\n"
+        + banner_dialogue
+        + "\n适合零基础入门阅读的对话体访谈，聊透了中医观、阴阳思维、经方与生活常识。\n\n"
+        + "| 文件 | 讲次 |\n|------|------|\n"
+        + "\n".join(ld_rows)
+        + "\n",
+    )
+
+    # 2. 仲景心法（前言 + 7 讲）
+    zj_src = raw_lectures_dir / "倪师仲景心法09年12月"
+    zj_out = out_dir / "02-仲景心法"
+    zj_rows = []
+    zj_files = [
+        ("0.前言.md", "00-前言.md", "前言（刘力红致欢迎词）"),
+        ("1.仲景心法.md", "01-第一讲.md", "第一讲：经方阴阳与学习入手"),
+        ("2.仲景心法.md", "02-第二讲.md", "第二讲：伤寒金匮脉络"),
+        ("3.仲景心法.md", "03-第三讲.md", "第三讲：辨证与寒热虚实"),
+        ("4.仲景心法.md", "04-第四讲.md", "第四讲：经方思路展开"),
+        ("5.仲景心法.md", "05-第五讲.md", "第五讲：脏腑与复杂病机讨论"),
+        ("6.仲景心法.md", "06-第六讲.md", "第六讲：水饮、经络与杂病辨析"),
+        ("7.仲景心法.md", "07-第七讲.md", "第七讲：脉症合参与答疑"),
+    ]
+    for src_name, dst_name, label in zj_files:
+        body = clean_public_lecture_text((zj_src / src_name).read_text(encoding="utf-8"))
+        write_clean(zj_out / dst_name, f"# 仲景心法（2009 年 12 月）— {label}\n\n" + banner_lecture + "\n" + body)
+        zj_rows.append(f"| [{dst_name}](./{dst_name}) | {label} |")
+    write_clean(
+        zj_out / "README.md",
+        "# 倪师仲景心法（2009 年 12 月 · 南宁公开讲座）\n\n"
+        + banner_lecture
+        + "\n浓缩串讲《伤寒论》与《金匮要略》的核心辨证思路，适合配合 `04-人纪学习资料/` 中的经方注解节选一起阅读。\n\n"
+        + "| 文件 | 讲次与主题 |\n|------|------|\n"
+        + "\n".join(zj_rows)
+        + "\n",
+    )
+
+    # 3. 扶阳论坛演讲（仅收录第一部分理论演讲 + 结尾，主动排除第二部分美国临床案例）
+    fy_src = raw_lectures_dir / "倪师扶阳论坛演讲09年10月"
+    fy_parts = [
+        clean_public_lecture_text((fy_src / "0.前言.md").read_text(encoding="utf-8")),
+        clean_public_lecture_text((fy_src / "第一部分：经方的运用与阳阳辩证法的关系.md").read_text(encoding="utf-8")),
+        "## 结语",
+        clean_public_lecture_text((fy_src / "结尾，讲附子.md").read_text(encoding="utf-8")),
+    ]
+    write_clean(
+        out_dir / "03-扶阳论坛演讲-经方与阴阳辨证.md",
+        "# 第三届扶阳论坛演讲：经方的运用与阴阳辨证法的关系（2009 年 10 月）\n\n"
+        + banner_lecture
+        + "> **范围说明**：本文件收录演讲理论部分；按本仓库安全边界，不收录演讲后半段的具体临床患者案例。\n\n"
+        + "\n\n".join(p for p in fy_parts if p),
+    )
+
+    # 4. 经方的妙用讲座
+    jf_src = raw_lectures_dir / "经方的妙用讲座09年12月"
+    jf_parts = [
+        clean_public_lecture_text((jf_src / "0.前言.md").read_text(encoding="utf-8")),
+        clean_public_lecture_text((jf_src / "1.经方的妙用.md").read_text(encoding="utf-8")),
+    ]
+    write_clean(
+        out_dir / "04-经方的妙用讲座.md",
+        "# 经方的妙用公开讲座（2009 年 12 月）\n\n"
+        + banner_lecture
+        + "\n"
+        + "\n\n".join(p for p in jf_parts if p),
+    )
+
+    # 5. 顶层 README.md
+    lectures_readme = """# 公开讲座与访谈（2009）
+
+这里收录了倪海厦先生 2009 年底的 4 组公开讲座与对话文字整理，已去掉全部第三方编辑插入的评论，保留原貌并按讲次拆分。
+
+## 目录
+
+| 目录 / 文件 | 说明 | 推荐时机 |
+| --- | --- | --- |
+| [01-梁冬对话倪海厦/](./01-梁冬对话倪海厦/README.md) | 《国学堂》7 讲完整对话（约 11 万字） | 最适合零基础入门，先建立中医与天地人整体观 |
+| [02-仲景心法/](./02-仲景心法/README.md) | 南宁公开讲座（前言 + 7 讲，约 11.7 万字） | 串讲《伤寒》《金匮》核心心法，配合经方学习 |
+| [03-扶阳论坛演讲-经方与阴阳辨证.md](./03-扶阳论坛演讲-经方与阴阳辨证.md) | 第三届扶阳论坛理论演讲（不含临床案例） | 理解阴阳辨证与经方思路的关系 |
+| [04-经方的妙用讲座.md](./04-经方的妙用讲座.md) | 广西中医学院公开演讲 | 经方总纲与辨证要点速览 |
+"""
+    write_clean(out_dir / "README.md", lectures_readme)
+
+
 def ensure_library_sub_readmes() -> None:
     """为天纪笔记与人纪节选子目录补齐 GitHub 可点击索引 README.md。"""
     tianji_notes_dir = KNOWLEDGE_DIR / "03-天纪学习资料" / "笔记与参考"
     if tianji_notes_dir.exists():
         notes_readme = (
-            "# 天纪听课笔记与推命参考\n\n"
+            "# 天纪听课笔记与参考\n\n"
             + LEARNING_BANNER_NI
             + "\n## 文件目录\n\n"
             + "| 文件 | 内容范围 | 对应图谱节点 |\n"
             + "|------|----------|-------------|\n"
+            + "| [紫微斗数核心框架与格局速查.md](./紫微斗数核心框架与格局速查.md) | 十四主星、十二宫位、生年四化、常见格局与倪师六亲/以果决行心法速查 | `紫微斗数` · `天机道` |\n"
             + "| [天机道笔记.md](./天机道笔记.md) | 紫微斗数星曜、十二宫位与盘面听课笔记 | `天机道` · `紫微斗数` |\n"
             + "| [人间道听课笔记.md](./人间道听课笔记.md) | 六十四卦人间处世与人事推演听课笔记 | `人间道` · `易经` |\n"
             + "| [地脉道听课笔记.md](./地脉道听课笔记.md) | 阳宅九宫方位、格局与堪舆听课笔记 | `地脉道` · `风水堪舆` |\n"
@@ -1099,14 +1339,14 @@ def ensure_library_sub_readmes() -> None:
         excerpts_readme = (
             "# 经方与内经注解节选（持续校勘中）\n\n"
             + LEARNING_BANNER_NI
-            + "> **校勘进度说明**：本目录仅收录已完成人工初校、无 OCR 乱码的前序可读章节（`public_ready`）；"
-            + "其余扫描章节校勘完成后将分批补齐，不盲目入库未校勘乱码。\n\n"
+            + "> **校勘进度说明**：本目录只放已完成人工初校、无 OCR 乱码的前序可读章节；"
+            + "其余扫描章节校对完毕后会分批补齐，也欢迎通过 [CONTRIBUTING.md](../../../CONTRIBUTING.md) 一起参与校勘。\n\n"
             + "## 已校勘文件目录\n\n"
             + "| 文件 | 已收录内容范围 | 对应图谱节点 |\n"
             + "|------|---------------|-------------|\n"
-            + "| [黄帝内经注解-节选.md](./黄帝内经注解-节选.md) | 素问序言、上古天真论等前序可读章节 | `黄帝内经` · `阴阳` · `五行` |\n"
-            + "| [伤寒论注解-节选.md](./伤寒论注解-节选.md) | 伤寒论序言、辨太阳病脉证并治已核验章节 | `伤寒论` · `六经辨证` · `经方` |\n"
-            + "| [金匮要略注解-节选.md](./金匮要略注解-节选.md) | 金匮前言、续伤寒篇与脏腑经络先后病脉证节选 | `金匮要略` · `方证对应` |\n"
+            + "| [黄帝内经注解-节选.md](./黄帝内经注解-节选.md) | 素问序言、上古天真论等前序可读章节（约 4.7 万字） | `黄帝内经` · `阴阳` · `五行` |\n"
+            + "| [伤寒论注解-节选.md](./伤寒论注解-节选.md) | 伤寒论序言、辨太阳病脉证并治已核验章节（约 4.7 万字） | `伤寒论` · `六经辨证` · `经方` |\n"
+            + "| [金匮要略注解-节选.md](./金匮要略注解-节选.md) | 金匮前言、续伤寒篇与脏腑经络先后病脉证节选（约 1.8 万字） | `金匮要略` · `方证对应` |\n"
         )
         write_clean(renji_excerpts_dir / "README.md", excerpts_readme)
 
@@ -1116,20 +1356,24 @@ def write_knowledge_top_docs() -> None:
 
 这里放着整个项目可以离线保存、直接阅读和喂给 AI 的资料，大部头文档都已经按卷或按章拆开（单文件不超过 186 KB），在 GitHub 网页上也能流畅翻看。
 
+第一次来，建议先读 3 分钟总导览：**[`00-倪海厦生平与三纪总览.md`](./00-倪海厦生平与三纪总览.md)**（讲清天纪、人纪、地纪的关系，以及每门课对应下面哪份文件）。
+
 | 目录 | 适合干什么 | 里头有什么 |
 |------|---------|-------------------|
-| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | 在线查概念 / 导入 Obsidian | 与网站同步的 64 张节点卡 + 5 篇专题 + 2 条学习路径（Obsidian 用户打开 [`00-知识图谱总览-MOC.md`](./01-知识图谱笔记/00-知识图谱总览-MOC.md) 即可用双链） |
-| [`02-AI知识库语料包/`](./02-AI知识库语料包/README.md) | 喂给 AI 陪读或搭 RAG | 合并单文件 `nihaixia-corpus-all.md`、`nodes/articles/edges.jsonl` 和 5 套天纪提示词 |
-| [`03-天纪学习资料/`](./03-天纪学习资料/README.md) | 系统读《天纪》 | 《天机道》《地脉道》《人间道（3 卷）》《易经64卦图》和听课笔记 |
+| [`00-倪海厦生平与三纪总览.md`](./00-倪海厦生平与三纪总览.md) | 建立全局地图 | 倪师生平师承、天纪/人纪/地纪三纪全景、学习顺序与本仓文件对照 |
+| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | 在线查概念 / 导入 Obsidian | 与网站同步的 64 张节点卡 + 5 篇专题 + 2 条学习路径，卡片「原始出处」已直接链接到本仓原文分章 |
+| [`02-AI知识库语料包/`](./02-AI知识库语料包/README.md) | 喂给 AI 陪读或搭 RAG | 合并单文件 `nihaixia-corpus-all.md`、`nodes/articles/edges.jsonl`、5 套天纪提示词与 `MANIFEST.json` |
+| [`03-天纪学习资料/`](./03-天纪学习资料/README.md) | 系统读《天纪》 | 《天机道》《地脉道》《人间道（3 卷）》《易经64卦图》、听课笔记与紫微核心框架速查 |
 | [`04-人纪学习资料/`](./04-人纪学习资料/README.md) | 系统读《人纪》与经典 | 《针灸大成（10 卷）》《人纪·针灸篇（8 章）》《神农本草经（5 卷）》及内经/伤寒/金匮已校勘节选 |
+| [`05-公开讲座与访谈/`](./05-公开讲座与访谈/README.md) | 零基础入门 / 经方心法串讲 | 《梁冬对话倪海厦（7 讲）》《仲景心法（7 讲）》《扶阳论坛》《经方的妙用》公开讲座文字稿 |
 
 ## 数据同步
 
-`01-知识图谱笔记/`、`02-AI知识库语料包/` 和离线数据包 `docs/data/offline-data.js` 均由 [`scripts/export_knowledge_assets.py`](../scripts/export_knowledge_assets.py) 自动生成：
+`01-知识图谱笔记/`、`02-AI知识库语料包/`（含 `MANIFEST.json`）和离线数据包 `docs/data/offline-data.js` 均由 [`scripts/export_knowledge_assets.py`](../scripts/export_knowledge_assets.py) 自动生成：
 
 ```bash
 python3 scripts/export_knowledge_assets.py            # 同步 01 / 02 与离线数据包
-python3 scripts/export_knowledge_assets.py --validate # 校验链接、路径与排版
+python3 scripts/export_knowledge_assets.py --validate # 校验链接、校验和、隐私与排版
 ```
 
 著作权与使用边界见 [LICENSE.md](./LICENSE.md)。
@@ -1249,8 +1493,31 @@ def validate_knowledge() -> list[str]:
             if p["title"] not in ptxt:
                 errors.append(f"tianji-prompts.md 缺少提示词: {p['title']}")
 
-    # 2b. 检查仓库根 README 与 knowledge/ 下全部相对 Markdown 链接有效
-    link_check_files = [REPO_ROOT / "README.md"] + sorted(KNOWLEDGE_DIR.rglob("*.md"))
+    # 2a. 检查三纪总览与 MANIFEST.json 校验和
+    if not (KNOWLEDGE_DIR / "00-倪海厦生平与三纪总览.md").exists():
+        errors.append("缺少 knowledge/00-倪海厦生平与三纪总览.md")
+    manifest_path = rag_dir / "MANIFEST.json"
+    if not manifest_path.exists():
+        errors.append("缺少 02-AI知识库语料包/MANIFEST.json")
+    else:
+        try:
+            manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            for entry in manifest.get("files") or []:
+                ef = rag_dir / entry["file"]
+                if not ef.exists():
+                    errors.append(f"MANIFEST.json 指向缺失文件: {entry['file']}")
+                    continue
+                ebytes = ef.read_bytes()
+                if len(ebytes) != entry.get("bytes"):
+                    errors.append(f"MANIFEST.json 字节数不一致: {entry['file']}")
+                actual_sha = hashlib.sha256(ebytes).hexdigest()
+                if actual_sha != entry.get("sha256_checksum"):
+                    errors.append(f"MANIFEST.json SHA256 不一致: {entry['file']}")
+        except Exception as exc:
+            errors.append(f"MANIFEST.json 解析失败: {exc}")
+
+    # 2b. 检查仓库根 README、CONTRIBUTING 与 knowledge/ 下全部相对 Markdown 链接有效
+    link_check_files = [REPO_ROOT / "README.md", REPO_ROOT / "CONTRIBUTING.md"] + sorted(KNOWLEDGE_DIR.rglob("*.md"))
     for md in link_check_files:
         if not md.exists():
             continue
@@ -1309,6 +1576,10 @@ def validate_knowledge() -> list[str]:
             m_priv = FORBIDDEN_PRIVACY_RE.search(text)
             if m_priv:
                 errors.append(f"疑似泄露隐私/网盘或无关第三方署名 {rel}: {m_priv.group(0)}")
+            if fpath.suffix == ".md":
+                m_ed = FORBIDDEN_EDITOR_NOTE_RE.search(text)
+                if m_ed:
+                    errors.append(f"存在未清洗的第三方小编注 {rel}: {m_ed.group(0)}")
             m_ocr = FORBIDDEN_OCR_RE.search(text)
             if m_ocr:
                 errors.append(f"存在未清洗的 OCR/Word 残留标签 {rel}: {m_ocr.group(0)}")
@@ -1339,6 +1610,7 @@ def main() -> int:
     parser.add_argument("--validate", action="store_true", help="仅执行质量与零死链校验")
     parser.add_argument("--raw-ima-dir", type=Path, help="可选：本地 IMA 原始整理包目录，用于刷新 03/04")
     parser.add_argument("--raw-ocr-dir", type=Path, help="可选：本地 OCR 校勘目录（含 06_中医经典与课程）")
+    parser.add_argument("--raw-lectures-dir", type=Path, help="可选：本地 2009 公开讲座与访谈目录，用于刷新 05")
     parser.add_argument("--sources-public-dir", type=Path, default=REPO_ROOT / "sources-public", help="可选：公开经典切分目录")
     args = parser.parse_args()
 
@@ -1353,19 +1625,23 @@ def main() -> int:
         print("OK knowledge/ & skills/ validation passed (zero dangling links, clean paths/formatting)")
         return 0
 
-    graph = json.loads(GRAPH_JSON.read_text(encoding="utf-8"))
-    prompts = json.loads(PROMPTS_JSON.read_text(encoding="utf-8"))
-    counts = export_graph_and_ai_packs(graph, prompts)
-    export_offline_site_bundle(graph, prompts)
-    write_knowledge_top_docs()
-    print(f"Exported 01-知识图谱笔记, 02-AI知识库语料包 & docs/data/offline-data.js: {counts}")
-
     if args.raw_ima_dir and args.raw_ocr_dir:
         export_library_texts(args.raw_ima_dir, args.raw_ocr_dir, args.sources_public_dir)
         print("Exported cleaned & chaptered 03-天纪学习资料 & 04-人纪学习资料")
     elif args.raw_ima_dir or args.raw_ocr_dir:
         print("ERROR: --raw-ima-dir 与 --raw-ocr-dir 需成对传入", file=sys.stderr)
         return 2
+
+    if args.raw_lectures_dir:
+        export_public_lectures(args.raw_lectures_dir)
+        print("Exported cleaned 05-公开讲座与访谈")
+
+    graph = json.loads(GRAPH_JSON.read_text(encoding="utf-8"))
+    prompts = json.loads(PROMPTS_JSON.read_text(encoding="utf-8"))
+    counts = export_graph_and_ai_packs(graph, prompts)
+    export_offline_site_bundle(graph, prompts)
+    write_knowledge_top_docs()
+    print(f"Exported 01-知识图谱笔记, 02-AI知识库语料包 (with MANIFEST.json) & docs/data/offline-data.js: {counts}")
 
     errors = validate_knowledge()
     if errors:

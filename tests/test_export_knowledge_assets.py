@@ -17,11 +17,28 @@ class ExportKnowledgeAssetsTests(unittest.TestCase):
         self.assertEqual(exporter.normalize_text(raw), "第一行\n\n第二行\n")
 
     def test_clean_source_section_removes_vault_wikilinks(self):
-        raw = "- [[倪海厦资料/中医/伤寒论/伤寒论注解B5|伤寒论注解B5]] — 太阳病篇\n- [[天机道笔记个人整理]]"
-        self.assertEqual(
-            exporter.clean_source_section(raw),
-            "- 伤寒论注解B5 — 太阳病篇\n- 天机道听课与盘面笔记",
+        raw = (
+            "- [[倪海厦资料/中医/伤寒论/伤寒论注解B5|伤寒论注解B5]] — 太阳病篇\n"
+            "- [[天机道笔记个人整理]]\n"
+            "- ⚠️ `神农本草经.md` 为 0B 空文件，需重新转换"
         )
+        out = exporter.clean_source_section(raw)
+        self.assertIn("[伤寒论注解（节选）](../../04-人纪学习资料/经方与内经节选/伤寒论注解-节选.md) — 太阳病篇", out)
+        self.assertIn("[天机道听课与盘面笔记](../../03-天纪学习资料/笔记与参考/天机道笔记.md)", out)
+        self.assertNotIn("0B 空文件", out)
+
+    def test_clean_public_lecture_text_strips_frontmatter_and_editor_notes(self):
+        raw = (
+            "---\ntype: raw_course_note\n---\n\n"
+            "第一段原文。\n\n"
+            "> 小编：第三方个人评论\n\n"
+            "第二段原文。\n"
+        )
+        out = exporter.clean_public_lecture_text(raw)
+        self.assertIn("第一段原文。", out)
+        self.assertIn("第二段原文。", out)
+        self.assertNotIn("小编", out)
+        self.assertNotIn("raw_course_note", out)
 
     def test_strip_picture_wrappers_keeps_real_chart_and_drops_omitted(self):
         raw = (
@@ -125,6 +142,9 @@ class ExportKnowledgeAssetsTests(unittest.TestCase):
         vault_readme = (REPO_ROOT / "knowledge" / "01-知识图谱笔记" / "README.md").read_text(encoding="utf-8")
         self.assertIn("[阴阳](./02-底层框架/阴阳.md)", vault_readme)
         self.assertIn("[00-知识图谱总览-MOC.md](./00-知识图谱总览-MOC.md)", vault_readme)
+        self.assertTrue((REPO_ROOT / "knowledge" / "00-倪海厦生平与三纪总览.md").exists())
+        self.assertTrue((REPO_ROOT / "knowledge" / "02-AI知识库语料包" / "MANIFEST.json").exists())
+        self.assertTrue((REPO_ROOT / "knowledge" / "05-公开讲座与访谈" / "README.md").exists())
 
     def test_validate_knowledge_passes_with_zero_errors(self):
         errors = exporter.validate_knowledge()

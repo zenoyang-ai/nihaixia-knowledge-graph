@@ -1,0 +1,23 @@
+name: 新增节点 / 功能建议
+description: 提议补充新的知识图谱节点、专题文章、学习路径或网站体验改进
+title: "[建议] "
+labels: ["enhancement"]
+body:
+  - type: dropdown
+    id: category
+    attributes:
+      label: 建议类型
+      options:
+        - 新增知识图谱节点或关联关系
+        - 补充开源阅读资料或速查笔记
+        - 网站界面 / 交互 / 搜索改进
+        - 天纪提示词 / Agent Skill 改进
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 具体想法
+      placeholder: 想加什么内容、解决什么学习痛点、它和现有哪些节点有关联
+    validations:
+      required: true

@@ -1,0 +1,29 @@
+name: 著作权与内容边界反馈
+description: 权利方异议下架申请，或反馈隐私/敏感医疗表述边界问题（核实后 7 个工作日内处理）
+title: "[边界/下架] "
+labels: ["notice"]
+body:
+  - type: dropdown
+    id: type
+    attributes:
+      label: 反馈类型
+      options:
+        - 著作权 / 权利方异议下架
+        - 隐私信息或第三方署名残留
+        - 医疗安全边界提示不妥
+    validations:
+      required: true
+  - type: input
+    id: target
+    attributes:
+      label: 涉及的具体文件或链接
+      placeholder: 请列出需要处理的仓库路径或网址
+    validations:
+      required: true
+  - type: textarea
+    id: statement
+    attributes:
+      label: 说明与联系信息
+      placeholder: 请说明原因及权利证明/核实方式，核实后将在 7 个工作日内移除或修正
+    validations:
+      required: true

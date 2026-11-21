@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 在线图谱网站（国内主站）
+    url: https://www.nihaixia-knowledge.xyz/
+    about: 直接在线查看知识图谱、学习路径、天纪提示词与 AI 问答
+  - name: 开源知识库目录
+    url: https://github.com/zenoyang-ai/nihaixia-knowledge-graph/blob/main/knowledge/README.md
+    about: 浏览离线笔记、AI 语料包与分章阅读资料

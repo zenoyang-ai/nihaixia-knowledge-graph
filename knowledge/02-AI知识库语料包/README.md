@@ -9,5 +9,6 @@
 | [`articles.jsonl`](./articles.jsonl) | 5 篇专题文章数据 | 补充长文检索 |
 | [`edges.jsonl`](./edges.jsonl) | 338 条节点关联边 | 搭 GraphRAG 或做图谱分析 |
 | [`tianji-prompts.md`](./tianji-prompts.md) | 5 套天纪提示词完整版 | 直接复制使用 |
+| [`MANIFEST.json`](./MANIFEST.json) | 机器可读数据清单、条数、许可口径与 SHA-256 校验和 | 给自动化脚本或 RAG 流水线核验版本 |
 
 如果想在 Claude Code、Cursor、Codex 里直接安装天纪提示词，看 [`skills/nihaixia-tianji/`](../../skills/nihaixia-tianji/README.md)。
