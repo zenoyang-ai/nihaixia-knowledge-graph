@@ -309,19 +309,19 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
 
     # 2b. 生成 GitHub 网页可直接点击阅读的 README.md 索引（与 Obsidian 双链 MOC 并存）
     gh_index_lines = [
-        "# 倪海厦知识图谱笔记库（Obsidian Vault & 在线阅读索引）",
+        "# 知识图谱笔记",
         "",
-        f"> 本目录由线上知识图谱真源（[`docs/data/graph.json`](../../docs/data/graph.json)）自动导出，共收录 **{len(nodes)} 个核心节点** + **{len(articles)} 篇深度专题文章** + **2 条完整学习路径**。",
-        ">",
-        "> - **GitHub 网页直接阅读**：下方全部为标准 Markdown 相对链接，点击即可阅读。",
-        "> - **Obsidian 本地导入**：直接把本目录作为 Vault 打开，从 [00-知识图谱总览-MOC.md](./00-知识图谱总览-MOC.md) 入口即可启用全部 `[[双链]]` 与关系图谱（零死链校验）。",
+        f"与在线网站同步的 **{len(nodes)} 张概念卡片 + {len(articles)} 篇专题 + 2 条学习路径**。",
         "",
-        "## 学习路线入口",
+        "- **在 GitHub 直接读**：直接点下面任意标题即可。",
+        "- **放进 Obsidian**：把当前文件夹作为本地仓库打开，从 [00-知识图谱总览-MOC.md](./00-知识图谱总览-MOC.md) 入口就能看到完整双链关系网。",
+        "",
+        "## 学习顺序",
         "",
         "- [倪海厦人纪学习路径](./01-学习路径/人纪学习路径.md) — 针灸 → 黄帝内经 → 神农本草经 → 伤寒论与金匮要略 → 医案研读",
         "- [倪海厦天纪学习路径](./01-学习路径/天纪学习路径.md) — 天机道（易经/紫微）→ 人间道（命理/人伦）→ 地脉道（风水）→ 三才贯通",
         "",
-        "## 知识层级索引（点击直达）",
+        "## 全部条目",
         "",
     ]
     for layer in ordered_layers:
@@ -475,21 +475,19 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
         ])
     write_clean(rag_dir / "nihaixia-corpus-all.md", "\n".join(corpus_parts))
 
-    rag_readme = f"""# AI / Agent 知识库语料包
+    rag_readme = f"""# AI 知识库语料包
 
-本目录由线上图谱数据自动导出，方便直接导入各类大模型或 AI 知识库工具。
+与在线网站同步导出，用来直接喂给大模型或接入自己的知识库工具。
 
-## 文件清单
-
-| 文件 | 内容 | 适用场景 |
+| 文件 | 里头是什么 | 怎么用 |
 |------|------|---------|
-| [`nihaixia-corpus-all.md`](./nihaixia-corpus-all.md) | {len(nodes)} 节点 + {len(articles)} 专题 + 学习路径 + {len(prompts)} 套天纪提示词合并单文件 | 直接拖入 **NotebookLM / Claude / ChatGPT / Kimi** 做问答底座 |
-| [`nodes.jsonl`](./nodes.jsonl) | {len(nodes)} 条结构化节点 JSONL（含定义、白话、边界） | 导入 **Dify / Coze / Cherry Studio** 或向量库 |
-| [`articles.jsonl`](./articles.jsonl) | {len(articles)} 篇主题文章 JSONL | 补充长文检索 |
-| [`edges.jsonl`](./edges.jsonl) | {len(edges_jsonl)} 条有向知识关系边 | 构建 **GraphRAG** 或知识网络分析 |
-| [`tianji-prompts.md`](./tianji-prompts.md) | {len(prompts)} 套天纪提示词完整 Markdown | 复制使用或作为 Agent Prompt 模板 |
+| [`nihaixia-corpus-all.md`](./nihaixia-corpus-all.md) | {len(nodes)} 张概念卡 + {len(articles)} 篇专题 + 学习路径 + {len(prompts)} 套天纪提示词 | 直接拖进 NotebookLM、Claude、ChatGPT 或 Kimi 陪读 |
+| [`nodes.jsonl`](./nodes.jsonl) | {len(nodes)} 条节点数据（含定义、白话解释、安全边界） | 导入 Dify、Coze、Cherry Studio 或向量库 |
+| [`articles.jsonl`](./articles.jsonl) | {len(articles)} 篇专题文章数据 | 补充长文检索 |
+| [`edges.jsonl`](./edges.jsonl) | {len(edges_jsonl)} 条节点关联边 | 搭 GraphRAG 或做图谱分析 |
+| [`tianji-prompts.md`](./tianji-prompts.md) | {len(prompts)} 套天纪提示词完整版 | 直接复制使用 |
 
-> 需要给 Codex / Claude Code 等 Agent 安装可调用技能，请见仓库根目录 [`skills/nihaixia-tianji/`](../../skills/nihaixia-tianji/SKILL.md)。
+如果想在 Claude Code、Cursor、Codex 里直接安装天纪提示词，看 [`skills/nihaixia-tianji/`](../../skills/nihaixia-tianji/README.md)。
 """
     write_clean(rag_dir / "README.md", rag_readme)
 
@@ -1010,21 +1008,21 @@ def export_library_texts(raw_ima_dir: Path, raw_ocr_dir: Path, sources_public_di
     write_clean(tianji_dir / "笔记与参考" / "地脉道听课笔记.md", clean_tianji_note("《天纪》地脉道听课笔记", (t_notes / "地脉道听课笔记.txt").read_text(encoding="utf-8")))
     write_clean(tianji_dir / "笔记与参考" / "易经推命批法.md", clean_tianji_note("易经推命批法笔记", (t_notes / "易经推命批法.txt").read_text(encoding="utf-8")))
 
-    tianji_readme = """# 天纪学习资料库
+    tianji_readme = """# 天纪学习资料
 
-> 原著与讲授思想归**倪海厦先生**及其权利继承人所有；本目录完整保留原文内容，仅做去噪排版与分卷整理，供个人非商业学习与传统文化研究。
+原著与讲授内容著作权归**倪海厦先生**及其权利继承人所有。这里保留原文，仅做去噪清洗和按卷拆分，供个人非商业学习。
 
-## 收录清单
+## 目录
 
-| 目录 / 文件 | 说明 | 对应图谱节点 |
+| 文件 / 文件夹 | 内容 | 对应图谱节点 |
 |------------|------|-------------|
-| [01-天机道.md](./01-天机道.md) | 天象、易理与紫微斗数核心体系 | `天机道` · `紫微斗数` |
-| [02-地脉道.md](./02-地脉道.md) | 阳宅地理与三才环境法则 | `地脉道` · `风水堪舆` |
-| [03-人间道/](./03-人间道/README.md) | 易经人伦观、处世与六十四卦推演（按序言/上经/下经分 3 卷） | `人间道` · `天纪与人纪` |
+| [01-天机道.md](./01-天机道.md) | 天象、易理与紫微斗数 | `天机道` · `紫微斗数` |
+| [02-地脉道.md](./02-地脉道.md) | 阳宅地理与环境法则 | `地脉道` · `风水堪舆` |
+| [03-人间道/](./03-人间道/README.md) | 易经六十四卦与处世（分序言、上经、下经 3 卷） | `人间道` · `天纪与人纪` |
 | [04-易经64卦图.md](./04-易经64卦图.md) | 六十四卦象解速查 | `易经` · `象数` |
-| [笔记与参考/](./笔记与参考/README.md) | 天机道、人间道、地脉道听课笔记与易经推命批法 | 配套学习笔记 |
+| [笔记与参考/](./笔记与参考/README.md) | 天机道、人间道、地脉道听课笔记与易经推命批法 | 配套笔记 |
 
-> 注：已主动剔除编码损坏或包含无关外部博客链接的原始草稿，确保在线阅读与检索体验干净可靠。
+> 说明：已去掉编码损坏或带无关外链的旧草稿，只保留干净可读的版本。
 """
     write_clean(tianji_dir / "README.md", tianji_readme)
 
@@ -1055,24 +1053,25 @@ def export_library_texts(raw_ima_dir: Path, raw_ocr_dir: Path, sources_public_di
             clean_sources_public_book(classics_dir / "jin-kuei-yao-lue", "金匮要略注解（节选·持续校勘中）", min_page=8),
         )
 
-    renji_readme = """# 人纪学习资料库
+    renji_readme = """# 人纪学习资料
 
-> 古代医经原典属于**公有领域（Public Domain）**；倪海厦先生的批注与课堂讲授思想著作权归**倪海厦先生**及其权利继承人所有。
-> 古籍原典与批注文本中出现的历史剂量、经方配伍、附方与灸法表述均**保留文献原貌**，仅供中医理论与文献学习，**严禁直接照方抓药、自行施治或作为个人用药/临床治疗指导**。
+古代医经原典属于公有领域；倪海厦先生的批注与课堂讲授著作权归**倪海厦先生**及其权利继承人所有。
 
-## 收录清单与校勘状态
+> **阅读提醒**：古籍和课堂实录里保留的历史剂量、附方与灸法均为文献原貌，只供学习参考，**不要照方抓药或自行施治**。身体不适请找正规执业医师。
 
-| 目录 / 文件 | 状态 | 说明 |
+## 目录与校勘进度
+
+| 文件 / 文件夹 | 进度 | 内容 |
 |------------|------|------|
-| [针灸大成/](./针灸大成/README.md) | ✅ 十卷全本（分卷） | 明·杨继洲原著（公有领域古籍），按卷一至卷十拆分 |
-| [人纪-针灸篇/](./人纪-针灸篇/README.md) | ✅ 完整收录（分章） | **人纪·针灸篇（课堂实录整理）**，保留原始时间码并按 8 个章节文件拆分 |
-| [神农本草经/](./神农本草经/README.md) | ✅ 完整校勘（分卷） | 涵盖自序、药性总义、上/中/下三经与增补本草，按 5 卷拆分 |
-| [经方与内经节选/](./经方与内经节选/README.md) | ⏳ 校勘更新中（3 册节选） | [黄帝内经注解](./经方与内经节选/黄帝内经注解-节选.md) · [伤寒论注解](./经方与内经节选/伤寒论注解-节选.md) · [金匮要略注解](./经方与内经节选/金匮要略注解-节选.md) |
+| [针灸大成/](./针灸大成/README.md) | 已全本分卷 | 明·杨继洲原著（公有领域），按卷一至卷十拆分 |
+| [人纪-针灸篇/](./人纪-针灸篇/README.md) | 已完整分章 | 人纪·针灸篇课堂实录整理，保留时间码，拆为 8 章 |
+| [神农本草经/](./神农本草经/README.md) | 已全本分卷 | 自序、药性总义、上/中/下三经与增补本草，共 5 卷 |
+| [经方与内经节选/](./经方与内经节选/README.md) | 持续校勘中 | [黄帝内经注解](./经方与内经节选/黄帝内经注解-节选.md) · [伤寒论注解](./经方与内经节选/伤寒论注解-节选.md) · [金匮要略注解](./经方与内经节选/金匮要略注解-节选.md) |
 
-## 主动不收录范围
+## 这里没有的内容
 
-- 暂未校勘完毕的扫描版 OCR 乱码文件不入库，后续人工核对后逐步补齐；
-- 《汉唐方剂讲解》《人纪班闭门课》及具体患者临床医案全文不在公开仓库收录，仅在知识图谱中保留辨证思路与学习框架。
+- 扫描乱码还没校对完的章节暂不放入，校好后再补；
+- 《汉唐方剂讲解》《人纪班闭门课》和具体患者医案全文不收录，只在知识图谱里保留辨证框架。
 """
     write_clean(renji_dir / "README.md", renji_readme)
     ensure_library_sub_readmes()
@@ -1113,27 +1112,27 @@ def ensure_library_sub_readmes() -> None:
 
 
 def write_knowledge_top_docs() -> None:
-    top_readme = """# 倪海厦开源知识库（Knowledge Hub）
+    top_readme = """# 开源知识库
 
-本目录沉淀了「倪海厦知识图谱」项目的全部可离线带走与可直接阅读的开源资料，大部头典籍均已按卷/按章拆分，便于在 GitHub 网页端流畅阅读：
+这里放着整个项目可以离线保存、直接阅读和喂给 AI 的资料，大部头文档都已经按卷或按章拆开（单文件不超过 186 KB），在 GitHub 网页上也能流畅翻看。
 
-| 目录 | 面向人群 | 你可以直接拿走什么？ |
+| 目录 | 适合干什么 | 里头有什么 |
 |------|---------|-------------------|
-| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | Obsidian / GitHub 读者 | 与线上网站 100% 同步的 **64 节点 + 5 篇专题文章** + 人纪/天纪学习路径（网页端直接点击阅读；Obsidian 打开 [`00-知识图谱总览-MOC.md`](./01-知识图谱笔记/00-知识图谱总览-MOC.md) 享零死链 `[[双链]]`） |
-| [`02-AI知识库语料包/`](./02-AI知识库语料包/README.md) | AI / Agent / RAG 玩家 | 单文件 `nihaixia-corpus-all.md`（直拖 NotebookLM / Claude）、`nodes.jsonl` / `edges.jsonl`（接入 Dify / Coze / GraphRAG）+ 5 套天纪提示词 |
-| [`03-天纪学习资料/`](./03-天纪学习资料/README.md) | 天纪与术数学习者 | 去噪分卷后的《天机道》《地脉道》《人间道（3 卷）》《易经64卦图》及配套听课笔记 |
-| [`04-人纪学习资料/`](./04-人纪学习资料/README.md) | 中医经典与针灸学习者 | 分卷/分章后的《针灸大成（10 卷）》《人纪·针灸篇（课堂实录整理·8 章）》《神农本草经（5 卷）》及内经/伤寒/金匮已校勘节选 |
+| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | 在线查概念 / 导入 Obsidian | 与网站同步的 64 张节点卡 + 5 篇专题 + 2 条学习路径（Obsidian 用户打开 [`00-知识图谱总览-MOC.md`](./01-知识图谱笔记/00-知识图谱总览-MOC.md) 即可用双链） |
+| [`02-AI知识库语料包/`](./02-AI知识库语料包/README.md) | 喂给 AI 陪读或搭 RAG | 合并单文件 `nihaixia-corpus-all.md`、`nodes/articles/edges.jsonl` 和 5 套天纪提示词 |
+| [`03-天纪学习资料/`](./03-天纪学习资料/README.md) | 系统读《天纪》 | 《天机道》《地脉道》《人间道（3 卷）》《易经64卦图》和听课笔记 |
+| [`04-人纪学习资料/`](./04-人纪学习资料/README.md) | 系统读《人纪》与经典 | 《针灸大成（10 卷）》《人纪·针灸篇（8 章）》《神农本草经（5 卷）》及内经/伤寒/金匮已校勘节选 |
 
-## 同步与校验
+## 数据同步
 
-`01-知识图谱笔记/`、`02-AI知识库语料包/` 与站点离线兜底数据 `docs/data/offline-data.js` 均由脚本 [`scripts/export_knowledge_assets.py`](../scripts/export_knowledge_assets.py) 从 `docs/data/graph.json` 与 `docs/data/prompts.json` 自动生成：
+`01-知识图谱笔记/`、`02-AI知识库语料包/` 和离线数据包 `docs/data/offline-data.js` 均由 [`scripts/export_knowledge_assets.py`](../scripts/export_knowledge_assets.py) 自动生成：
 
 ```bash
 python3 scripts/export_knowledge_assets.py            # 同步 01 / 02 与离线数据包
-python3 scripts/export_knowledge_assets.py --validate # 校验零死链、无隐私/路径与排版残留
+python3 scripts/export_knowledge_assets.py --validate # 校验链接、路径与排版
 ```
 
-使用边界与著作权声明见 [LICENSE.md](./LICENSE.md)。
+著作权与使用边界见 [LICENSE.md](./LICENSE.md)。
 """
     write_clean(KNOWLEDGE_DIR / "README.md", top_readme)
     ensure_library_sub_readmes()
