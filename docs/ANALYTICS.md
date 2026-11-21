@@ -6,7 +6,7 @@
 - HTTP：`https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics`
 - 集合：`site_daily_stats`（需在控制台已创建）
 - 定时触发器：`dailyVisitReport`，cron `0 15 0 * * * *`（本环境 CloudBase cron 按**北京时间**解释，即每天北京 00:15 汇总**前一自然日**）
-- 云函数路径：`cloudbase/functions/nihaixia-analytics/`（VERSION `0.2.0`，本地分支已更新；如需线上启用 GitHub 导流点击日报计数，请手动执行 `cd cloudbase && tcb fn deploy nihaixia-analytics`）
+- 云函数路径：`cloudbase/functions/nihaixia-analytics/`（VERSION `0.2.0`，支持 GitHub 导流点击日报计数；推送 `main` 时由 `.github/workflows/deploy-analytics.yml` 通过 `tcb fn code update` 自动更新代码且保留控制台环境变量与定时触发器）
 
 ## 行为摘要
 

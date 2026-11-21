@@ -1,0 +1,47 @@
+name: Deploy Analytics Function (CloudBase)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cloudbase/functions/nihaixia-analytics/**'
+      - '.github/workflows/deploy-analytics.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-analytics:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CloudBase CLI
+        run: npm install -g @cloudbase/cli@3.6.4
+
+      - name: Login to CloudBase (non-interactive, CAM API key)
+        env:
+          CLOUDBASE_SECRET_ID: ${{ secrets.CLOUDBASE_SECRET_ID }}
+          CLOUDBASE_SECRET_KEY: ${{ secrets.CLOUDBASE_SECRET_KEY }}
+        run: tcb login --apiKeyId "$CLOUDBASE_SECRET_ID" --apiKey "$CLOUDBASE_SECRET_KEY"
+
+      - name: Update nihaixia-analytics code only (preserve console env vars & triggers)
+        working-directory: cloudbase
+        run: tcb fn code update nihaixia-analytics
+
+      - name: Verify live health & Feishu config preserved
+        run: |
+          sleep 5
+          RESP=$(curl -sS -m 15 "https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics")
+          echo "Live response: $RESP"
+          node -e '
+            const d = JSON.parse(process.argv[1]);
+            if (!d.ok) throw new Error("health ok=false");
+            if (d.version !== "0.2.0") throw new Error("unexpected version: " + d.version);
+            if (!d.feishu_configured) throw new Error("feishu_configured lost!");
+            console.log("Verified nihaixia-analytics v0.2.0 live with feishu_configured=true");
+          ' "$RESP"
