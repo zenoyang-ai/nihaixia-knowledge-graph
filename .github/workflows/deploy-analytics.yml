@@ -35,13 +35,26 @@ jobs:
 
       - name: Verify live health & Feishu config preserved
         run: |
-          sleep 5
-          RESP=$(curl -sS -m 15 "https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics")
-          echo "Live response: $RESP"
-          node -e '
-            const d = JSON.parse(process.argv[1]);
-            if (!d.ok) throw new Error("health ok=false");
-            if (d.version !== "0.2.0") throw new Error("unexpected version: " + d.version);
-            if (!d.feishu_configured) throw new Error("feishu_configured lost!");
-            console.log("Verified nihaixia-analytics v0.2.0 live with feishu_configured=true");
-          ' "$RESP"
+          EXPECTED_VERSION=$(node -e '
+            const fs = require("fs");
+            const src = fs.readFileSync("cloudbase/functions/nihaixia-analytics/index.js", "utf8");
+            const m = src.match(/const VERSION = [\x27"]([^\x27"]+)[\x27"]/);
+            if (!m) throw new Error("VERSION not found");
+            process.stdout.write(m[1]);
+          ')
+          echo "Expecting live nihaixia-analytics version: $EXPECTED_VERSION"
+          for i in $(seq 1 12); do
+            sleep 5
+            RESP=$(curl -sS -m 15 "https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-analytics" || true)
+            echo "Attempt $i: $RESP"
+            if node -e '
+              const d = JSON.parse(process.argv[1]);
+              if (d.ok && d.version === process.argv[2] && d.feishu_configured) process.exit(0);
+              process.exit(1);
+            ' "$RESP" "$EXPECTED_VERSION" 2>/dev/null; then
+              echo "Verified nihaixia-analytics v$EXPECTED_VERSION live with feishu_configured=true"
+              exit 0
+            fi
+          done
+          echo "Timed out waiting for nihaixia-analytics v$EXPECTED_VERSION" >&2
+          exit 1
