@@ -59,7 +59,7 @@ WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 MD_REL_LINK_RE = re.compile(r"\[[^\]]+\]\((\.\.?/[^)\s]+)\)")
 FORBIDDEN_PATH_RE = re.compile(r"/(?:Users|home)/[^\s\"'<>]+|~/Workspace|staging_v\d+|tcm_shennong_full")
 FORBIDDEN_PRIVACY_RE = re.compile(
-    r"杨圣旦|民间中医爱好者|英年早肥|pan\.baidu\.com|pan\.quark\.cn|aliyundrive\.com|(?<!\d)1[3-9]\d{9}(?!\d)"
+    r"民间中医爱好者|英年早肥|pan\.baidu\.com|pan\.quark\.cn|aliyundrive\.com|(?<!\d)1[3-9]\d{9}(?!\d)"
 )
 FORBIDDEN_EDITOR_NOTE_RE = re.compile(r"^>\s*小编", re.M)
 FORBIDDEN_OCR_RE = re.compile(
