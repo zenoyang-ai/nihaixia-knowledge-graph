@@ -112,6 +112,26 @@
         return elapsed >= RATE_LIMIT_MS ? 0 : RATE_LIMIT_MS - elapsed;
     }
 
+    function escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    function localizeApiError(code) {
+        const map = {
+            rate_limited: '提交过于频繁，请稍后再试',
+            origin_not_allowed: '当前访问来源未授权',
+            feishu_not_configured: '暂未配置云端通道',
+            feishu_delivery_failed: '飞书推送暂时不可用',
+            invalid_json: '请求格式异常',
+            method_not_allowed: '请求方式不受支持',
+        };
+        return map[code] || code || '未知错误';
+    }
+
     function saveToLocal(payload) {
         const existing = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
         if (!Array.isArray(existing)) throw new Error('存储格式异常');
@@ -222,16 +242,17 @@
                 }
 
                 if (savedLocally) {
+                    const readableErr = escapeHtml(localizeApiError(apiError));
                     form.style.display = 'none';
                     successState.style.display = 'block';
                     successState.querySelector('h3').textContent = '未能送达飞书，已保存本机';
                     const p = successState.querySelector('p');
                     if (p) {
-                        p.innerHTML = `飞书发送失败（${apiError || '未知错误'}）。反馈已写入浏览器本地存储作为备份，站长可在控制台执行 <code>getFeedbacks()</code> 查阅。也可到公众号<strong>「数字问渡」</strong>留言。`;
+                        p.innerHTML = `飞书发送失败（${readableErr}）。反馈已写入浏览器本地存储作为备份，站长可在控制台执行 <code>getFeedbacks()</code> 查阅。也可到公众号<strong>「数字问渡」</strong>留言。`;
                     }
                 } else {
                     window.alert(
-                        '反馈未能送达飞书：' + (apiError || '未知错误')
+                        '反馈未能送达飞书：' + localizeApiError(apiError)
                         + '\n\n本地保存也失败：' + localError
                         + '\n\n请改用公众号「数字问渡」后台留言。'
                     );

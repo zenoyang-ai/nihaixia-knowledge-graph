@@ -378,7 +378,18 @@ document.addEventListener('DOMContentLoaded', () => {
             // 历史必须以完整的一轮结束，不能把未获得回答的 user 留在上下文里。
             if (valid.at(-1)?.role === 'user') valid.pop();
             if (valid[0]?.role === 'assistant') valid.shift();
-            const trimmed = valid.slice(-MAX_HISTORY_ROUNDS * 2);
+
+            // 自愈清理：过滤旧版可能误存入历史的医疗拒答轮次，防止下一轮正常提问被连带拦截。
+            const sanitized = [];
+            const BLOCKED_ASSISTANT_RE = /(?:本系统仅供学习研究，不提供诊断|如遇紧急医疗情况，请立即拨打\s*120)/;
+            for (let i = 0; i + 1 < valid.length; i += 2) {
+                const u = valid[i];
+                const a = valid[i + 1];
+                if (u.role === 'user' && a.role === 'assistant' && !BLOCKED_ASSISTANT_RE.test(a.content)) {
+                    sanitized.push(u, a);
+                }
+            }
+            const trimmed = sanitized.slice(-MAX_HISTORY_ROUNDS * 2);
             if (trimmed.length % 2 === 1) trimmed.shift();
             return trimmed;
         } catch { return []; }
@@ -698,12 +709,25 @@ document.addEventListener('DOMContentLoaded', () => {
         return `抱歉，当前无法连接问答服务${hint}。请检查网络或稍后重试；若持续失败，可能是服务未配置或浏览器跨域限制。`;
     }
 
+    function formatBlockedReply(data) {
+        const raw = String(data?.reply || data?.error || '').trim();
+        if (/120|急救|紧急医疗/.test(raw)) {
+            return raw;
+        }
+        if (raw.startsWith('本系统仅供学习研究')) {
+            return `不好意思，${raw.replace('如有健康问题，', '此类身体不适、问诊或用药问题，')}`;
+        }
+        if (raw) {
+            return raw.startsWith('不好意思') || raw.startsWith('抱歉') ? raw : `不好意思，${raw}`;
+        }
+        return '不好意思，本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。此类身体不适、问诊或用药问题，请咨询专业中医师或前往线下医疗机构就诊。';
+    }
+
     function describeQaFailure(res, data) {
         if (data?.blocked) return null;
-        if (data?.rate_limited) return data.error || '提问过于频繁，请稍后再试';
+        if (data?.rate_limited || (res && res.status === 429)) return data?.error || '提问过于频繁，请稍后再试';
         if (data?.error) return data.error;
         if (res && res.status === 403) return '服务拒绝访问：来源未授权（跨域未配置）';
-        if (res && res.status === 429) return '提问过于频繁，请稍后再试';
         if (res && res.status >= 500) return '问答服务暂时不可用，请稍后重试';
         if (res && !res.ok) return `服务返回错误（HTTP ${res.status}）`;
         return '服务未返回有效回答';
@@ -749,7 +773,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             removeTyping();
 
-            if (res.ok && data.reply) {
+            if (data.blocked) {
+                // 问诊/处方/急救类安全拒答（覆盖 HTTP 400 第一层输入拦截与 HTTP 200 第二层输出拦截）：
+                // 友好提示就医、不显示假网络错误与重试按钮，且不写入本地历史免得连带拦截后续正常学习提问。
+                addMessage('assistant', formatBlockedReply(data), { provider: 'system', degraded: false });
+                clearStatus();
+                lastFailedMessage = '';
+                if (retryBtn) retryBtn.hidden = true;
+            } else if (data.invalid_history) {
+                localStorage.removeItem(LS_HISTORY_KEY);
+                localStorage.removeItem(LS_SESSION_KEY);
+                addMessage('assistant', '当前对话上下文已过期或格式异常，已为您自动重置会话，请点击重试或重新发送问题。', { provider: 'system', degraded: false });
+                lastFailedMessage = trimmedMsg;
+                if (retryBtn) retryBtn.hidden = false;
+                clearStatus();
+            } else if (res.ok && data.reply) {
                 const providerInfo = { provider: data.provider, degraded: data.degraded };
                 addMessage('assistant', data.reply, providerInfo, data.knowledge_sources);
                 clearStatus();
@@ -757,6 +795,17 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (retryBtn) retryBtn.hidden = true;
                 // 保存助手回复到历史
                 saveHistory([...requestMessages, { role: 'assistant', content: data.reply }]);
+            } else if (res.status === 429 || data.rate_limited) {
+                const msg = data.error || '提问过于频繁，请稍等几秒后再试。';
+                addMessage('assistant', `不好意思，${msg}`, { provider: 'system', degraded: false });
+                lastFailedMessage = trimmedMsg;
+                if (retryBtn) retryBtn.hidden = false;
+                setStatus(msg, true);
+            } else if (res.status === 400 && data.error) {
+                addMessage('assistant', `请调整提问后再试：${data.error}`, { provider: 'system', degraded: false });
+                lastFailedMessage = '';
+                if (retryBtn) retryBtn.hidden = true;
+                clearStatus();
             } else {
                 const detail = describeQaFailure(res, data);
                 lastFailedMessage = trimmedMsg;
