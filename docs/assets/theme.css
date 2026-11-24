@@ -1597,7 +1597,7 @@ html[data-theme="dark"] .qa-source-rel--mid {
     line-height: 1.35;
 }
 
-/* 桌面端：问答视图全视口弹性布局（不产生整页滚动条，底栏保留 8px-24px 呼吸留白） */
+/* 桌面端：问答视图基础宽度与紧凑留白 */
 @media (min-width: 1025px) {
     .main.main--qa {
         padding-top: 12px;
@@ -1611,10 +1611,6 @@ html[data-theme="dark"] .qa-source-rel--mid {
         padding: 0;
         display: flex;
         flex-direction: column;
-        height: calc(100vh - var(--header-h) - 66px);
-        height: calc(100dvh - var(--header-h) - 66px);
-        min-height: 460px;
-        overflow: hidden;
     }
 
     .main.main--qa .qa-hero {
@@ -1640,6 +1636,20 @@ html[data-theme="dark"] .qa-source-rel--mid {
         padding: 9px 14px;
         font-size: 13px;
         line-height: 1.4;
+    }
+
+    .main.main--qa .qa-chat-input-row {
+        flex-shrink: 0;
+    }
+}
+
+/* 桌面端常规高度（>=680px）：全视口弹性贴底（不产生整页滚动条，底栏保留 13px 呼吸留白） */
+@media (min-width: 1025px) and (min-height: 680px) {
+    .main.main--qa .qa-view {
+        height: calc(100vh - var(--header-h) - 66px);
+        height: calc(100dvh - var(--header-h) - 66px);
+        min-height: 460px;
+        overflow: hidden;
     }
 
     .main.main--qa .qa-chat {
@@ -1672,9 +1682,31 @@ html[data-theme="dark"] .qa-source-rel--mid {
         text-align: center;
         padding: 24px 20px;
     }
+}
 
-    .main.main--qa .qa-chat-input-row {
-        flex-shrink: 0;
+/* 桌面端矮屏（<680px，如 Windows 150% 缩放笔记本 / 1366x768 窗口）：退回自然流式高度，避免裁切底栏按钮 */
+@media (min-width: 1025px) and (max-height: 679px) {
+    .main.main--qa {
+        padding-bottom: 64px;
+    }
+
+    .main.main--qa .qa-view {
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .main.main--qa .qa-chat {
+        display: flex;
+        flex-direction: column;
+        min-height: 0;
+        overflow: visible;
+    }
+
+    .main.main--qa .qa-chat-messages {
+        min-height: 180px;
+        max-height: 50vh;
+        overflow-y: auto;
     }
 }
 

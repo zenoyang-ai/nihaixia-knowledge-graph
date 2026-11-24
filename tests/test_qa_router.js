@@ -7,6 +7,7 @@ const {
   normalizeRequest,
   isMedicalRequest,
   isMedicalOutput,
+  getMedicalBlockReply,
   normalizeOrderedListMarkers,
   validateHistory,
 } = require('../cloudbase/functions/nihaixia-qa-router');
@@ -804,4 +805,22 @@ test('v5.6.2 isMedicalRequest intercepts colloquial decoction dosage requests cl
   assert.strictEqual(isMedicalRequest('发烧怕冷无汗能自己抓几克麻黄汤来喝？'), true);
   assert.strictEqual(isMedicalRequest('桂枝汤可以喝吗？'), true);
   assert.strictEqual(isMedicalRequest('麻黄汤的组成是什么？'), false);
+});
+
+test('v5.6.2 acute emergency red-flag symptoms trigger 120 reply while pure classical learning stays exempt', () => {
+  for (const q of [
+    '胸口剧痛呼吸困难冒冷汗怎么办',
+    '我爸突然口眼歪斜言语不清怎么办',
+    '突然胸闷喘不上气出冷汗',
+    '刚才吐血了，伤寒论怎么治',
+  ]) {
+    assert.strictEqual(isMedicalRequest(q), true, `Expected emergency block for: ${q}`);
+    assert.match(getMedicalBlockReply(q), /120/, `Expected 120 reply for: ${q}`);
+  }
+  for (const q of [
+    '《金匮要略》中关于吐血、咯血的原文思路是什么？',
+    '倪海厦怎么讲解中风、半身不遂的辨证原则？',
+  ]) {
+    assert.strictEqual(isMedicalRequest(q), false, `Expected learning exemption for: ${q}`);
+  }
 });

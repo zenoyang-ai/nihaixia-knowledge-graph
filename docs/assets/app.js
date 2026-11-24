@@ -436,15 +436,12 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    queueMicrotask(() => {
-        if (messagesEl && messagesEl.querySelector('.qa-chat-message')) {
-            setQuestionsCollapsed(true);
-        }
-    });
+    let pendingRestoreScrollEl = null;
 
     function clearHistory() {
         localStorage.removeItem(LS_HISTORY_KEY);
         localStorage.removeItem(LS_SESSION_KEY);
+        pendingRestoreScrollEl = null;
         if (messagesEl) {
             messagesEl.innerHTML = `
                 <div class="qa-chat-empty">
@@ -685,8 +682,31 @@ document.addEventListener('DOMContentLoaded', () => {
         </details>`;
     }
 
-    function addMessage(role, content, providerInfo, knowledgeSources) {
-        if (!messagesEl) return;
+    function scrollToAssistantStart(msgEl, instant = false) {
+        if (!messagesEl || !msgEl || messagesEl.clientHeight <= 0) return;
+        const layoutTop = (el) => {
+            let y = 0;
+            let cur = el;
+            while (cur) {
+                y += cur.offsetTop + (cur === el ? 0 : cur.clientTop);
+                cur = cur.offsetParent;
+            }
+            return y;
+        };
+        const relTop = layoutTop(msgEl) - layoutTop(messagesEl) - messagesEl.clientTop;
+        const targetTop = Math.max(0, relTop - 12);
+        if (instant) {
+            const prevBehavior = messagesEl.style.scrollBehavior;
+            messagesEl.style.scrollBehavior = 'auto';
+            messagesEl.scrollTop = targetTop;
+            messagesEl.style.scrollBehavior = prevBehavior;
+        } else {
+            messagesEl.scrollTop = targetTop;
+        }
+    }
+
+    function addMessage(role, content, providerInfo, knowledgeSources, options = {}) {
+        if (!messagesEl) return null;
         removeEmptyState();
         const div = document.createElement('div');
         div.className = `qa-chat-message ${role}`;
@@ -716,26 +736,51 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             });
         }
-        if (role === 'assistant') {
-            // 新回复到达时定位到回复开头：用无 transform 影响的布局坐标差，避免 offsetParent 或入场位移把首段顶出可视区
-            if (messagesEl.clientHeight > 0) {
-                const layoutTop = (el) => {
-                    let y = 0;
-                    let cur = el;
-                    while (cur) {
-                        y += cur.offsetTop + (cur === el ? 0 : cur.clientTop);
-                        cur = cur.offsetParent;
-                    }
-                    return y;
-                };
-                const relTop = layoutTop(div) - layoutTop(messagesEl) - messagesEl.clientTop;
-                const targetTop = Math.max(0, relTop - 12);
-                messagesEl.scrollTop = targetTop;
+        if (!options.skipScroll) {
+            if (role === 'assistant') {
+                // 新回复到达时定位到回复开头：用无 transform 影响的布局坐标差，避免 offsetParent 或入场位移把首段顶出可视区
+                scrollToAssistantStart(div, Boolean(options.instantScroll));
+            } else {
+                messagesEl.scrollTop = messagesEl.scrollHeight;
             }
-        } else {
-            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
+        return div;
+    }
+
+    // 页面加载时恢复本地多轮上下文，确保界面展示与发送历史严格一致（所见即所得，消除幽灵上下文）
+    function restoreHistory() {
+        if (!messagesEl) return;
+        const saved = getHistory();
+        if (!saved.length) return;
+        saveHistory(saved);
+        let lastAssistantEl = null;
+        for (const item of saved) {
+            const el = addMessage(item.role, item.content, null, null, { skipScroll: true });
+            if (item.role === 'assistant') lastAssistantEl = el;
+        }
+        setQuestionsCollapsed(true);
+        if (lastAssistantEl) {
+            if (messagesEl.clientHeight > 0) {
+                requestAnimationFrame(() => scrollToAssistantStart(lastAssistantEl, true));
+            } else {
+                pendingRestoreScrollEl = lastAssistantEl;
+            }
         }
     }
+    restoreHistory();
+
+    window.addEventListener('hashchange', () => {
+        if (!pendingRestoreScrollEl || !messagesEl) return;
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                if (pendingRestoreScrollEl && messagesEl.clientHeight > 0) {
+                    const targetEl = pendingRestoreScrollEl;
+                    pendingRestoreScrollEl = null;
+                    scrollToAssistantStart(targetEl, true);
+                }
+            });
+        });
+    });
 
     // ---- HTML 消毒 ----
     // 校验 URL 协议是否在允许列表内；同时拒绝包含控制字符的可疑 URL

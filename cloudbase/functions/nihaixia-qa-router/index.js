@@ -19,7 +19,7 @@
 const cloudbase = require('@cloudbase/node-sdk');
 const { searchDocuments } = require('./knowledge-search');
 
-const VERSION = '5.6.1';
+const VERSION = '5.6.2';
 const MODEL_TEMPERATURE = 0.1;
 const MAX_CONTEXT_CHARS = 30000; // 上下文总量上限
 const MAX_HISTORY_LENGTH = 2000;
@@ -53,7 +53,9 @@ const STRONG_TREATMENT_INTENT_PATTERN = /(?:怎么办|怎么治|能治好吗|该
 const WEAK_TREATMENT_INTENT_PATTERN = /(?:比较好|有效|推荐|可以吗|可以用吗)/;
 const LEARNING_RECOMMENDATION_PATTERN = /(?:他|她).{0,8}推荐.{0,12}学习|(?:学习|经方学习).{0,24}(?:顺序|路径|从哪里|如何入手|怎么学|入手)|学习顺序|从哪里入手比较有效/;
 
-const EMERGENCY_PATTERN = /(?:救命|急救|危重|抢救|快不行|昏迷|休克)/;
+const EMERGENCY_PATTERN = /(?:救命|急救|危重|抢救|快不行|昏迷|休克|意识不清|失去意识|没呼吸|没心跳|大出血|服毒|吞药|割腕|自杀|跳楼|过敏性休克)/;
+const ACUTE_EMERGENCY_SYMPTOM_PATTERN = /(?:胸口剧痛|剧烈胸痛|突发胸痛|心绞痛|心肌梗死|心梗|脑溢血|脑出血|胸痛.{0,8}(?:呼吸困难|喘不上气|冒冷汗|出冷汗|左臂|发紧|压榨)|胸闷.{0,8}(?:呼吸困难|喘不上气|冒冷汗|剧痛)|呼吸困难|喘不上气|窒息|剧烈头痛.{0,8}(?:呕吐|模糊|晕)|吐血|呕血|咯血|便血不止|抽搐|昏厥|晕倒|口眼歪斜|突发偏瘫|半身不遂|言语不清|高烧(?:40|41|不退|惊厥))/;
+const EMERGENCY_URGENCY_PATTERN = /(?:怎么办|怎么处理|怎么缓解|怎么治|吃什么|用什么|要不要去医院|刚|刚才|突然|现在|正在|冒冷汗|出冷汗|冷汗|痛得|疼得|受不了)/;
 const MEDICAL_BLOCK_REPLY = '本系统仅供学习研究，不提供诊断、处方、剂量或治疗建议。如有健康问题，请咨询专业中医师或前往线下医疗机构就诊。';
 const EMERGENCY_BLOCK_REPLY = '如遇紧急医疗情况，请立即拨打 120 急救电话，并尽快前往线下医院就诊。本系统不能提供急救或诊疗服务。';
 
@@ -129,11 +131,21 @@ function hasPersonTreatmentQuery(text) {
   return false;
 }
 
+function isEmergencyRequest(text) {
+  if (!text || typeof text !== 'string') return false;
+  const t = text.trim();
+  if (EMERGENCY_PATTERN.test(t)) return true;
+  if (!ACUTE_EMERGENCY_SYMPTOM_PATTERN.test(t)) return false;
+  if (EMERGENCY_URGENCY_PATTERN.test(t) || PERSON_PATTERN.test(t)) return true;
+  return !hasLearningContext(t);
+}
+
 function isMedicalRequest(text) {
   if (!text || typeof text !== 'string') return false;
   const t = text.trim();
 
   if (ALWAYS_BLOCK_PATTERNS.some((p) => p.test(t))) return true;
+  if (isEmergencyRequest(t)) return true;
 
   if (hasPersonTreatmentQuery(t)) return true;
   if (hasFeverTreatmentQuery(t)) return true;
@@ -151,7 +163,7 @@ function isMedicalRequest(text) {
 }
 
 function getMedicalBlockReply(text) {
-  if (EMERGENCY_PATTERN.test(text)) return EMERGENCY_BLOCK_REPLY;
+  if (isEmergencyRequest(text)) return EMERGENCY_BLOCK_REPLY;
   return MEDICAL_BLOCK_REPLY;
 }
 
@@ -163,7 +175,8 @@ function getMedicalBlockReplyFromContext(history, currentMsg) {
     }
   }
   if (typeof currentMsg === 'string') parts.push(currentMsg);
-  return getMedicalBlockReply(parts.join('\n'));
+  if (parts.some((p) => isEmergencyRequest(p))) return EMERGENCY_BLOCK_REPLY;
+  return MEDICAL_BLOCK_REPLY;
 }
 
 // ---------------------------------------------------------------------------
