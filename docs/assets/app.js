@@ -221,7 +221,15 @@ class NihaixiaApp {
             const view = document.getElementById('view-graph');
             if (!view || !view.classList.contains('active')) return;
             if (this.forceGraph.svg) return;
-            try { this.forceGraph.render(); } catch (e) { console.error('Graph render error:', e); }
+            try {
+                this.forceGraph.render();
+            } catch (e) {
+                console.error('Graph render error:', e);
+                this.forceGraph.svg = null;
+                if (this.forceGraph.container && !this.forceGraph.container.querySelector('.graph-fallback')) {
+                    this.forceGraph.renderMissingEngineFallback([...this.data.nodes, ...this.data.articles]);
+                }
+            }
         });
     }
 

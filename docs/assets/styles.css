@@ -673,6 +673,11 @@ body {
     width: 176px;
 }
 
+.graph-container.graph-fallback-mode .graph-legend,
+.graph-container:has(.graph-fallback) .graph-legend {
+    display: none;
+}
+
 .graph-legend-title {
     font-size: 11px;
     font-weight: 700;

@@ -6,8 +6,8 @@
 
 [![在线主站](https://img.shields.io/badge/在线主站-nihaixia--knowledge.xyz-b9362c?style=flat-square)](https://www.nihaixia-knowledge.xyz/)
 [![知识图谱](https://img.shields.io/badge/知识图谱-64_节点_·_5_专题-4a6fa5?style=flat-square)](https://www.nihaixia-knowledge.xyz/#/graph)
-[![开源资料](https://img.shields.io/badge/开源资料-148_篇_·_约_120_万字-5b7a5e?style=flat-square)](./knowledge/README.md)
-[![Releases](https://img.shields.io/badge/离线包下载-v1.0.0-8c6d46?style=flat-square)](https://github.com/zenoyang-ai/nihaixia-knowledge-graph/releases/latest)
+[![开源资料](https://img.shields.io/badge/开源资料-144_篇_·_约_120_万字-5b7a5e?style=flat-square)](./knowledge/README.md)
+[![Releases](https://img.shields.io/badge/离线包下载-v1.0.1-8c6d46?style=flat-square)](https://github.com/zenoyang-ai/nihaixia-knowledge-graph/releases/latest)
 [![License](https://img.shields.io/badge/协议-MIT_%2F_CC_BY--SA_4.0-6e6a64?style=flat-square)](./LICENSE)
 
 [在线网站](https://www.nihaixia-knowledge.xyz/) · [里头有什么](#里头有什么) · [怎么用](#怎么用) · [天纪 Skill](#在-ai-工具里装天纪提示词) · [目录](#目录) · [边界与版权](#边界与版权)
@@ -31,7 +31,7 @@
 
 这个仓库做了两件事：
 
-1. **搭了一个免费在线网站**：把人纪和天纪拆成五个层级、69 个核心节点，配好学习顺序、关系图谱和基于资料库的 AI 问答。
+1. **搭了一个免费在线网站**：把人纪和天纪拆成五个层级、69 个可视化节点，配好学习顺序、关系图谱和基于资料库的 AI 问答。
 2. **把背后整理的资料全部开源**：所有节点笔记、AI 语料包、去噪分章后的《天纪》《人纪》阅读文本和天纪提示词，都在这个仓库里，拿走就能直接用。
 
 > 国内主站：[www.nihaixia-knowledge.xyz](https://www.nihaixia-knowledge.xyz/) ｜ 腾讯云备用：[CloudBase](https://zeno-d9g0gdvw4a57635c0-1452182285.tcloudbaseapp.com/) ｜ 海外备份：[GitHub Pages](https://zenoyang-ai.github.io/nihaixia-knowledge-graph/)
@@ -45,7 +45,7 @@
 | 你想做什么 | 点这里 | 里头有什么 |
 | --- | --- | --- |
 | 先把三纪全貌看明白 | [在线网站](https://www.nihaixia-knowledge.xyz/) · [三纪总览](./knowledge/00-倪海厦生平与三纪总览.md) | 交互式知识图谱、学习路径、AI 问答，以及生平师承、天纪/人纪/地纪全景对照表 |
-| 放进 Obsidian 做笔记 | [`knowledge/01-知识图谱笔记/`](./knowledge/01-知识图谱笔记/README.md) | 与网站同步的 64 张概念卡 + 5 篇专题 + 2 条路径，内部双链全通，卡片出处直连原文分章 |
+| 放进 Obsidian 做笔记 | [`knowledge/01-知识图谱笔记/`](./knowledge/01-知识图谱笔记/README.md) | 与网站同步的 64 张节点卡 + 5 篇专题 + 2 条路径，内部双链全通，卡片出处直连原文分章 |
 | 喂给 NotebookLM / Claude / Dify | [`knowledge/02-AI知识库语料包/`](./knowledge/02-AI知识库语料包/README.md) | 合并单文件 `nihaixia-corpus-all.md`、结构化 `jsonl`、提示词合集与 `MANIFEST.json` |
 | 按卷分章读《天纪》《人纪》 | [`03-天纪学习资料/`](./knowledge/03-天纪学习资料/README.md) · [`04-人纪学习资料/`](./knowledge/04-人纪学习资料/README.md) | 《天机道》《地脉道》《人间道》《易经64卦图》、紫微格局速查；《针灸大成》《人纪·针灸篇》《神农本草经》及内经/伤寒/金匮已校勘节选（单文件均 ≤ 186 KB） |
 | 零基础看对话、听经方心法 | [`knowledge/05-公开讲座与访谈/`](./knowledge/05-公开讲座与访谈/README.md) | 《梁冬对话倪海厦（7 讲）》《仲景心法（7 讲）》《扶阳论坛》《经方的妙用》公开讲座纯文字整理 |
@@ -130,7 +130,7 @@ Codex 内置脚本安装方式与规则细节见 [`skills/nihaixia-tianji/`](./s
 
 ```text
 nihaixia-knowledge-graph
-├── knowledge/                          开源知识库（148 篇 · 约 120 万字）
+├── knowledge/                          开源知识库（144 篇 · 约 120 万字）
 │   ├── 00-倪海厦生平与三纪总览.md          生平师承、天纪/人纪/地纪全景与课程对照地图
 │   ├── 01-知识图谱笔记/                  69 篇节点与专题 + 学习路径（双链全通，出处直连原文）
 │   ├── 02-AI知识库语料包/                单文件全集 + jsonl + 提示词 + MANIFEST.json

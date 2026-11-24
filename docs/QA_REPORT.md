@@ -2,7 +2,7 @@
 
 > 网站数据与质量口径说明。以下内容以当前发布目录和校验脚本为准。
 
-## 当前口径（2026-07-19）
+## 当前口径（2026-11-24）
 
 | 指标 | 数值 |
 |------|------|
@@ -10,7 +10,7 @@
 | 主题文章 `articles` | 5 |
 | 内容项合计 | 69 |
 | 有向 `node_links` | 338 |
-| 运行时去重后无向边 | 283 |
+| 运行时去重后无向边 | 273 |
 | 悬空 `node_links` | 0 |
 | Manifest 资料数 | 231 |
 | 可枚举文件数 | 227 |
@@ -29,13 +29,13 @@ OK nodes_total=69
 OK topic_articles=5
 OK public_sources=4 (3 readable)
 OK medical_safety=learning_only
-OK node_links directed=338 undirected=283 dangling=0
+OK node_links directed=338 undirected=273 dangling=0
 ```
 
 说明：
 
-- 顶层没有 `links` 数组；图谱边由各节点 `node_links` 在 `docs/assets/graph.js` 运行时派生。
-- `nodes_total=69` = 64 节点 + 5 主题文章。
+- 顶层没有 `links` 数组；图谱边由各节点 `node_links` 在 `docs/assets/graph.js` 运行时派生（并由 `build_site_data.py` 从 `upstream + downstream + related` 单一真源同步）。
+- `nodes_total=69` = 64 节点 + 5 主题文章（五层知识架构：`底层框架 4`、`辨证框架 12`、`方法工具 25`、`案例研读 10`、`天纪体系 13`）。
 - 旧文档中的「71 节点 / 6 主题文章 / 289 关系」均已作废。
 
 ## 医疗安全检查

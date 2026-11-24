@@ -24,7 +24,6 @@ class Sidebar {
             '方法工具': 'var(--layer-treatment)',
             '案例研读': 'var(--layer-cases)',
             '天纪体系': 'var(--layer-tianji)',
-            '学习路径': 'var(--layer-path)',
             '深度专题': 'var(--layer-topic)',
         };
 

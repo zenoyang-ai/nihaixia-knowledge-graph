@@ -13,8 +13,8 @@ class ForceGraph {
         this.linkEls = null;
         this.nodeEls = null;
         this.viewport = null;
-        this.positionStorageKey = 'nihaixia_graph_positions_v1';
-        this.transformKey = 'nihaixia_graph_transform_v1';
+        this.positionStorageKey = 'nihaixia_graph_positions_v3';
+        this.transformKey = 'nihaixia_graph_transform_v3';
         this._allowTransformPersist = true;
 
         // 标签显隐状态
@@ -27,15 +27,15 @@ class ForceGraph {
         this.conceptBoxes = [
             {
                 key: 'renji', label: '人纪', desc: '中医教学',
-                match: (n) => ['底层框架', '辨证框架', '方法工具', '案例研读', '学习路径'].includes(n.layer),
+                match: (n) => ['底层框架', '辨证框架', '方法工具', '案例研读'].includes(n.layer) || /人纪|六经辨证|经方针灸本草/.test(n.title || ''),
             },
             {
                 key: 'tianji', label: '天纪', desc: '三才术数',
-                match: (n) => n.layer === '天纪体系',
+                match: (n) => n.layer === '天纪体系' || ['阴阳', '五行', '天人合一'].includes(n.title) || /天纪|天人合一/.test(n.title || ''),
             },
             {
                 key: 'jingfang', label: '经方', desc: '经典方剂',
-                match: (n) => n.node_type === 'formula' || /汤|丸|散|经方|方剂|方义|汉唐/.test(n.title || ''),
+                match: (n) => n.node_type === 'formula' || ['伤寒论', '金匮要略', '仲景心法', '扶阳', '扶阳论坛', '方证对应'].includes(n.title) || /汤|丸|散|经方|方剂|方义|汉唐/.test(n.title || ''),
             },
             {
                 key: 'zhenjiu', label: '针灸', desc: '经络腧穴',
@@ -60,9 +60,9 @@ class ForceGraph {
         }
         this.layerAngle = {
             '底层框架': -90, '辨证框架': -18, '方法工具': 54,
-            '案例研读': 126, '天纪体系': 198, '学习路径': 270,
+            '案例研读': 126, '天纪体系': 198,
         };
-        this.typeLabel = { concept:'概念', classic:'经典', formula:'方剂', case:'案例', topic:'文章' };
+        this.typeLabel = { concept:'概念', classic:'经典', course:'课程', formula:'方剂', case:'案例', topic:'文章' };
 
         // 订阅全局搜索框：在图谱视图下高亮匹配节点
         const searchInput = document.getElementById('global-search');
@@ -85,7 +85,6 @@ class ForceGraph {
             '方法工具': cssVar('--layer-treatment', '#2c705f'),
             '案例研读': cssVar('--layer-cases', '#c7892b'),
             '天纪体系': cssVar('--layer-tianji', '#7b5ea7'),
-            '学习路径': cssVar('--layer-path', '#7f8c8d'),
             '深度专题': cssVar('--layer-topic', '#8c6b53'),
         };
     }
@@ -122,6 +121,16 @@ class ForceGraph {
         this.activeConcept = null;
         this.activeSearchQuery = null;
         if (this.simulation) this.simulation.stop();
+
+        if (typeof window.d3 === 'undefined') {
+            this.svg = null;
+            this.viewport = null;
+            this.nodeEls = null;
+            this.linkEls = null;
+            this.renderMissingEngineFallback(nodeList);
+            return;
+        }
+        this.container.closest('.graph-container')?.classList.remove('graph-fallback-mode');
 
         const rect = this.container.getBoundingClientRect();
         const width = rect.width || 800;
@@ -219,7 +228,7 @@ class ForceGraph {
         this.svg.setAttribute('width', width);
         this.svg.setAttribute('height', height);
         this.svg.setAttribute('role', 'img');
-        this.svg.setAttribute('aria-label', '倪海厦知识图谱力导向图，共 69 个节点');
+        this.svg.setAttribute('aria-label', `倪海厦知识图谱力导向图，共 ${this.nodes.length} 个节点`);
         this.svg.style.width = '100%';
         this.svg.style.height = '100%';
         this.svg.style.display = 'block';
@@ -818,6 +827,36 @@ class ForceGraph {
         }
 
         this.showDetail(node);
+    }
+
+    renderMissingEngineFallback(nodeList) {
+        this.container.closest('.graph-container')?.classList.add('graph-fallback-mode');
+        const items = nodeList || [];
+        const groups = {};
+        items.forEach((n) => {
+            const layer = this.resolveNodeLayer(n) || '深度专题';
+            if (!groups[layer]) groups[layer] = [];
+            groups[layer].push(n);
+        });
+        const layers = [...(this.data.layers || []), ...Object.keys(groups).filter((l) => !(this.data.layers || []).includes(l))];
+        const wrap = document.createElement('div');
+        wrap.className = 'graph-fallback';
+        wrap.style.cssText = 'padding:28px 24px 80px;max-width:960px;margin:0 auto;height:100%;overflow:auto;';
+        wrap.innerHTML = `
+            <div style="padding:14px 16px;margin-bottom:20px;border:1px solid var(--border-color);border-radius:10px;background:var(--surface-card);color:var(--on-surface);">
+                <strong style="color:var(--accent);">知识图谱引擎加载受限</strong>
+                <p style="margin:6px 0 0;font-size:13px;color:var(--on-surface-muted);">力导向脚本（D3.js）未能加载，以下已切换为按层级整理的 ${items.length} 个条目直达目录，可继续正常阅读全部节点。</p>
+            </div>
+            ${layers.filter((l) => (groups[l] || []).length).map((layer) => `
+                <div style="margin-bottom:18px;">
+                    <div style="font-size:13px;font-weight:700;color:var(--on-surface-strong);margin-bottom:8px;">${layer}（${groups[layer].length}）</div>
+                    <div style="display:flex;flex-wrap:wrap;gap:8px;">
+                        ${groups[layer].map((n) => `<a class="stage-node" href="#/note/${encodeURIComponent(n.title)}">${n.title}</a>`).join('')}
+                    </div>
+                </div>
+            `).join('')}
+        `;
+        this.container.appendChild(wrap);
     }
 
     showDetail(node) {

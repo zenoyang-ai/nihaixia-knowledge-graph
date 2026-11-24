@@ -19,32 +19,32 @@
       "file": "nihaixia-corpus-all.md",
       "format": "markdown",
       "records": 74,
-      "bytes": 88888,
-      "sha256_checksum": "d618c12459cc83b86b858f1ef8ab7e21763d96d716d5e0236f85810308b92f1f",
+      "bytes": 98461,
+      "sha256_checksum": "b2e901f49f9ccda64ce21a860a5b603f957c82d959cdd1dc6e3ce082cbe61409",
       "description": "合并单文件：64 节点 + 5 专题 + 学习路径 + 5 套天纪提示词"
     },
     {
       "file": "nodes.jsonl",
       "format": "jsonl",
       "records": 64,
-      "bytes": 108165,
-      "sha256_checksum": "e9a461328c5a8e99368c8e9bd75cde640ff8da04b9e3018fbb1a00670f465ad3",
+      "bytes": 116390,
+      "sha256_checksum": "ddb6277af6a057b4a72947cda47cfac95165c9436d18d6c84174eabb5718b449",
       "description": "64 条图谱节点结构化数据（id/title/layer/definition/summary/quotes/misconceptions/safety_boundary）"
     },
     {
       "file": "articles.jsonl",
       "format": "jsonl",
       "records": 5,
-      "bytes": 8326,
-      "sha256_checksum": "d6f252405e5cf1211327bdc20095b3c0fe1283fb5c6cfc7cd4e32f25f347980a",
+      "bytes": 8681,
+      "sha256_checksum": "d4e6095164da423bc3f43711145e3a46172a625cf3179313a5c536ee375eaf8c",
       "description": "5 篇深度专题结构化数据"
     },
     {
       "file": "edges.jsonl",
       "format": "jsonl",
       "records": 338,
-      "bytes": 75469,
-      "sha256_checksum": "30dbfaa263b6d21d480fcfe352466e7e0bbe4e4963caf0523aa2593cfb257d77",
+      "bytes": 74293,
+      "sha256_checksum": "582c1c71db2a6438fcecc32769c5006d808570bf3e9a8a848d4019f5e37b3d8a",
       "description": "338 条有向知识关联边（source/source_title/target/target_title）"
     },
     {

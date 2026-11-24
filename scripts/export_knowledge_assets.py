@@ -32,28 +32,12 @@ OFFLINE_DATA_JS = DOCS_DATA_DIR / "offline-data.js"
 KNOWLEDGE_DIR = REPO_ROOT / "knowledge"
 
 LAYER_DIRS = {
-    "学习路径": "01-学习路径",
     "底层框架": "02-底层框架",
     "辨证框架": "03-辨证框架",
     "方法工具": "04-方法工具",
     "案例研读": "05-案例研读",
     "天纪体系": "06-天纪体系",
 }
-
-RENJI_STAGES = [
-    ("第一步：针灸大成", "先学针灸，建立经络穴位基础，直观感受人体能量系统", ["针灸", "经络"]),
-    ("第二步：黄帝内经", "中医理论根本，理解阴阳五行、脏腑经络的完整框架", ["阴阳", "五行", "天人合一", "脏腑辨证", "气血津液", "黄帝内经"]),
-    ("第三步：神农本草经", "学习中药药性，为经方学习打基础", ["神农本草经", "四气五味", "本草", "炮制"]),
-    ("第四步：伤寒论与金匮要略", "经方核心，掌握六经辨证体系", ["六经辨证", "八纲辨证", "寒热虚实", "表里", "虚实", "病机", "证候", "经方", "方证对应", "方剂", "伤寒论", "金匮要略"]),
-    ("第五步：医案研读", "通过真实医案把理论串起来，培养临床思维", ["医案学习法", "临床案例索引", "血液类病证研读", "免疫相关案例研读", "疑难病证案例研读", "水液代谢类案例研读", "肿块类案例研读", "脏腑复杂案例研读", "望诊案例研读"]),
-]
-
-TIANJI_STAGES = [
-    ("第一步：易经基础与天机道", "以易经为轴，建立天地人三才的认知框架", ["天人合一", "阴阳", "五行", "易经", "象数", "三才", "天机道"]),
-    ("第二步：人间道——紫微斗数与命理", "学习紫微斗数、四柱命理，理解人事推演方法", ["人间道", "紫微斗数", "四柱命理"]),
-    ("第三步：地脉道——风水堪舆", "学习地理风水、罗盘使用，理解环境对人的影响", ["地脉道", "风水堪舆"]),
-    ("第四步：三才贯通", "天机道、人间道、地脉道三者互相参照，形成完整体系", ["天纪与人纪"]),
-]
 
 WIKILINK_RE = re.compile(r"\[\[([^\]|]+)(?:\|([^\]]+))?\]\]")
 MD_REL_LINK_RE = re.compile(r"\[[^\]]+\]\((\.\.?/[^)\s]+)\)")
@@ -103,6 +87,7 @@ SOURCE_LIBRARY_LINKS = [
     ("地脉道听课笔记", "地脉道听课笔记", "../../03-天纪学习资料/笔记与参考/地脉道听课笔记.md"),
     ("地脉道", "地脉道", "../../03-天纪学习资料/02-地脉道.md"),
     ("人间道听课笔记", "人间道听课笔记", "../../03-天纪学习资料/笔记与参考/人间道听课笔记.md"),
+    ("读易心法", "人间道·序言与读易心法", "../../03-天纪学习资料/03-人间道/00-序言与读易心法.md"),
     ("人间道", "人间道（3 卷）", "../../03-天纪学习资料/03-人间道/README.md"),
     ("易经64卦图", "易经64卦图", "../../03-天纪学习资料/04-易经64卦图.md"),
     ("易经推命批法", "易经推命批法", "../../03-天纪学习资料/笔记与参考/易经推命批法.md"),
@@ -285,7 +270,13 @@ def render_learning_path_md(title: str, intro: str, stages: list, valid_titles: 
         f"> {intro}",
         "",
     ]
-    for stage_title, desc, nodes in stages:
+    for stage in stages:
+        if isinstance(stage, dict):
+            stage_title = stage["title"]
+            desc = stage.get("desc", "")
+            nodes = stage.get("nodes") or []
+        else:
+            stage_title, desc, nodes = stage
         lines.extend([f"## {stage_title}", "", desc, ""])
         links = [f"- [[{n}]]" if n in valid_titles else f"- {n}" for n in nodes]
         lines.extend(links)
@@ -320,22 +311,28 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
     for article in articles:
         write_clean(vault_dir / "07-深度专题" / f"{article['title']}.md", render_obsidian_item(article, valid_titles))
 
-    # 2. 导出学习路径与 MOC 总览
+    # 2. 从 graph["learning_paths"] 单一真源导出学习路径与 MOC 总览
+    learning_paths = graph.get("learning_paths") or {}
+    renji_lp = learning_paths.get("renji")
+    tianji_lp = learning_paths.get("tianji")
+    if not (renji_lp and tianji_lp):
+        raise ValueError("docs/data/graph.json 缺少 learning_paths.renji / tianji 配置")
+
     write_clean(
         vault_dir / "01-学习路径" / "人纪学习路径.md",
         render_learning_path_md(
-            "倪海厦人纪学习路径",
-            "人纪是倪海厦先生的中医教学体系，推荐顺序：针灸 → 黄帝内经 → 神农本草经 → 伤寒论 → 金匮要略 → 医案研读。",
-            RENJI_STAGES,
+            renji_lp["title"],
+            renji_lp["desc"],
+            renji_lp["stages"],
             valid_titles,
         ),
     )
     write_clean(
         vault_dir / "01-学习路径" / "天纪学习路径.md",
         render_learning_path_md(
-            "倪海厦天纪学习路径",
-            "天纪是天、人、地三才体系，以易经为轴，涵盖天机道、人间道、地脉道。",
-            TIANJI_STAGES,
+            tianji_lp["title"],
+            tianji_lp["desc"],
+            tianji_lp["stages"],
             valid_titles,
         ),
     )
@@ -353,7 +350,10 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
         "## 知识层级索引",
         "",
     ]
-    ordered_layers = ["底层框架", "辨证框架", "方法工具", "案例研读", "天纪体系", "学习路径"]
+    ordered_layers = list(graph.get("layers") or ["底层框架", "辨证框架", "方法工具", "案例研读", "天纪体系"])
+    for layer in layer_groups:
+        if layer not in ordered_layers:
+            ordered_layers.append(layer)
     for layer in ordered_layers:
         titles = layer_groups.get(layer, [])
         if not titles:
@@ -379,8 +379,8 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
         "",
         "## 学习顺序",
         "",
-        "- [倪海厦人纪学习路径](./01-学习路径/人纪学习路径.md) — 针灸 → 黄帝内经 → 神农本草经 → 伤寒论与金匮要略 → 医案研读",
-        "- [倪海厦天纪学习路径](./01-学习路径/天纪学习路径.md) — 天机道（易经/紫微）→ 人间道（命理/人伦）→ 地脉道（风水）→ 三才贯通",
+        "- [倪海厦人纪学习路径](./01-学习路径/人纪学习路径.md) — 导学 → 针灸大成 → 黄帝内经 → 神农本草经 → 伤寒论 → 金匮要略与扶阳心法 → 医案研读",
+        "- [倪海厦天纪学习路径](./01-学习路径/天纪学习路径.md) — 易经根基 → 天机道（紫微/四柱）→ 地脉道（风水/阳宅定位）→ 人间道（六十四卦/以果决行）→ 三才贯通（区分三纪与三道）",
         "",
         "## 全部条目",
         "",
@@ -494,14 +494,17 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
         "",
         "## 一、学习路径总览",
         "",
-        "### 人纪学习路径",
+        f"### {renji_lp['title']}",
+        "",
+        renji_lp["desc"],
+        "",
     ]
-    for st, desc, ns in RENJI_STAGES:
-        corpus_parts.append(f"- **{st}**：{desc}（关联节点：{'、'.join(ns)}）")
-    corpus_parts.extend(["", "### 天纪学习路径"])
-    for st, desc, ns in TIANJI_STAGES:
-        corpus_parts.append(f"- **{st}**：{desc}（关联节点：{'、'.join(ns)}）")
-    corpus_parts.extend(["", "## 二、图谱节点与专题（69 项）", ""])
+    for st in renji_lp["stages"]:
+        corpus_parts.append(f"- **{st['title']}**：{st['desc']}（关联节点：{'、'.join(st['nodes'])}）")
+    corpus_parts.extend(["", f"### {tianji_lp['title']}", "", tianji_lp["desc"], ""])
+    for st in tianji_lp["stages"]:
+        corpus_parts.append(f"- **{st['title']}**：{st['desc']}（关联节点：{'、'.join(st['nodes'])}）")
+    corpus_parts.extend(["", f"## 二、图谱节点与专题（{len(all_items)} 项）", ""])
     for item in all_items:
         sec = item.get("sections") or {}
         corpus_parts.extend([
@@ -539,11 +542,11 @@ def export_graph_and_ai_packs(graph: dict, prompts: list) -> dict:
     # 6. 生成机器可读清单 MANIFEST.json（含 SHA-256 校验和与分层协议口径）
     manifest_entries = []
     file_specs = [
-        ("nihaixia-corpus-all.md", "markdown", len(all_items) + len(prompts), "合并单文件：64 节点 + 5 专题 + 学习路径 + 5 套天纪提示词"),
-        ("nodes.jsonl", "jsonl", len(nodes), "64 条图谱节点结构化数据（id/title/layer/definition/summary/quotes/misconceptions/safety_boundary）"),
-        ("articles.jsonl", "jsonl", len(articles), "5 篇深度专题结构化数据"),
-        ("edges.jsonl", "jsonl", len(edges_jsonl), "338 条有向知识关联边（source/source_title/target/target_title）"),
-        ("tianji-prompts.md", "markdown", len(prompts), "5 套天纪提示词完整版与简版"),
+        ("nihaixia-corpus-all.md", "markdown", len(all_items) + len(prompts), f"合并单文件：{len(nodes)} 节点 + {len(articles)} 专题 + 学习路径 + {len(prompts)} 套天纪提示词"),
+        ("nodes.jsonl", "jsonl", len(nodes), f"{len(nodes)} 条图谱节点结构化数据（id/title/layer/definition/summary/quotes/misconceptions/safety_boundary）"),
+        ("articles.jsonl", "jsonl", len(articles), f"{len(articles)} 篇深度专题结构化数据"),
+        ("edges.jsonl", "jsonl", len(edges_jsonl), f"{len(edges_jsonl)} 条有向知识关联边（source/source_title/target/target_title）"),
+        ("tianji-prompts.md", "markdown", len(prompts), f"{len(prompts)} 套天纪提示词完整版与简版"),
     ]
     for fname, fmt, records, desc in file_specs:
         fpath = rag_dir / fname
@@ -1328,8 +1331,8 @@ def ensure_library_sub_readmes() -> None:
             + "|------|----------|-------------|\n"
             + "| [紫微斗数核心框架与格局速查.md](./紫微斗数核心框架与格局速查.md) | 十四主星、十二宫位、生年四化、常见格局与倪师六亲/以果决行心法速查 | `紫微斗数` · `天机道` |\n"
             + "| [天机道笔记.md](./天机道笔记.md) | 紫微斗数星曜、十二宫位与盘面听课笔记 | `天机道` · `紫微斗数` |\n"
-            + "| [人间道听课笔记.md](./人间道听课笔记.md) | 六十四卦人间处世与人事推演听课笔记 | `人间道` · `易经` |\n"
-            + "| [地脉道听课笔记.md](./地脉道听课笔记.md) | 阳宅九宫方位、格局与堪舆听课笔记 | `地脉道` · `风水堪舆` |\n"
+            + "| [人间道听课笔记.md](./人间道听课笔记.md) | 六十四卦人间处世与人事推演听课笔记 | `人间道` · `六十四卦` · `以果决行` |\n"
+            + "| [地脉道听课笔记.md](./地脉道听课笔记.md) | 阳宅九宫方位、格局与堪舆听课笔记 | `地脉道` · `风水堪舆` · `阳宅定位` |\n"
             + "| [易经推命批法.md](./易经推命批法.md) | 易经象数与三才综合推演笔记 | `象数` · `三才` |\n"
         )
         write_clean(tianji_notes_dir / "README.md", notes_readme)
@@ -1351,8 +1354,16 @@ def ensure_library_sub_readmes() -> None:
         write_clean(renji_excerpts_dir / "README.md", excerpts_readme)
 
 
-def write_knowledge_top_docs() -> None:
-    top_readme = """# 开源知识库
+def write_knowledge_top_docs(counts=None) -> None:
+    if counts is None:
+        g_meta = json.loads(GRAPH_JSON.read_text(encoding="utf-8"))
+        nodes_cnt = len(g_meta.get("nodes") or [])
+        articles_cnt = len(g_meta.get("articles") or [])
+    else:
+        nodes_cnt = counts["nodes"]
+        articles_cnt = counts["articles"]
+
+    top_readme = f"""# 开源知识库
 
 这里放着整个项目可以离线保存、直接阅读和喂给 AI 的资料，大部头文档都已经按卷或按章拆开（单文件不超过 186 KB），在 GitHub 网页上也能流畅翻看。
 
@@ -1361,7 +1372,7 @@ def write_knowledge_top_docs() -> None:
 | 目录 | 适合干什么 | 里头有什么 |
 |------|---------|-------------------|
 | [`00-倪海厦生平与三纪总览.md`](./00-倪海厦生平与三纪总览.md) | 建立全局地图 | 倪师生平师承、天纪/人纪/地纪三纪全景、学习顺序与本仓文件对照 |
-| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | 在线查概念 / 导入 Obsidian | 与网站同步的 64 张节点卡 + 5 篇专题 + 2 条学习路径，卡片「原始出处」已直接链接到本仓原文分章 |
+| [`01-知识图谱笔记/`](./01-知识图谱笔记/README.md) | 在线查概念 / 导入 Obsidian | 与网站同步的 {nodes_cnt} 张节点卡 + {articles_cnt} 篇专题 + 2 条学习路径，卡片「原始出处」已直接链接到本仓原文分章 |
 | [`02-AI知识库语料包/`](./02-AI知识库语料包/README.md) | 喂给 AI 陪读或搭 RAG | 合并单文件 `nihaixia-corpus-all.md`、`nodes/articles/edges.jsonl`、5 套天纪提示词与 `MANIFEST.json` |
 | [`03-天纪学习资料/`](./03-天纪学习资料/README.md) | 系统读《天纪》 | 《天机道》《地脉道》《人间道（3 卷）》《易经64卦图》、听课笔记与紫微核心框架速查 |
 | [`04-人纪学习资料/`](./04-人纪学习资料/README.md) | 系统读《人纪》与经典 | 《针灸大成（10 卷）》《人纪·针灸篇（8 章）》《神农本草经（5 卷）》及内经/伤寒/金匮已校勘节选 |
@@ -1460,6 +1471,34 @@ def validate_knowledge() -> list[str]:
     for item in nodes + articles:
         if item["title"] not in stems:
             errors.append(f"01-知识图谱笔记 缺少条目文件: {item['title']}.md")
+
+    # 1a. 校验学习路径与 graph.json 单一真源一致且 100% 覆盖全部条目
+    all_titles = {item["title"] for item in nodes + articles}
+    learning_paths = graph.get("learning_paths")
+    if not isinstance(learning_paths, dict):
+        errors.append("graph.json 缺少顶层 learning_paths 真源配置")
+    else:
+        covered = set()
+        for key, fname in (("renji", "人纪学习路径.md"), ("tianji", "天纪学习路径.md")):
+            lp = learning_paths.get(key) or {}
+            lp_file = vault_dir / "01-学习路径" / fname
+            lp_text = lp_file.read_text(encoding="utf-8") if lp_file.exists() else ""
+            if not lp_text:
+                errors.append(f"缺少学习路径文档: 01-知识图谱笔记/01-学习路径/{fname}")
+            for st in lp.get("stages") or []:
+                st_title = st.get("title", "")
+                if lp_text and st_title not in lp_text:
+                    errors.append(f"{fname} 未与真源同步，缺少阶段: {st_title}")
+                for ntitle in st.get("nodes") or []:
+                    if ntitle not in all_titles:
+                        errors.append(f"learning_paths.{key} 引用不存在的条目: {ntitle}")
+                    else:
+                        covered.add(ntitle)
+                        if lp_text and f"[[{ntitle}]]" not in lp_text:
+                            errors.append(f"{fname} 缺少双链节点: [[{ntitle}]]")
+        missing_in_paths = sorted(all_titles - covered)
+        if missing_in_paths:
+            errors.append(f"存在未纳入学习路径的条目 ({len(missing_in_paths)}): {', '.join(missing_in_paths)}")
 
     for md in sorted(vault_dir.rglob("*.md")):
         content = md.read_text(encoding="utf-8")
@@ -1640,7 +1679,7 @@ def main() -> int:
     prompts = json.loads(PROMPTS_JSON.read_text(encoding="utf-8"))
     counts = export_graph_and_ai_packs(graph, prompts)
     export_offline_site_bundle(graph, prompts)
-    write_knowledge_top_docs()
+    write_knowledge_top_docs(counts)
     print(f"Exported 01-知识图谱笔记, 02-AI知识库语料包 (with MANIFEST.json) & docs/data/offline-data.js: {counts}")
 
     errors = validate_knowledge()

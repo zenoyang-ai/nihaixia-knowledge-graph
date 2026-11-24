@@ -180,17 +180,97 @@ def load_existing_graph():
         return json.load(f)
 
 
+def compute_expected_stats(graph):
+    """基于 nodes 与 articles 实时计算精确统计口径。"""
+    nodes = graph.get("nodes", [])
+    articles = graph.get("articles", [])
+    concept_nodes = sum(1 for n in nodes if n.get("node_type") == "concept")
+    classic_course_nodes = sum(1 for n in nodes if n.get("node_type") in ("classic", "course"))
+    case_formula_nodes = sum(1 for n in nodes if n.get("node_type") in ("case", "formula"))
+    topic_articles = len(articles)
+    return {
+        "nodes_total": len(nodes) + len(articles),
+        "concept_nodes": concept_nodes,
+        "classic_course_nodes": classic_course_nodes,
+        "case_formula_nodes": case_formula_nodes,
+        "topic_articles": topic_articles,
+    }
+
+
+def _dedupe_titles(names):
+    seen = set()
+    out = []
+    for name in names or []:
+        if name and name not in seen:
+            seen.add(name)
+            out.append(name)
+    return out
+
+
+def sync_links_and_stats(graph):
+    """以 upstream + downstream + related 为单一真源派生 node_links，并重算 stats。"""
+    content_items = graph.get("nodes", []) + graph.get("articles", [])
+    by_id = {item["id"]: item for item in content_items if item.get("id")}
+    by_title = {item["title"]: item for item in content_items if item.get("title")}
+
+    for item in content_items:
+        self_title = item.get("title")
+        up = [t for t in _dedupe_titles(item.get("upstream")) if t != self_title]
+        down = [t for t in _dedupe_titles(item.get("downstream")) if t != self_title]
+        rel = [t for t in _dedupe_titles(item.get("related")) if t != self_title]
+
+        existing_sem = set(up + down + rel)
+        for lk in item.get("node_links") or []:
+            if not isinstance(lk, dict):
+                continue
+            target = by_id.get(lk.get("path"))
+            if target and target["title"] != self_title and target["title"] not in existing_sem:
+                rel.append(target["title"])
+                existing_sem.add(target["title"])
+
+        item["upstream"] = up
+        item["downstream"] = down
+        item["related"] = rel
+
+        combined = _dedupe_titles(up + down + rel)
+        rebuilt_links = []
+        for target_title in combined:
+            target = by_title.get(target_title)
+            if target:
+                rebuilt_links.append({"path": target["id"], "alias": target["title"]})
+        item["node_links"] = rebuilt_links
+
+    expected = compute_expected_stats(graph)
+    graph.setdefault("stats", {}).update(expected)
+    return graph
+
+
 def validate(graph):
     """验证数据一致性"""
     errors = []
     stats = graph["stats"]
 
-    # 检查节点数据存在
-    if stats.get("nodes_total", 0) == 0:
+    # 检查节点数据存在与分类算术一致
+    expected_stats = compute_expected_stats(graph)
+    if expected_stats["nodes_total"] == 0:
         errors.append("nodes_total=0, 节点数据为空")
-
-    if stats.get("topic_articles", 0) == 0:
+    if expected_stats["topic_articles"] == 0:
         errors.append("topic_articles=0, 主题文章为空")
+
+    category_sum = (
+        expected_stats["concept_nodes"]
+        + expected_stats["classic_course_nodes"]
+        + expected_stats["case_formula_nodes"]
+        + expected_stats["topic_articles"]
+    )
+    if category_sum != expected_stats["nodes_total"]:
+        errors.append(
+            f"节点类型统计加总异常: sum={category_sum} != nodes_total={expected_stats['nodes_total']}"
+        )
+
+    for key, exp_val in expected_stats.items():
+        if stats.get(key) != exp_val:
+            errors.append(f"stats.{key} 不一致: 写着 {stats.get(key)}, 实际={exp_val}")
 
     # 检查 public_sources 一致性
     actual_public = graph.get("public_sources", [])
@@ -224,28 +304,88 @@ def validate(graph):
         if not node.get("sections", {}).get("安全边界"):
             errors.append(f"节点 {node.get('id', '?')} 缺少安全边界")
 
-    # 检查 node_links 是否指向已有 nodes / articles（与 docs/assets/graph.js 解析口径一致）
+    # 检查 upstream/downstream/related 与 node_links 是否指向已有条目且完全同源
     content_items = graph.get("nodes", []) + graph.get("articles", [])
     id_set = {item.get("id") for item in content_items if item.get("id")}
+    by_title = {item.get("title"): item for item in content_items if item.get("title")}
     directed_links = 0
     dangling_links = []
     undirected = set()
     for node in content_items:
         source_id = node.get("id")
+        self_title = node.get("title") or source_id
+        sem_titles = set()
+        for field in ("upstream", "downstream", "related"):
+            for ref in node.get(field) or []:
+                if not ref or ref not in by_title or ref == self_title:
+                    errors.append(f"悬空语义引用 {self_title}.{field} -> {ref or '?'}")
+                else:
+                    sem_titles.add(ref)
+
+        link_titles = set()
         for link in node.get("node_links") or []:
             directed_links += 1
             target_path = link.get("path") if isinstance(link, dict) else None
+            alias = link.get("alias") if isinstance(link, dict) else None
             if not target_path or target_path not in id_set or target_path == source_id:
-                dangling_links.append(
-                    f"{node.get('title') or source_id} -> {target_path or '?'}"
-                )
+                dangling_links.append(f"{self_title} -> {target_path or '?'}")
                 continue
+            if not alias or alias not in by_title or by_title[alias].get("id") != target_path:
+                errors.append(f"node_links 别名/路径不匹配 {self_title} -> alias={alias}, path={target_path}")
+            else:
+                link_titles.add(alias)
             undirected.add(tuple(sorted((source_id, target_path))))
+
+        if sem_titles != link_titles:
+            only_sem = sorted(sem_titles - link_titles)
+            only_nl = sorted(link_titles - sem_titles)
+            errors.append(
+                f"{self_title} 详情关联与图谱连线不一致 (sem_only={only_sem}, node_links_only={only_nl})"
+            )
 
     if dangling_links:
         preview = "; ".join(dangling_links[:5])
         more = "" if len(dangling_links) <= 5 else f" …共 {len(dangling_links)} 条"
         errors.append(f"悬空 node_links {len(dangling_links)} 条: {preview}{more}")
+
+    # 检查 learning_paths 单一真源（0 悬空引用、100% 覆盖全部节点与专题文章）
+    title_set = {item.get("title") for item in content_items if item.get("title")}
+    layers_list = graph.get("layers") or []
+    for node in graph.get("nodes", []):
+        if node.get("layer") and node.get("layer") not in layers_list:
+            errors.append(f"节点 {node.get('title', '?')} 的 layer={node.get('layer')} 不在顶层 layers 数组中")
+
+    learning_paths = graph.get("learning_paths")
+    if not isinstance(learning_paths, dict):
+        errors.append("graph.json 缺少顶层 learning_paths 真源配置")
+    else:
+        covered_titles = set()
+        for path_key in ("renji", "tianji"):
+            lp = learning_paths.get(path_key)
+            if not isinstance(lp, dict):
+                errors.append(f"learning_paths 缺少路径: {path_key}")
+                continue
+            if not (lp.get("title") and lp.get("desc")):
+                errors.append(f"learning_paths.{path_key} 缺少 title 或 desc")
+            stages = lp.get("stages")
+            if not isinstance(stages, list) or not stages:
+                errors.append(f"learning_paths.{path_key} 缺少 stages")
+                continue
+            for stage in stages:
+                st_title = stage.get("title", "?")
+                st_nodes = stage.get("nodes") or []
+                if not st_nodes:
+                    errors.append(f"learning_paths.{path_key} 阶段「{st_title}」未配置任何节点")
+                for ntitle in st_nodes:
+                    if ntitle not in title_set:
+                        errors.append(f"learning_paths.{path_key} 阶段「{st_title}」引用了不存在的节点: {ntitle}")
+                    else:
+                        covered_titles.add(ntitle)
+        uncovered = sorted(title_set - covered_titles)
+        if uncovered:
+            errors.append(
+                f"以下 {len(uncovered)} 个条目未纳入任何学习路径（请补充到 learning_paths）: {', '.join(uncovered)}"
+            )
 
     return {
         "ok": len(errors) == 0,
@@ -260,9 +400,12 @@ def validate(graph):
 
 
 def build_and_update():
-    """更新 graph.json 的 public_sources 部分"""
+    """同步 node_links / stats / public_sources 并写入 graph.json"""
     print("加载已有 graph.json...")
     graph = load_existing_graph()
+
+    print("同步 node_links 与统计口径...")
+    sync_links_and_stats(graph)
 
     print("扫描公开原文...")
     public_sources = scan_public_sources()
@@ -271,7 +414,6 @@ def build_and_update():
     print(f"  找到 {len(public_sources)} 个文件, 其中 {readable_count} 个可读")
 
     # 更新 graph 数据
-    readable_count = sum(1 for s in public_sources if s.get("readable", False))
     graph["public_sources"] = public_sources
     graph["stats"]["public_sources"] = len(public_sources)
     graph["stats"]["public_sources_readable"] = readable_count
@@ -283,7 +425,10 @@ def build_and_update():
         json.dump(graph, f, ensure_ascii=False, indent=2)
 
     print(f"已更新: {GRAPH_JSON}")
-    print(f"public_sources: {len(public_sources)} ({readable_count} 可读)")
+    print(
+        f"stats: nodes_total={graph['stats']['nodes_total']}, "
+        f"public_sources={len(public_sources)} ({readable_count} 可读)"
+    )
 
     return graph
 

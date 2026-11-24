@@ -150,6 +150,87 @@ class ExportKnowledgeAssetsTests(unittest.TestCase):
         errors = exporter.validate_knowledge()
         self.assertEqual(errors, [], f"Unexpected knowledge validation errors: {errors[:5]}")
 
+    def test_learning_paths_ssot_covers_all_69_items_and_resume_metrics(self):
+        import json
+
+        graph = json.loads((REPO_ROOT / "docs" / "data" / "graph.json").read_text(encoding="utf-8"))
+        all_items = graph["nodes"] + graph["articles"]
+        all_titles = {item["title"] for item in all_items}
+
+        # 锁定简历口径四大核心指标：五层知识架构 · 231 项资料 · 69 个可视化节点 · 338 条关联
+        self.assertEqual(len(graph["layers"]), 5)
+        self.assertEqual(graph["stats"]["manifest_total"], 231)
+        self.assertEqual(len(graph["nodes"]), 64)
+        self.assertEqual(len(graph["articles"]), 5)
+        self.assertEqual(graph["stats"]["nodes_total"], 69)
+        self.assertEqual(len(all_titles), 69)
+        self.assertEqual(sum(len(x.get("node_links") or []) for x in all_items), 338)
+
+        # stats 分类之和严格等于 nodes_total
+        stats = graph["stats"]
+        self.assertEqual(
+            stats["concept_nodes"]
+            + stats["classic_course_nodes"]
+            + stats["case_formula_nodes"]
+            + stats["topic_articles"],
+            stats["nodes_total"],
+        )
+
+        # 五层结构严格对齐，无“学习路径”孤岛层
+        self.assertEqual(
+            graph["layers"],
+            ["底层框架", "辨证框架", "方法工具", "案例研读", "天纪体系"],
+        )
+        self.assertNotIn("学习路径", {n.get("layer") for n in graph["nodes"]})
+
+        lp = graph["learning_paths"]
+        covered = set()
+        for key in ("renji", "tianji"):
+            for stage in lp[key]["stages"]:
+                covered.update(stage["nodes"])
+        self.assertEqual(covered, all_titles)
+
+        # 天纪 3·3·3 对称与边界 + 人纪第一步含《针灸大成》
+        tianji_stages = {s["title"]: s["nodes"] for s in lp["tianji"]["stages"]}
+        tianji_dao_nodes = next(v for k, v in tianji_stages.items() if "天机道" in k)
+        dimai_dao_nodes = next(v for k, v in tianji_stages.items() if "地脉道" in k)
+        renjian_dao_nodes = next(v for k, v in tianji_stages.items() if "人间道" in k)
+        self.assertEqual(tianji_dao_nodes, ["天机道", "紫微斗数", "四柱命理"])
+        self.assertEqual(dimai_dao_nodes, ["地脉道", "风水堪舆", "阳宅定位"])
+        self.assertEqual(renjian_dao_nodes, ["人间道", "六十四卦", "以果决行"])
+        renji_step1 = next(s["nodes"] for s in lp["renji"]["stages"] if "针灸大成" in s["title"])
+        self.assertEqual(renji_step1, ["针灸大成", "针灸", "经络"])
+
+        # node_links 与 upstream + downstream + related 100% 同源，0 悬空
+        by_title = {item["title"]: item for item in all_items}
+        for item in all_items:
+            sem = set((item.get("upstream") or []) + (item.get("downstream") or []) + (item.get("related") or []))
+            nl = {lk["alias"] for lk in (item.get("node_links") or [])}
+            self.assertEqual(sem, nl, f"Link mismatch on {item['title']}")
+            for ref in sem:
+                self.assertIn(ref, by_title, f"Dangling semantic ref on {item['title']} -> {ref}")
+
+        # 4 个重复壳节点已无损融合移除，且核心干货已吸收到主节点
+        for merged_title in ("虚实", "望诊学习笔记", "扶阳学习笔记", "汉唐案例索引"):
+            self.assertNotIn(merged_title, by_title)
+        self.assertIn("真虚假实", by_title["寒热虚实"]["sections"]["核心理解"])
+        self.assertIn("眼诊", by_title["望诊案例研读"]["sections"]["核心理解"])
+        self.assertIn("眼诊", by_title["望闻问切"]["sections"]["核心理解"])
+        self.assertIn("扶阳摘记", by_title["扶阳"]["sections"]["核心理解"])
+        self.assertIn("方义结构讲解", by_title["临床案例索引"]["sections"]["核心理解"])
+
+        # 关键事实纠偏断言
+        self.assertNotIn("第一本经典", by_title["黄帝内经"]["definition"])
+        self.assertNotIn("阳宅学", by_title["天机道"]["sections"]["核心理解"])
+        self.assertNotIn("干预方式", by_title["针灸"]["sections"]["核心理解"])
+        self.assertNotIn("干预方式", by_title["针灸"]["quotes"][0]["text"])
+        self.assertNotIn("先教人纪", by_title["天人合一如何连接天纪和人纪"]["sections"]["核心理解"])
+        self.assertIn("三道", by_title["天纪与人纪"]["sections"]["核心理解"])
+        self.assertIn("金匮要略", by_title["天纪与人纪"]["sections"]["核心理解"])
+        self.assertNotIn("0B 空文件", by_title["神农本草经"]["sections"]["原始出处"])
+        self.assertNotIn("人间道", {lk["alias"] for lk in by_title["紫微斗数"]["node_links"]})
+        self.assertNotIn("紫微斗数", {lk["alias"] for lk in by_title["人间道"]["node_links"]})
+
 
 if __name__ == "__main__":
     unittest.main()
