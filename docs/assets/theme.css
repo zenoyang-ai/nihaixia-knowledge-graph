@@ -1456,3 +1456,263 @@ html[data-theme="dark"] .qa-source-rel--mid {
         justify-content: space-between;
     }
 }
+
+/* ============================================
+   v6 — AI 问答页全视口弹性布局与推荐问题动态折叠
+   ============================================ */
+
+.qa-view .qa-section-heading {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.qa-section-heading-main {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    min-width: 0;
+}
+
+.qa-questions-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 999px;
+    background: var(--surface-card);
+    color: var(--on-surface-muted);
+    font-family: inherit;
+    font-size: 12px;
+    line-height: 1.25;
+    cursor: pointer;
+    flex-shrink: 0;
+    white-space: nowrap;
+    transition: border-color 0.18s ease, color 0.18s ease, background-color 0.18s ease;
+}
+
+.qa-questions-toggle:hover,
+.qa-questions-toggle:focus-visible {
+    border-color: var(--accent);
+    color: var(--accent);
+    background: var(--surface-hover);
+    outline: none;
+}
+
+.qa-questions-toggle-chevron {
+    transition: transform 0.2s ease;
+    flex-shrink: 0;
+}
+
+.qa-questions.is-collapsed {
+    margin-bottom: 10px;
+    padding: 4px 12px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    flex-shrink: 0;
+}
+
+.qa-questions.is-collapsed .qa-section-heading {
+    margin: 0;
+    padding: 0;
+    min-height: 0;
+    line-height: 1.3;
+}
+
+.qa-questions.is-collapsed .qa-section-heading small {
+    display: none;
+}
+
+.qa-questions.is-collapsed .qa-question-grid {
+    display: none;
+}
+
+.qa-questions.is-collapsed .qa-questions-toggle-chevron {
+    transform: rotate(180deg);
+}
+
+.qa-chat-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 6px 14px 8px;
+    border-top: 1px solid var(--border-color);
+    background: var(--surface-soft);
+    min-height: 36px;
+    flex-shrink: 0;
+}
+
+.qa-chat-toolbar-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-width: 0;
+    flex: 1 1 auto;
+}
+
+.qa-chat-hint {
+    font-size: 11px;
+    color: var(--on-surface-faint);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.qa-chat-hint[hidden],
+.qa-chat-toolbar-status:has(.qa-chat-status:not(:empty)) .qa-chat-hint {
+    display: none;
+}
+
+.qa-chat-toolbar .qa-chat-status {
+    padding: 0;
+    margin: 0;
+    min-height: 0;
+    text-align: left;
+    font-size: 12px;
+    color: var(--on-surface-muted);
+}
+
+.qa-chat-toolbar .qa-chat-status:empty {
+    display: none;
+}
+
+.qa-chat-toolbar-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+.qa-chat-toolbar .qa-chat-retry,
+.qa-chat-toolbar .qa-chat-clear {
+    align-self: auto;
+    margin: 0;
+    padding: 4px 12px;
+    font-size: 12px;
+    line-height: 1.35;
+}
+
+/* 桌面端：问答视图全视口弹性布局（不产生整页滚动条，底栏保留 8px-24px 呼吸留白） */
+@media (min-width: 1025px) {
+    .main.main--qa {
+        padding-top: 12px;
+        padding-bottom: 52px;
+    }
+
+    .main.main--qa .qa-view {
+        width: 100%;
+        max-width: 1120px;
+        margin: 0 auto;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - var(--header-h) - 66px);
+        height: calc(100dvh - var(--header-h) - 66px);
+        min-height: 460px;
+        overflow: hidden;
+    }
+
+    .main.main--qa .qa-hero {
+        flex-shrink: 0;
+        padding: 14px 20px;
+        margin-bottom: 10px;
+    }
+
+    .main.main--qa .qa-notice {
+        flex-shrink: 0;
+        padding: 8px 14px;
+        margin-bottom: 10px;
+        font-size: 12px;
+    }
+
+    .main.main--qa .qa-questions {
+        flex-shrink: 0;
+        margin-bottom: 10px;
+    }
+
+    .main.main--qa .qa-question-card {
+        min-height: 46px;
+        padding: 9px 14px;
+        font-size: 13px;
+        line-height: 1.4;
+    }
+
+    .main.main--qa .qa-chat {
+        flex: 1 1 auto;
+        min-height: 220px;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+    }
+
+    .main.main--qa .qa-chat-messages {
+        flex: 1 1 auto;
+        min-height: 120px;
+        max-height: none;
+        overflow-y: auto;
+    }
+
+    .main.main--qa .qa-chat-messages:has(> .qa-chat-empty) {
+        display: flex;
+        flex-direction: column;
+    }
+
+    .main.main--qa .qa-chat-empty {
+        flex: 1 1 auto;
+        min-height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        text-align: center;
+        padding: 24px 20px;
+    }
+
+    .main.main--qa .qa-chat-input-row {
+        flex-shrink: 0;
+    }
+}
+
+/* 移动端与平板：自然流式排版，不锁定 100vh 避免软键盘挤压视口 */
+@media (max-width: 1024px) {
+    .main.main--qa .qa-view {
+        width: 100%;
+        height: auto;
+        min-height: 0;
+        overflow: visible;
+        padding: 8px 0 12px;
+        display: flex;
+        flex-direction: column;
+    }
+
+    .qa-view .qa-section-heading {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+    }
+
+    .qa-section-heading-main {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 2px;
+    }
+
+    .qa-chat-toolbar {
+        padding: 6px 12px 8px;
+    }
+
+    .qa-chat-hint {
+        display: none;
+    }
+
+    .main.main--qa .qa-chat-messages {
+        min-height: 240px;
+        max-height: 48vh;
+    }
+}

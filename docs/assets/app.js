@@ -71,6 +71,8 @@ class NihaixiaApp {
             statusEl.textContent = '已填入预设问题，按回车或点击右侧发送即可提问';
             statusEl.style.color = '';
         }
+        const hintEl = document.getElementById('qa-chat-hint');
+        if (hintEl) hintEl.hidden = true;
         try {
             history.replaceState(null, '', '#/qa');
         } catch (_) {}
@@ -270,6 +272,12 @@ class NihaixiaApp {
             v.style.display = 'none';
         });
 
+        // 同步主容器 QA 视口弹性布局标记
+        const mainContentEl = document.getElementById('main-content');
+        if (mainContentEl) {
+            mainContentEl.classList.toggle('main--qa', view === 'qa');
+        }
+
         // 显示目标视图
         const target = document.getElementById(`view-${view}`);
         if (target) {
@@ -348,6 +356,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusEl = document.getElementById('qa-chat-status');
     const clearBtn = document.getElementById('qa-chat-clear');
     const retryBtn = document.getElementById('qa-chat-retry');
+    const questionsSectionEl = document.getElementById('qa-questions');
+    const questionsToggleBtn = document.getElementById('qa-questions-toggle');
+    const hintEl = document.getElementById('qa-chat-hint');
 
     // ---- localStorage 会话管理 ----
     const LS_SESSION_KEY = 'nihaixia_qa_session';
@@ -407,6 +418,30 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem(LS_HISTORY_KEY, JSON.stringify(trimmed));
     }
 
+    function setQuestionsCollapsed(collapsed) {
+        if (!questionsSectionEl) return;
+        questionsSectionEl.classList.toggle('is-collapsed', collapsed);
+        if (questionsToggleBtn) {
+            questionsToggleBtn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+            const label = questionsToggleBtn.querySelector('.qa-questions-toggle-text');
+            if (label) {
+                label.textContent = collapsed ? '展开示例' : '收起示例';
+            }
+        }
+    }
+
+    if (questionsToggleBtn && questionsSectionEl) {
+        questionsToggleBtn.addEventListener('click', () => {
+            setQuestionsCollapsed(!questionsSectionEl.classList.contains('is-collapsed'));
+        });
+    }
+
+    queueMicrotask(() => {
+        if (messagesEl && messagesEl.querySelector('.qa-chat-message')) {
+            setQuestionsCollapsed(true);
+        }
+    });
+
     function clearHistory() {
         localStorage.removeItem(LS_HISTORY_KEY);
         localStorage.removeItem(LS_SESSION_KEY);
@@ -419,6 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 </div>`;
         }
         if (retryBtn) retryBtn.hidden = true;
+        setQuestionsCollapsed(false);
         setStatus('对话已清空');
         setTimeout(clearStatus, 2000);
     }
@@ -431,12 +467,14 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!statusEl) return;
         statusEl.textContent = text;
         statusEl.style.color = isError ? 'var(--accent)' : '';
+        if (hintEl) hintEl.hidden = Boolean(text);
     }
 
     function clearStatus() {
         if (!statusEl) return;
         statusEl.textContent = '';
         statusEl.style.color = '';
+        if (hintEl) hintEl.hidden = false;
     }
 
     function removeEmptyState() {
@@ -937,6 +975,7 @@ document.addEventListener('DOMContentLoaded', () => {
         sendBtn && (sendBtn.disabled = true);
         inputEl && (inputEl.disabled = true);
         clearStatus();
+        setQuestionsCollapsed(true);
 
         const trimmedMsg = message.trim();
         addMessage('user', trimmedMsg);

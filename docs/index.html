@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="asset-version" content="20261124-v37">
+    <meta name="asset-version" content="20261124-v38">
     <meta name="description" content="以五层知识架构（69 个核心节点与专题、338 条有向关联）系统梳理倪海厦先生《人纪》中医与《天纪》三才体系，提供交互式知识图谱、人纪/天纪学习路径、天纪提示词与站内知识库 AI 问答。">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="倪海厦知识图谱">
@@ -14,13 +14,13 @@
     <meta name="twitter:card" content="summary_large_image">
     <title>倪海厦知识图谱</title>
     <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
-    <link rel="stylesheet" href="assets/fonts.css?v=20261124-v37">
-    <link rel="stylesheet" href="assets/styles.css?v=20261124-v37">
-    <link rel="stylesheet" href="assets/oriental.css?v=20261124-v37">
-    <link rel="stylesheet" href="assets/theme.css?v=20261124-v37">
-    <script src="assets/theme.js?v=20261124-v37"></script>
-    <script src="lib/d3.v7.min.js?v=20261124-v37"></script>
-    <script src="lib/marked.min.js?v=20261124-v37"></script>
+    <link rel="stylesheet" href="assets/fonts.css?v=20261124-v38">
+    <link rel="stylesheet" href="assets/styles.css?v=20261124-v38">
+    <link rel="stylesheet" href="assets/oriental.css?v=20261124-v38">
+    <link rel="stylesheet" href="assets/theme.css?v=20261124-v38">
+    <script src="assets/theme.js?v=20261124-v38"></script>
+    <script src="lib/d3.v7.min.js?v=20261124-v38"></script>
+    <script src="lib/marked.min.js?v=20261124-v38"></script>
 </head>
 <body>
     <div id="app">
@@ -204,12 +204,20 @@
                         本问答仅供学习研究，不构成医疗建议；请勿用于诊断、处方、剂量或治疗决策。
                     </div>
 
-                    <section class="qa-questions">
+                    <section class="qa-questions" id="qa-questions">
                         <div class="qa-section-heading">
-                            <span>推荐问题</span>
-                            <small>点击即发送，也可以在下方自由提问</small>
+                            <div class="qa-section-heading-main">
+                                <span>推荐问题</span>
+                                <small>点击即发送，也可以在下方自由提问</small>
+                            </div>
+                            <button type="button" class="qa-questions-toggle" id="qa-questions-toggle" aria-expanded="true" aria-controls="qa-question-grid">
+                                <span class="qa-questions-toggle-text">收起示例</span>
+                                <svg class="qa-questions-toggle-chevron" width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
+                                    <path d="M3.5 8.5L7 5l3.5 3.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                                </svg>
+                            </button>
                         </div>
-                        <div class="qa-question-grid">
+                        <div class="qa-question-grid" id="qa-question-grid">
                             <button type="button" class="qa-question-card" data-question="天纪里面的紫微斗数是说什么的？">天纪里面的紫微斗数是说什么的？</button>
                             <button type="button" class="qa-question-card" data-question="倪海厦人纪和天纪的关系是什么？">倪海厦人纪和天纪的关系是什么？</button>
                             <button type="button" class="qa-question-card" data-question="经方、针灸、本草在学习路径中分别承担什么作用？">经方、针灸、本草在学习路径中分别承担什么作用？</button>
@@ -232,10 +240,15 @@
                                 </svg>
                             </button>
                         </div>
-                        <div class="qa-chat-status" id="qa-chat-status"></div>
-                        <button type="button" class="qa-chat-retry" id="qa-chat-retry" hidden>重新尝试</button>
-                        <div class="qa-chat-actions">
-                            <button type="button" class="qa-chat-clear" id="qa-chat-clear">清空对话</button>
+                        <div class="qa-chat-toolbar" id="qa-chat-toolbar">
+                            <div class="qa-chat-toolbar-status">
+                                <span class="qa-chat-hint" id="qa-chat-hint">Enter 发送 · Shift+Enter 换行</span>
+                                <div class="qa-chat-status" id="qa-chat-status"></div>
+                            </div>
+                            <div class="qa-chat-toolbar-actions">
+                                <button type="button" class="qa-chat-retry" id="qa-chat-retry" hidden>重新尝试</button>
+                                <button type="button" class="qa-chat-clear" id="qa-chat-clear">清空对话</button>
+                            </div>
                         </div>
                     </section>
                 </div>
@@ -265,18 +278,18 @@
         </div>
     </div>
 
-    <script src="assets/router.js?v=20261124-v37"></script>
-    <script src="assets/sidebar.js?v=20261124-v37"></script>
-    <script src="assets/graph.js?v=20261124-v37"></script>
-    <script src="assets/detail.js?v=20261124-v37"></script>
-    <script src="assets/overview.js?v=20261124-v37"></script>
-    <script src="assets/path.js?v=20261124-v37"></script>
-    <script src="assets/prompts.js?v=20261124-v37"></script>
-    <script src="assets/search.js?v=20261124-v37"></script>
-    <script src="assets/poster.js?v=20261124-v37"></script>
-    <script src="assets/feedback.js?v=20261124-v37"></script>
-    <script src="assets/analytics.js?v=20261124-v37"></script>
-    <script src="assets/app.js?v=20261124-v37"></script>
-    <script src="assets/enhance.js?v=20261124-v37"></script>
+    <script src="assets/router.js?v=20261124-v38"></script>
+    <script src="assets/sidebar.js?v=20261124-v38"></script>
+    <script src="assets/graph.js?v=20261124-v38"></script>
+    <script src="assets/detail.js?v=20261124-v38"></script>
+    <script src="assets/overview.js?v=20261124-v38"></script>
+    <script src="assets/path.js?v=20261124-v38"></script>
+    <script src="assets/prompts.js?v=20261124-v38"></script>
+    <script src="assets/search.js?v=20261124-v38"></script>
+    <script src="assets/poster.js?v=20261124-v38"></script>
+    <script src="assets/feedback.js?v=20261124-v38"></script>
+    <script src="assets/analytics.js?v=20261124-v38"></script>
+    <script src="assets/app.js?v=20261124-v38"></script>
+    <script src="assets/enhance.js?v=20261124-v38"></script>
 </body>
 </html>
