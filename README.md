@@ -7,7 +7,7 @@
 [![在线主站](https://img.shields.io/badge/在线主站-nihaixia--knowledge.xyz-b9362c?style=flat-square)](https://www.nihaixia-knowledge.xyz/)
 [![知识图谱](https://img.shields.io/badge/知识图谱-64_节点_·_5_专题-4a6fa5?style=flat-square)](https://www.nihaixia-knowledge.xyz/#/graph)
 [![开源资料](https://img.shields.io/badge/开源资料-144_篇_·_约_120_万字-5b7a5e?style=flat-square)](./knowledge/README.md)
-[![Releases](https://img.shields.io/badge/离线包下载-v1.0.1-8c6d46?style=flat-square)](https://github.com/zenoyang-ai/nihaixia-knowledge-graph/releases/latest)
+[![Releases](https://img.shields.io/badge/离线包下载-v1.0.2-8c6d46?style=flat-square)](https://github.com/zenoyang-ai/nihaixia-knowledge-graph/releases/latest)
 [![License](https://img.shields.io/badge/协议-MIT_%2F_CC_BY--SA_4.0-6e6a64?style=flat-square)](./LICENSE)
 
 [在线网站](https://www.nihaixia-knowledge.xyz/) · [里头有什么](#里头有什么) · [怎么用](#怎么用) · [天纪 Skill](#在-ai-工具里装天纪提示词) · [目录](#目录) · [边界与版权](#边界与版权)
