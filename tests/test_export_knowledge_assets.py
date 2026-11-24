@@ -222,6 +222,8 @@ class ExportKnowledgeAssetsTests(unittest.TestCase):
         # 关键事实纠偏断言
         self.assertNotIn("第一本经典", by_title["黄帝内经"]["definition"])
         self.assertNotIn("阳宅学", by_title["天机道"]["sections"]["核心理解"])
+        for t_name in ("紫微斗数", "易经", "象数", "四柱命理"):
+            self.assertNotIn("天机道终稿", by_title[t_name]["sections"]["学习路径"])
         self.assertNotIn("干预方式", by_title["针灸"]["sections"]["核心理解"])
         self.assertNotIn("干预方式", by_title["针灸"]["quotes"][0]["text"])
         self.assertNotIn("先教人纪", by_title["天人合一如何连接天纪和人纪"]["sections"]["核心理解"])

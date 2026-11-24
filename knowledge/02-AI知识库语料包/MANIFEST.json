@@ -28,7 +28,7 @@
       "format": "jsonl",
       "records": 64,
       "bytes": 116390,
-      "sha256_checksum": "ddb6277af6a057b4a72947cda47cfac95165c9436d18d6c84174eabb5718b449",
+      "sha256_checksum": "29db25340bbcc619bbcdd2055232782d000ed84c878e7e6367d0b54f4eebe330",
       "description": "64 条图谱节点结构化数据（id/title/layer/definition/summary/quotes/misconceptions/safety_boundary）"
     },
     {

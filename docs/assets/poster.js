@@ -129,7 +129,7 @@
 
         // 收集要展示的文本内容
         const title = node.title || '知识节点';
-        const layerTag = node.layer || '经典概念';
+        const layerTag = node.layer || (node.node_type === 'topic' ? '深度专题' : '经典概念');
         const summary = stripMarkdown(
             node.definition || node.summary || '中医经典知识总结，理法方药兼备，由倪海厦老师系统讲授。'
         );

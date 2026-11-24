@@ -1,0 +1,100 @@
+name: Sync & Deploy QA Knowledge Functions (CloudBase)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'docs/data/graph.json'
+      - 'knowledge/00-倪海厦生平与三纪总览.md'
+      - 'scripts/generate-knowledge-base.js'
+      - 'scripts/sync_qa_core_from_graph.js'
+      - 'cloudbase/functions/nihaixia-qa-router/**'
+      - 'cloudbase/functions/nihaixia-qa-mp/**'
+      - '.github/workflows/deploy-qa.yml'
+  workflow_dispatch:
+
+jobs:
+  deploy-qa:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install CloudBase CLI
+        run: npm install -g @cloudbase/cli@3.6.4
+
+      - name: Login to CloudBase (non-interactive, CAM API key)
+        env:
+          CLOUDBASE_SECRET_ID: ${{ secrets.CLOUDBASE_SECRET_ID }}
+          CLOUDBASE_SECRET_KEY: ${{ secrets.CLOUDBASE_SECRET_KEY }}
+        run: tcb login --apiKeyId "$CLOUDBASE_SECRET_ID" --apiKey "$CLOUDBASE_SECRET_KEY"
+
+      - name: Download live knowledge-base.json from nihaixia-qa-router (preserve 03..11 chunks)
+        run: |
+          rm -rf /tmp/qa-live
+          tcb -e zeno-d9g0gdvw4a57635c0 fn code download nihaixia-qa-router /tmp/qa-live
+          ls -la /tmp/qa-live
+
+      - name: Rebuild core cards, learning paths, and BM25 index from docs/data/graph.json
+        run: |
+          node scripts/sync_qa_core_from_graph.js /tmp/qa-live
+          rm -rf /tmp/qa-live
+
+      - name: Install QA function dependencies & run tests
+        run: |
+          npm ci --prefix cloudbase/functions/nihaixia-qa-router
+          npm ci --prefix cloudbase/functions/nihaixia-qa-mp
+          node --test tests/test_sync_qa_core.js tests/test_qa_router.js tests/test_qa_answer_policy.js tests/test_qa_mp.js
+
+      - name: Verify live BM25 ranking uses updated core cards
+        run: |
+          node - <<'NODE'
+          const assert = require('node:assert/strict');
+          const searchRouter = require('./cloudbase/functions/nihaixia-qa-router/knowledge-search');
+          const searchMp = require('./cloudbase/functions/nihaixia-qa-mp/knowledge-search');
+          for (const mod of [searchRouter, searchMp]) {
+            const q1 = mod.searchDocuments('黄帝内经是人纪第一门课吗', 5);
+            assert.ok(q1.length > 0);
+            for (const doc of q1) {
+              assert.ok(!doc.content.includes('第一本经典'), `Found stale text in ${doc.chunk_title}`);
+              assert.ok(!doc.content.includes('理论→本草'), `Found stale sequence in ${doc.chunk_title}`);
+            }
+            const q2 = mod.searchDocuments('人间道 六十四卦 以果决行', 5).map((d) => d.chunk_title);
+            assert.ok(q2.includes('六十四卦') && q2.includes('以果决行'), `Missing Tianji cards: ${q2}`);
+            const q3 = mod.searchDocuments('地脉道 阳宅定位', 5).map((d) => d.chunk_title);
+            assert.ok(q3.includes('阳宅定位'), `Missing 阳宅定位: ${q3}`);
+          }
+          console.log('QA_RUNNER_BM25_ASSERTIONS_PASSED');
+          NODE
+
+      - name: Remove runner node_modules so CloudBase uses installDependency cleanly
+        run: rm -rf cloudbase/functions/*/node_modules
+
+      - name: Hot-update nihaixia-qa-router and nihaixia-qa-mp code & corpus (preserve env vars & triggers)
+        working-directory: cloudbase
+        run: |
+          tcb fn code update nihaixia-qa-router
+          tcb fn code update nihaixia-qa-mp
+
+      - name: Verify live nihaixia-qa-router health endpoint
+        run: |
+          for i in $(seq 1 12); do
+            sleep 5
+            RESP=$(curl -sS -m 15 "https://zeno-d9g0gdvw4a57635c0-1452182285.ap-shanghai.app.tcloudbase.com/nihaixia-qa-router/health" || true)
+            echo "Attempt $i: $RESP"
+            if node -e '
+              const d = JSON.parse(process.argv[1]);
+              if (d.status === "ok" && d.providers && d.providers.hybrid && d.providers.cloudbase) process.exit(0);
+              process.exit(1);
+            ' "$RESP" 2>/dev/null; then
+              echo "Verified nihaixia-qa-router health ok with hybrid+cloudbase enabled"
+              exit 0
+            fi
+          done
+          echo "Timed out waiting for nihaixia-qa-router health check" >&2
+          exit 1

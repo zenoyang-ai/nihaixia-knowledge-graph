@@ -325,7 +325,7 @@ function tokenize(text) {
 
 // 主题领域关键词 — 用于查询扩展（与 knowledge-search.js 保持一致）
 const TOPIC_KEYWORDS = {
-  '天纪': ['天纪', '天机道', '人间道', '地脉道', '紫微', '斗数', '易经', '六十四卦', '风水'],
+  '天纪': ['天纪', '天机道', '人间道', '地脉道', '紫微', '斗数', '易经', '六十四卦', '风水', '阳宅定位', '以果决行'],
   '针灸': ['针灸', '针法', '灸法', '经络', '穴位', '针灸大成'],
   '方剂': ['方剂', '经方', '汉唐', '汤方', '桂枝汤', '麻黄汤', '小柴胡', '理中', '四逆'],
   '课程': ['课程', '讲座', '演讲', '闭门课', '扶阳', '梁冬'],
@@ -512,8 +512,12 @@ if (require.main === module) {
 }
 
 module.exports = {
+  TOPIC_KEYWORDS,
+  buildInvertedIndex,
+  extractKeywords,
   getSemanticSectionTitle,
   splitIntoChunks,
   splitSemanticSections,
   splitSubfileContent,
+  tokenize,
 };

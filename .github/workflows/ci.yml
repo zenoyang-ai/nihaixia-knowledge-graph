@@ -137,10 +137,11 @@ jobs:
       - name: Run shared QA answer policy tests
         run: node --test tests/test_qa_answer_policy.js
 
-      - name: Run analytics & feedback tests
+      - name: Run analytics & feedback & QA sync tests
         run: |
           node --test tests/test_analytics.js
           node --test tests/test_feedback.js
+          node --test tests/test_sync_qa_core.js
 
       - name: Syntax check nihaixia-qa-router/index.js
         run: node --check cloudbase/functions/nihaixia-qa-router/index.js
@@ -159,8 +160,10 @@ jobs:
           node --check cloudbase/functions/nihaixia-analytics/index.js
           node --check cloudbase/functions/nihaixia-feedback/index.js
 
-      - name: Syntax check RAG corpus generator
-        run: node --check scripts/generate-knowledge-base.js
+      - name: Syntax check RAG corpus generator & QA sync scripts
+        run: |
+          node --check scripts/generate-knowledge-base.js
+          node --check scripts/sync_qa_core_from_graph.js
 
       - name: Syntax check all frontend JS files
         run: |
