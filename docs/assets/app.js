@@ -717,9 +717,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
         if (role === 'assistant') {
-            // 新回复到达时定位到回复开头，避免长答案被滚动到最底部看不见首段
-            const targetTop = Math.max(0, div.offsetTop - 12);
-            messagesEl.scrollTop = targetTop;
+            // 新回复到达时定位到回复开头：用无 transform 影响的布局坐标差，避免 offsetParent 或入场位移把首段顶出可视区
+            if (messagesEl.clientHeight > 0) {
+                const layoutTop = (el) => {
+                    let y = 0;
+                    let cur = el;
+                    while (cur) {
+                        y += cur.offsetTop + (cur === el ? 0 : cur.clientTop);
+                        cur = cur.offsetParent;
+                    }
+                    return y;
+                };
+                const relTop = layoutTop(div) - layoutTop(messagesEl) - messagesEl.clientTop;
+                const targetTop = Math.max(0, relTop - 12);
+                messagesEl.scrollTop = targetTop;
+            }
         } else {
             messagesEl.scrollTop = messagesEl.scrollHeight;
         }
