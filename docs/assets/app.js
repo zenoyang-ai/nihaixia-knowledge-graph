@@ -1,10 +1,79 @@
 // 主入口 — 初始化所有模块
 const ASSET_VERSION = document.querySelector('meta[name="asset-version"]')?.content || '20260723-v18';
+const HUB_ROUTE_STORAGE = 'nihaixia_last_hub_route_v1';
+const HUB_ROUTE_LABELS = {
+    '/': '← 返回总览',
+    '/path': '← 返回人纪路径',
+    '/path/renji': '← 返回人纪路径',
+    '/path/tianji': '← 返回天纪路径',
+    '/graph': '← 返回图谱',
+    '/prompts': '← 返回天纪提示词',
+    '/qa': '← 返回 AI 问答',
+};
+
+window.updateNihaixiaHubRoute = function (hubPath) {
+    if (!hubPath || !HUB_ROUTE_LABELS[hubPath]) return;
+    window.__nhxLastHubRoute = hubPath;
+    try { sessionStorage.setItem(HUB_ROUTE_STORAGE, hubPath); } catch (_) {}
+};
+
+window.getNihaixiaReturnRoute = function () {
+    let hub = window.__nhxLastHubRoute;
+    if (!hub) {
+        try { hub = sessionStorage.getItem(HUB_ROUTE_STORAGE); } catch (_) {}
+    }
+    if (!hub || !HUB_ROUTE_LABELS[hub]) hub = '/graph';
+    return {
+        href: `#${hub === '/path/renji' ? '/path' : hub}`,
+        label: HUB_ROUTE_LABELS[hub],
+    };
+};
 
 class NihaixiaApp {
     constructor() {
         this.data = null;
         this.init();
+    }
+
+    parseHashParts(rawHash) {
+        const clean = (rawHash || window.location.hash || '#/').replace(/^#/, '');
+        const qIdx = clean.indexOf('?');
+        const path = (qIdx >= 0 ? clean.slice(0, qIdx) : clean) || '/';
+        const query = qIdx >= 0 ? clean.slice(qIdx + 1) : '';
+        return { path, query };
+    }
+
+    applyQaPrefill(queryStr) {
+        if (!queryStr) return;
+        let q = '';
+        try {
+            q = (new URLSearchParams(queryStr).get('q') || '').trim();
+        } catch (_) {
+            return;
+        }
+        if (!q) return;
+        window.__nhxPendingQaPrompt = q;
+        const inputEl = document.getElementById('qa-chat-input');
+        const statusEl = document.getElementById('qa-chat-status');
+        if (inputEl) {
+            inputEl.value = q;
+            inputEl.dispatchEvent(new Event('input'));
+            requestAnimationFrame(() => {
+                inputEl.focus();
+                try {
+                    const len = inputEl.value.length;
+                    inputEl.setSelectionRange(len, len);
+                } catch (_) {}
+            });
+            window.__nhxPendingQaPrompt = '';
+        }
+        if (statusEl) {
+            statusEl.textContent = '已填入预设问题，按回车或点击右侧发送即可提问';
+            statusEl.style.color = '';
+        }
+        try {
+            history.replaceState(null, '', '#/qa');
+        } catch (_) {}
     }
 
     loadOfflineData() {
@@ -99,7 +168,7 @@ class NihaixiaApp {
         // 6. 再次根据 hash 切换（数据加载完成后，确保视图状态正确）
         this.switchViewFromHash();
 
-        const currentPath = (window.location.hash || '#/').replace(/^#/, '') || '/';
+        const { path: currentPath } = this.parseHashParts(window.location.hash);
         if (currentPath.startsWith('/note/') && this.noteDetail) {
             const title = decodeURIComponent(currentPath.slice('/note/'.length));
             this.noteDetail.render(title);
@@ -131,8 +200,7 @@ class NihaixiaApp {
 
     // 根据当前 hash 切换视图（比 switchView 多一步 hash 解析）
     switchViewFromHash() {
-        const hash = window.location.hash || '#/';
-        const path = hash.replace(/^#/, '') || '/';
+        const { path, query } = this.parseHashParts(window.location.hash);
 
         const knownStatic = ['/', '/path', '/path/renji', '/path/tianji', '/graph', '/prompts', '/qa'];
         const isNote = path.startsWith('/note/') && path.length > '/note/'.length;
@@ -140,10 +208,15 @@ class NihaixiaApp {
 
         if (!isValid) {
             history.replaceState(null, '', '#/');
+            window.updateNihaixiaHubRoute('/');
             this._showRouteNotice('页面不存在，已返回总览');
             this.switchView('overview');
             this.updateNav();
             return;
+        }
+
+        if (!isNote && !(path === '/qa' && query)) {
+            window.updateNihaixiaHubRoute(path);
         }
 
         // 解析路由到视图名
@@ -158,6 +231,9 @@ class NihaixiaApp {
         this.switchView(viewName);
         if (viewName === 'path' && this.pathView) {
             this.pathView.setActiveTab(path === '/path/tianji' ? 'tianji' : 'renji');
+        }
+        if (viewName === 'qa' && query) {
+            this.applyQaPrefill(query);
         }
         this.updateNav();
     }
@@ -234,8 +310,7 @@ class NihaixiaApp {
     }
 
     updateNav() {
-        const hash = window.location.hash || '#/';
-        const path = hash.replace(/^#/, '') || '/';
+        const { path } = this.parseHashParts(window.location.hash);
 
         document.querySelectorAll('.nav-btn').forEach(btn => {
             const route = btn.dataset.route;
@@ -756,6 +831,12 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         inputEl.addEventListener('input', autoResize);
         inputEl.addEventListener('focus', autoResize);
+        if (window.__nhxPendingQaPrompt) {
+            inputEl.value = window.__nhxPendingQaPrompt;
+            window.__nhxPendingQaPrompt = '';
+            autoResize();
+            setStatus('已填入预设问题，按回车或点击右侧发送即可提问');
+        }
     }
 
         inputEl && inputEl.addEventListener('keydown', (e) => {

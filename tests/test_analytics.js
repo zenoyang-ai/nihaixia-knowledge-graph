@@ -202,4 +202,11 @@ test('POST github_click event increments click counters without inflating PV', a
     local: { uv: 0, pv: 0, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0 },
   });
   assert.match(report, /GitHub 导流点击：2 次（顶栏 1 · 提示词 1）/);
+
+  const reportWithNoteSource = buildDailyReportText('2026-11-20', {
+    cn: { uv: 5, pv: 12, githubClicks: 3, githubClicksHeader: 1, githubClicksPrompts: 1, githubClicksNoteSource: 1 },
+    overseas: { uv: 1, pv: 2, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0, githubClicksNoteSource: 0 },
+    local: { uv: 0, pv: 0, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0, githubClicksNoteSource: 0 },
+  });
+  assert.match(reportWithNoteSource, /GitHub 导流点击：3 次（顶栏 1 · 原典 1 · 提示词 1）/);
 });

@@ -799,3 +799,9 @@ test('v5.5.0 validateHistory rejects medical content in prior user messages', ()
 test('v5.5.0 isMedicalOutput allows original text dosage explanation without second person', () => {
   assert.strictEqual(isMedicalOutput('原文记载分三次服即可'), false);
 });
+
+test('v5.6.2 isMedicalRequest intercepts colloquial decoction dosage requests cleanly', () => {
+  assert.strictEqual(isMedicalRequest('发烧怕冷无汗能自己抓几克麻黄汤来喝？'), true);
+  assert.strictEqual(isMedicalRequest('桂枝汤可以喝吗？'), true);
+  assert.strictEqual(isMedicalRequest('麻黄汤的组成是什么？'), false);
+});

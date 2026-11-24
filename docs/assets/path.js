@@ -83,6 +83,9 @@ class PathView {
                 if (window.location.hash !== targetHash) {
                     history.replaceState(null, '', targetHash);
                 }
+                if (typeof window.updateNihaixiaHubRoute === 'function') {
+                    window.updateNihaixiaHubRoute(targetHash.slice(1));
+                }
             });
         });
     }

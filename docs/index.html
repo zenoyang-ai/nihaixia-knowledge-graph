@@ -3,16 +3,24 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="asset-version" content="20261124-v33">
+    <meta name="asset-version" content="20261124-v35">
+    <meta name="description" content="以五层知识架构（69 个核心节点与专题、338 条有向关联）系统梳理倪海厦先生《人纪》中医与《天纪》三才体系，提供交互式知识图谱、人纪/天纪学习路径、天纪提示词与站内知识库 AI 问答。">
+    <meta property="og:type" content="website">
+    <meta property="og:site_name" content="倪海厦知识图谱">
+    <meta property="og:title" content="倪海厦知识图谱 — 中医人纪与天纪体系交互导览">
+    <meta property="og:description" content="五层知识架构 · 69 个概念节点与深度专题 · 338 条关联 · 人纪/天纪学习路径 · 站内 AI 问答（仅供学习研究，不构成医疗建议）。">
+    <meta property="og:url" content="https://www.nihaixia-knowledge.xyz/">
+    <meta property="og:image" content="https://www.nihaixia-knowledge.xyz/assets/og-preview.png">
+    <meta name="twitter:card" content="summary_large_image">
     <title>倪海厦知识图谱</title>
-    <link rel="icon" href="data:,">
-    <link rel="stylesheet" href="assets/fonts.css?v=20261124-v33">
-    <link rel="stylesheet" href="assets/styles.css?v=20261124-v33">
-    <link rel="stylesheet" href="assets/oriental.css?v=20261124-v33">
-    <link rel="stylesheet" href="assets/theme.css?v=20261124-v33">
-    <script src="assets/theme.js?v=20261124-v33"></script>
-    <script src="lib/d3.v7.min.js?v=20261124-v33"></script>
-    <script src="lib/marked.min.js?v=20261124-v33"></script>
+    <link rel="icon" type="image/svg+xml" href="assets/favicon.svg">
+    <link rel="stylesheet" href="assets/fonts.css?v=20261124-v35">
+    <link rel="stylesheet" href="assets/styles.css?v=20261124-v35">
+    <link rel="stylesheet" href="assets/oriental.css?v=20261124-v35">
+    <link rel="stylesheet" href="assets/theme.css?v=20261124-v35">
+    <script src="assets/theme.js?v=20261124-v35"></script>
+    <script src="lib/d3.v7.min.js?v=20261124-v35"></script>
+    <script src="lib/marked.min.js?v=20261124-v35"></script>
 </head>
 <body>
     <div id="app">
@@ -79,6 +87,9 @@
                 <!-- 五层阶段卡片 -->
                 <div class="stages-row" id="stages-row"></div>
 
+                <!-- 深度专题导读（5 篇旗舰文章） -->
+                <section class="overview-topics" id="overview-topics" hidden></section>
+
                 <!-- 路径入口 -->
                 <div class="route-cards-new">
                     <a href="#/path" class="route-card-new">
@@ -100,6 +111,11 @@
                         <span class="route-card-num">04</span>
                         <strong class="oriental-serif">天纪提示词</strong>
                         <span>可直接复制与调用的玄学分析工具包。</span>
+                    </a>
+                    <a href="#/qa" class="route-card-new route-card-new--wide">
+                        <span class="route-card-num">05</span>
+                        <strong class="oriental-serif">AI 问答</strong>
+                        <span>围绕站内原典、概念节点与学习路径自由提问，核验思路与上下游关联。</span>
                     </a>
                 </div>
 
@@ -135,19 +151,25 @@
                         <div class="graph-canvas" id="graph-canvas"></div>
                         
                         <!-- 图例 -->
-                        <div class="graph-legend">
-                            <div class="graph-legend-title oriental-serif">层级</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cosmology)"></span>底层框架</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-diagnosis)"></span>辨证框架</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-treatment)"></span>方法工具</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cases)"></span>案例研读</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-tianji)"></span>天纪体系</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-topic)"></span>深度专题</div>
-                            <div class="graph-legend-divider"></div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot graph-legend-dot--core"></span>核心节点</div>
-                            <div class="graph-legend-item"><span class="graph-legend-dot graph-legend-dot--standard"></span>普通节点</div>
-                            <div class="graph-legend-divider"></div>
-                            <div class="graph-legend-hint">拖拽 · 滚轮缩放 · 悬停聚焦</div>
+                        <div class="graph-legend" id="graph-legend">
+                            <button type="button" class="graph-legend-toggle" id="graph-legend-toggle" aria-expanded="false" aria-controls="graph-legend-body">
+                                <span>图例</span>
+                                <span class="graph-legend-toggle-arrow" aria-hidden="true">▾</span>
+                            </button>
+                            <div class="graph-legend-body" id="graph-legend-body">
+                                <div class="graph-legend-title oriental-serif">层级</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cosmology)"></span>底层框架</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-diagnosis)"></span>辨证框架</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-treatment)"></span>方法工具</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-cases)"></span>案例研读</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-tianji)"></span>天纪体系</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot" style="background:var(--layer-topic)"></span>深度专题</div>
+                                <div class="graph-legend-divider"></div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot graph-legend-dot--core"></span>核心节点</div>
+                                <div class="graph-legend-item"><span class="graph-legend-dot graph-legend-dot--standard"></span>普通节点</div>
+                                <div class="graph-legend-divider"></div>
+                                <div class="graph-legend-hint" id="graph-legend-hint">拖拽 · 滚轮缩放 · 悬停聚焦</div>
+                            </div>
                         </div>
 
                         <!-- 节点详情 Panel -->
@@ -243,18 +265,18 @@
         </div>
     </div>
 
-    <script src="assets/router.js?v=20261124-v33"></script>
-    <script src="assets/sidebar.js?v=20261124-v33"></script>
-    <script src="assets/graph.js?v=20261124-v33"></script>
-    <script src="assets/detail.js?v=20261124-v33"></script>
-    <script src="assets/overview.js?v=20261124-v33"></script>
-    <script src="assets/path.js?v=20261124-v33"></script>
-    <script src="assets/prompts.js?v=20261124-v33"></script>
-    <script src="assets/search.js?v=20261124-v33"></script>
-    <script src="assets/poster.js?v=20261124-v33"></script>
-    <script src="assets/feedback.js?v=20261124-v33"></script>
-    <script src="assets/analytics.js?v=20261124-v33"></script>
-    <script src="assets/app.js?v=20261124-v33"></script>
-    <script src="assets/enhance.js?v=20261124-v33"></script>
+    <script src="assets/router.js?v=20261124-v35"></script>
+    <script src="assets/sidebar.js?v=20261124-v35"></script>
+    <script src="assets/graph.js?v=20261124-v35"></script>
+    <script src="assets/detail.js?v=20261124-v35"></script>
+    <script src="assets/overview.js?v=20261124-v35"></script>
+    <script src="assets/path.js?v=20261124-v35"></script>
+    <script src="assets/prompts.js?v=20261124-v35"></script>
+    <script src="assets/search.js?v=20261124-v35"></script>
+    <script src="assets/poster.js?v=20261124-v35"></script>
+    <script src="assets/feedback.js?v=20261124-v35"></script>
+    <script src="assets/analytics.js?v=20261124-v35"></script>
+    <script src="assets/app.js?v=20261124-v35"></script>
+    <script src="assets/enhance.js?v=20261124-v35"></script>
 </body>
 </html>

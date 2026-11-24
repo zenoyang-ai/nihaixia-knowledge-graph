@@ -72,6 +72,41 @@ class ForceGraph {
                 this.highlightSearchMatches(searchInput.value);
             });
         }
+
+        // 图例移动端折叠切换与设备适配提示
+        this.bindLegendControls();
+        this.updateLegendHint();
+    }
+
+    bindLegendControls() {
+        if (this._legendBound) return;
+        this._legendBound = true;
+        const legend = document.getElementById('graph-legend');
+        const toggleBtn = document.getElementById('graph-legend-toggle');
+        if (!legend || !toggleBtn) return;
+        toggleBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const expanded = legend.classList.toggle('expanded');
+            toggleBtn.setAttribute('aria-expanded', expanded ? 'true' : 'false');
+        });
+    }
+
+    collapseLegend() {
+        const legend = document.getElementById('graph-legend');
+        const toggleBtn = document.getElementById('graph-legend-toggle');
+        if (!legend) return;
+        legend.classList.remove('expanded');
+        if (toggleBtn) toggleBtn.setAttribute('aria-expanded', 'false');
+    }
+
+    updateLegendHint() {
+        const hintEl = document.getElementById('graph-legend-hint');
+        if (!hintEl) return;
+        const isTouchOrNarrow = (window.matchMedia && window.matchMedia('(pointer: coarse)').matches)
+            || window.innerWidth <= 768;
+        hintEl.textContent = isTouchOrNarrow
+            ? '单指拖拽 · 双指缩放 · 点击节点'
+            : '拖拽 · 滚轮缩放 · 悬停聚焦';
     }
 
     refreshLayerColors() {
@@ -419,12 +454,13 @@ class ForceGraph {
                 self.linkEls.querySelectorAll('line').forEach(line => { line.style.opacity = ''; line.style.stroke = ''; });
             });
 
-        // 点击空白处清除选择与概念筛选
+        // 点击空白处清除选择、概念筛选并收起图例
         this.svg.addEventListener('click', (event) => {
             const onNode = event.target.closest && event.target.closest('.graph-node');
             if (!onNode) {
                 self.clearSelection();
                 self.clearConceptFilter();
+                self.collapseLegend();
             }
         });
 
@@ -465,22 +501,23 @@ class ForceGraph {
         };
         this.simulation.on('tick', ticked);
 
-        // 预热：同步迭代到准稳态，页面打开时布局已基本稳定，不再长时间漂移
+        // 预热：同步迭代到准稳态，页面打开时立即 fit 到安全区内，避免顶部节点遮挡
         this.simulation.stop();
         for (let i = 0; i < 140; i++) this.simulation.tick();
         ticked();
-        // 轻量重启保留一点有机感，随后自然冷却至静止；稳定后再 fit，避免错误 transform 被持久化
-        this._initialFitPending = true;
+        const appliedSavedNow = this._isNarrow ? false : this.restoreSavedTransform();
+        if (!appliedSavedNow) {
+            this.fitToView({ animate: false, persist: false });
+        }
+        // 轻量重启保留一点有机感，随后自然冷却至静止
+        this._initialFitPending = !appliedSavedNow;
         this.simulation.on('end', () => {
             if (!this._initialFitPending) return;
             this._initialFitPending = false;
-            const appliedSaved = this._isNarrow ? false : this.restoreSavedTransform();
-            if (!appliedSaved) {
-                this.fitToView({ animate: false, persist: false });
-            }
+            this.fitToView({ animate: false, persist: false });
             this.updateLabelVisibility();
         });
-        this.simulation.alpha(0.22).restart();
+        this.simulation.alpha(0.18).restart();
 
         // 顶部大概念框（HTML overlay）
         this.renderConceptBoxes();
@@ -506,6 +543,8 @@ class ForceGraph {
                 this.svg.setAttribute('width', w);
                 this.svg.setAttribute('height', h);
                 if (wasNarrow !== this._isNarrow) {
+                    this.updateLegendHint();
+                    this.collapseLegend();
                     this.fitToView({ animate: false, persist: false });
                 }
             };
@@ -531,11 +570,11 @@ class ForceGraph {
         if (!Number.isFinite(minX) || maxX <= minX || maxY <= minY) return;
 
         const isNarrow = width <= 768;
-        // 顶部概念栏、底部图例/安全区、左右边距
+        // 顶部概念栏、底部图例/安全区、左右边距（移动端避开顶部概念条+缩放条与底部胶囊）
         const padL = isNarrow ? 16 : 28;
         const padR = isNarrow ? 16 : 28;
-        const padT = isNarrow ? 72 : 64;
-        const padB = isNarrow ? 96 : 72;
+        const padT = isNarrow ? 86 : 80;
+        const padB = isNarrow ? 64 : 72;
         const availW = Math.max(80, width - padL - padR);
         const availH = Math.max(80, height - padT - padB);
         const bw = maxX - minX;

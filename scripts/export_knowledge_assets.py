@@ -22,6 +22,7 @@ import re
 import shutil
 import sys
 from pathlib import Path
+from typing import Optional
 from urllib.parse import unquote
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -102,6 +103,165 @@ SOURCE_LIBRARY_LINKS = [
     ("扶阳论坛", "扶阳论坛演讲（经方与阴阳辨证）", "../../05-公开讲座与访谈/03-扶阳论坛演讲-经方与阴阳辨证.md"),
     ("经方的妙用", "经方的妙用讲座", "../../05-公开讲座与访谈/04-经方的妙用讲座.md"),
 ]
+
+# graph.json / source_links 统一标准化出处目录：(匹配关键字列表, 公开标准名称, 本仓可读相对路径)
+CANONICAL_SOURCE_RULES = [
+    (("天机道笔记个人整理", "天机道听课与盘面笔记", "天机道笔记"), "《天机道听课与盘面笔记》", "knowledge/03-天纪学习资料/笔记与参考/天机道笔记.md"),
+    (("地脉道听课笔记",), "《地脉道听课笔记》", "knowledge/03-天纪学习资料/笔记与参考/地脉道听课笔记.md"),
+    (("人间道听课笔记",), "《人间道听课笔记》", "knowledge/03-天纪学习资料/笔记与参考/人间道听课笔记.md"),
+    (("读易心法",), "《人间道·序言与读易心法》", "knowledge/03-天纪学习资料/03-人间道/00-序言与读易心法.md"),
+    (("天机道·地脉道·人间道",), "《天纪》三才原典（天机道·地脉道·人间道）", "knowledge/03-天纪学习资料/README.md"),
+    (("天机道终稿", "天机道"), "《天机道》", "knowledge/03-天纪学习资料/01-天机道.md"),
+    (("地脉道",), "《地脉道》", "knowledge/03-天纪学习资料/02-地脉道.md"),
+    (("人间道",), "《人间道》（3 卷）", "knowledge/03-天纪学习资料/03-人间道/README.md"),
+    (("易经64卦图",), "《易经64卦图》", "knowledge/03-天纪学习资料/04-易经64卦图.md"),
+    (("易经推命批法",), "《易经推命批法》", "knowledge/03-天纪学习资料/笔记与参考/易经推命批法.md"),
+    (("针灸大成",), "《针灸大成》（十卷全本）", "knowledge/04-人纪学习资料/针灸大成/README.md"),
+    (("人纪-简体针灸教程", "人纪简体针灸教程", "人纪·针灸篇"), "《人纪·针灸篇》（8 章）", "knowledge/04-人纪学习资料/人纪-针灸篇/README.md"),
+    (("神农本草经",), "《神农本草经》（5 卷）", "knowledge/04-人纪学习资料/神农本草经/README.md"),
+    (("黄帝内经白话文",), "《黄帝内经白话文》", None),
+    (("黄帝外经",), "《黄帝外经》", None),
+    (("黄帝内经",), "《黄帝内经注解》（节选）", "knowledge/04-人纪学习资料/经方与内经节选/黄帝内经注解-节选.md"),
+    (("桂林孤本",), "《桂林孤本伤寒杂病论》", None),
+    (("伤寒论",), "《伤寒论注解》（节选）", "knowledge/04-人纪学习资料/经方与内经节选/伤寒论注解-节选.md"),
+    (("金匮要略",), "《金匮要略注解》（节选）", "knowledge/04-人纪学习资料/经方与内经节选/金匮要略注解-节选.md"),
+    (("梁冬对话",), "《梁冬对话倪海厦》（7 讲）", "knowledge/05-公开讲座与访谈/01-梁冬对话倪海厦/README.md"),
+    (("仲景心法",), "《仲景心法》（7 讲）", "knowledge/05-公开讲座与访谈/02-仲景心法/README.md"),
+    (("扶阳论坛",), "《扶阳论坛演讲：经方与阴阳辨证》", "knowledge/05-公开讲座与访谈/03-扶阳论坛演讲-经方与阴阳辨证.md"),
+    (("经方的妙用", "经方结构与应用思路"), "《经方的妙用讲座》", "knowledge/05-公开讲座与访谈/04-经方的妙用讲座.md"),
+    (("闭门课",), "《人纪班闭门课》参考讲记", None),
+    (("汉唐方剂讲解", "方义结构讲解"), "《汉唐方剂讲解》参考笔记", None),
+    (("2008年3-5月医案",), "《倪海厦临床医案（2008年3-5月）》", None),
+    (("2008年6月医案",), "《倪海厦临床医案（2008年6月）》", None),
+    (("医案全集",), "《倪海厦临床医案全集》", None),
+    (("扶阳摘记",), "《扶阳摘记》", None),
+    (("眼诊心得",), "《眼诊心得》", None),
+    (("四柱六神用法问答",), "《四柱六神用法问答》", None),
+    (("罗盘逐层详解",), "《罗盘逐层详解》", None),
+    (("罗经易解",), "《罗经易解》", None),
+    (("中医知识关联",), "《中医知识关联整理》", None),
+    (("天人合一思想整合",), "《天人合一思想整合整理》", None),
+]
+
+SOURCE_NOISE_NOTE_RE = re.compile(
+    r"^(?:原始\s*PDF（[^）]+）|已转换可检索版(?:（[^）]+）)?|可检索版|注解版（推荐）|B5\s*版上册|\d+(?:\.\d+)?\s*(?:KB|MB)(?:\s*完整合集)?)$"
+)
+REPO_FORBIDDEN_PRIVATE_STRINGS = ("倪海厦资料", "天机道终稿", "注解B5", "个人整理", ".docx")
+
+
+def _clean_source_note(raw_note: str) -> str:
+    note = (raw_note or "").strip()
+    if not note or SOURCE_NOISE_NOTE_RE.match(note):
+        return ""
+    note = re.sub(r"\s*（(?:原始\s*PDF|已转换可检索版|可检索版)[^）]*）", "", note).strip()
+    if SOURCE_NOISE_NOTE_RE.match(note):
+        return ""
+    return note
+
+
+def _resolve_canonical_source(raw_target: str, alias: str = "", raw_note: str = "") -> Optional[dict]:
+    """将原始路径或书名归一为公开标准出处对象 {label, note?, repo_path?}。"""
+    combined = f"{raw_target} {alias}".strip()
+    if not combined:
+        return None
+    note = _clean_source_note(raw_note)
+    # 针对“经方的妙用”两类不同别名保留有价值的说明
+    if "经方结构与应用思路" in combined and not note:
+        note = "经方结构与应用思路"
+
+    for keywords, label, repo_path in CANONICAL_SOURCE_RULES:
+        if any(kw in combined for kw in keywords):
+            entry = {"label": label}
+            if note:
+                entry["note"] = note
+            if repo_path and (REPO_ROOT / repo_path).exists():
+                entry["repo_path"] = repo_path
+            return entry
+
+    # 兜底清理（兼容已经干净的《...》书名）
+    clean_lbl = (alias or raw_target).strip()
+    clean_lbl = re.sub(r"（(?:MD版|PDF|完整版PDF)）", "", clean_lbl).strip()
+    clean_lbl = re.sub(r"\.(?:md|pdf|docx?|txt)$", "", clean_lbl, flags=re.I).strip()
+    if not clean_lbl:
+        return None
+    entry = {"label": clean_lbl}
+    if note:
+        entry["note"] = note
+    return entry
+
+
+def normalize_item_sources(item: dict) -> tuple[str, list[dict]]:
+    """统一归一单个节点/专题的 原始出处 文本与结构化 source_links，彻底移除私人目录与文件后缀。"""
+    sections = item.get("sections") or {}
+    raw_origin = sections.get("原始出处") or ""
+    entries: list[dict] = []
+
+    for line in raw_origin.splitlines():
+        s = line.strip()
+        if not s or "0B 空文件" in s:
+            continue
+        s = re.sub(r"^-\s*", "", s)
+        raw_note = ""
+        if "—" in s:
+            left, raw_note = s.split("—", 1)
+        elif " - " in s:
+            left, raw_note = s.split(" - ", 1)
+        else:
+            left = s
+        left = left.strip()
+        m = WIKILINK_RE.search(left)
+        if m:
+            entry = _resolve_canonical_source(m.group(1).strip(), (m.group(2) or "").strip(), raw_note)
+        else:
+            entry = _resolve_canonical_source(left, left, raw_note)
+        if entry:
+            entries.append(entry)
+
+    for sl in item.get("source_links") or []:
+        if not isinstance(sl, dict):
+            continue
+        if sl.get("label"):
+            entry = _resolve_canonical_source(sl.get("repo_path") or sl["label"], sl["label"], sl.get("note") or "")
+        else:
+            entry = _resolve_canonical_source(sl.get("path") or "", sl.get("alias") or "", sl.get("note") or "")
+        if entry:
+            entries.append(entry)
+
+    # 合并去重：同 (label, repo_path) 若既有带具体章节 note 的条目也有空 note 条目，保留前者
+    has_detailed_note = {
+        (e["label"], e.get("repo_path", ""))
+        for e in entries
+        if e.get("note")
+    }
+    deduped: list[dict] = []
+    seen = set()
+    for e in entries:
+        key_base = (e["label"], e.get("repo_path", ""))
+        note = e.get("note", "")
+        if not note and key_base in has_detailed_note:
+            continue
+        sig = (key_base[0], key_base[1], note)
+        if sig in seen:
+            continue
+        seen.add(sig)
+        deduped.append(e)
+
+    clean_lines = [
+        f"- {e['label']} — {e['note']}" if e.get("note") else f"- {e['label']}"
+        for e in deduped
+    ]
+    return "\n".join(clean_lines), deduped
+
+
+def sanitize_graph_sources(graph: dict) -> dict:
+    """原地清洗 graph['nodes'] 与 graph['articles'] 中的 原始出处 与 source_links。"""
+    for item in (graph.get("nodes") or []) + (graph.get("articles") or []):
+        origin_text, clean_links = normalize_item_sources(item)
+        item.setdefault("sections", {})
+        if origin_text:
+            item["sections"]["原始出处"] = origin_text
+        item["source_links"] = clean_links
+    return graph
 
 
 def _resolve_source_link(raw_target: str, alias: str) -> str:
@@ -245,9 +405,27 @@ def render_obsidian_item(item: dict, valid_titles: set[str]) -> str:
             body.append(f"- **同层/关联**：{format_link_list(related, valid_titles)}")
         body.append("")
 
-    origin = clean_source_section(sections.get("原始出处") or "")
-    if origin:
-        body.extend(["## 原始出处", "", origin, ""])
+    canonical_links = [
+        sl for sl in (item.get("source_links") or []) if isinstance(sl, dict) and sl.get("label")
+    ]
+    if canonical_links:
+        obs_lines = []
+        for sl in canonical_links:
+            lbl = sl["label"]
+            repo_path = (sl.get("repo_path") or "").strip()
+            note = (sl.get("note") or "").strip()
+            if repo_path.startswith("knowledge/") and (REPO_ROOT / repo_path).exists():
+                rel_from_layer = "../../" + repo_path[len("knowledge/") :]
+                link_title = lbl.replace("《", "").replace("》", "")
+                head = f"[{link_title}]({rel_from_layer})"
+            else:
+                head = lbl
+            obs_lines.append(f"- {head} — {note}" if note else f"- {head}")
+        body.extend(["## 原始出处", "", "\n".join(obs_lines), ""])
+    else:
+        origin = clean_source_section(sections.get("原始出处") or "")
+        if origin:
+            body.extend(["## 原始出处", "", origin, ""])
 
     safety = (sections.get("安全边界") or "").strip()
     if safety:
@@ -1429,6 +1607,14 @@ def validate_knowledge() -> list[str]:
     errors = []
     graph = json.loads(GRAPH_JSON.read_text(encoding="utf-8"))
     prompts = json.loads(PROMPTS_JSON.read_text(encoding="utf-8"))
+
+    # 校验 graph.json 无私人vault路径/过时后缀残留
+    for col in ("nodes", "articles"):
+        for item in graph.get(col) or []:
+            blob = json.dumps(item, ensure_ascii=False)
+            for bad in REPO_FORBIDDEN_PRIVATE_STRINGS:
+                if bad in blob:
+                    errors.append(f"docs/data/graph.json [{item.get('title', '?')}] 含未清洗字符串: {bad}")
     nodes = graph.get("nodes", [])
     articles = graph.get("articles", [])
     expected_edges = sum(len(x.get("node_links") or []) for x in (nodes + articles))
@@ -1676,6 +1862,8 @@ def main() -> int:
         print("Exported cleaned 05-公开讲座与访谈")
 
     graph = json.loads(GRAPH_JSON.read_text(encoding="utf-8"))
+    sanitize_graph_sources(graph)
+    GRAPH_JSON.write_text(json.dumps(graph, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
     prompts = json.loads(PROMPTS_JSON.read_text(encoding="utf-8"))
     counts = export_graph_and_ai_packs(graph, prompts)
     export_offline_site_bundle(graph, prompts)

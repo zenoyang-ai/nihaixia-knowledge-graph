@@ -15,7 +15,8 @@ class Router {
 
     // 解析当前 hash
     parse(hash) {
-        const path = hash.replace(/^#/, '') || '/';
+        const clean = (hash || '').replace(/^#/, '');
+        const path = clean.split('?')[0] || '/';
         // 精确匹配
         if (this.routes[path]) return { pattern: path, params: {}, handler: this.routes[path] };
         // 参数匹配（如 /note/:title）

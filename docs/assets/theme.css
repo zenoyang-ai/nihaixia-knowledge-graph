@@ -774,7 +774,7 @@ strong, b { font-weight: 600; }
     user-select: none;
 }
 @media (max-width: 768px) {
-    .graph-zoombar { top: 68px; bottom: auto; right: 10px; }
+    .graph-zoombar { top: auto; bottom: 16px; right: 10px; }
     .graph-container:has(.graph-detail-panel.open) .graph-zoombar,
     .graph-container.panel-open .graph-zoombar { right: 10px; }
 }
@@ -925,5 +925,301 @@ strong, b { font-weight: 600; }
     .graph-view {
         height: calc(100vh - var(--header-h) - 36px);
         margin: -10px -8px -64px;
+    }
+}
+
+/* ============================================
+   v4 — 闭环入口（专题导读 / 原典出处 / AI 追问）+ 移动端图例折叠 & Tab 防折行
+   ============================================ */
+
+/* ---- 总览：5 篇深度专题导读区 + 5 号 AI 问答入口卡 ---- */
+.overview-topics {
+    margin: 0 0 28px;
+    padding: 20px 22px;
+    background: var(--surface-card);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+}
+.overview-topics[hidden] { display: none; }
+.overview-topics-header {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+.overview-topics-kicker {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    color: var(--accent);
+    margin-bottom: 2px;
+}
+.overview-topics-header h2 {
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--on-surface-strong);
+    margin: 0;
+}
+.overview-topics-count {
+    font-size: 12px;
+    color: var(--on-surface-faint);
+    white-space: nowrap;
+}
+.overview-topics-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+@media (max-width: 1024px) {
+    .overview-topics-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+.overview-topic-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    padding: 12px 14px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    text-decoration: none;
+    color: var(--on-surface);
+    transition: border-color 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+.overview-topic-card:hover {
+    border-color: var(--accent);
+    background: var(--surface-hover);
+    transform: translateY(-1px);
+}
+.overview-topic-card strong {
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--on-surface-strong);
+    line-height: 1.4;
+}
+.overview-topic-card span {
+    font-size: 12px;
+    line-height: 1.5;
+    color: var(--on-surface-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+@media (min-width: 769px) {
+    .route-card-new--wide {
+        grid-column: 1 / -1;
+    }
+}
+
+/* ---- 详情页：原始出处与开源精读 + AI 追问引导 + 安全边界 ---- */
+.note-source-list {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.note-source-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 10px 14px;
+    border-radius: 8px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-color);
+    font-size: 13px;
+    line-height: 1.5;
+}
+.note-source-main {
+    color: var(--on-surface);
+    min-width: 0;
+}
+.note-source-label {
+    font-weight: 600;
+    color: var(--on-surface-strong);
+}
+.note-source-note {
+    color: var(--on-surface-muted);
+}
+.note-source-link {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-size: 12px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.16s ease, color 0.16s ease;
+}
+.note-source-link:hover {
+    background: var(--accent-solid);
+    border-color: var(--accent-solid);
+    color: #fff;
+}
+
+.note-qa-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: 28px 0 12px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: var(--surface-soft);
+    border: 1px solid var(--border-color);
+    border-left: 3px solid var(--accent);
+}
+.note-qa-copy {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    min-width: 0;
+}
+.note-qa-copy strong {
+    font-size: 14px;
+    color: var(--on-surface-strong);
+}
+.note-qa-copy span {
+    font-size: 12px;
+    color: var(--on-surface-muted);
+    line-height: 1.5;
+}
+.note-qa-cta {
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 14px;
+    border-radius: 8px;
+    background: var(--accent-solid);
+    color: #fff;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background 0.16s ease;
+}
+.note-qa-cta:hover {
+    background: var(--accent-solid-hover);
+}
+
+.note-section--safety {
+    margin-top: 28px;
+    padding-top: 16px;
+    border-top: 1px solid var(--border-color);
+}
+.note-safety-content {
+    font-size: 13px;
+    color: var(--on-surface-muted);
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .overview-topics { padding: 14px 14px 16px; margin-bottom: 20px; }
+    .overview-topics-grid { grid-template-columns: 1fr; }
+    .note-source-item,
+    .note-qa-box {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 10px;
+    }
+    .note-qa-cta { width: 100%; justify-content: center; }
+}
+
+/* ---- 全局搜索：提示词 / AI 问答兜底项 ---- */
+.search-dropdown-action {
+    border-top: 1px solid var(--border-color);
+    background: var(--surface-soft);
+}
+.search-dropdown-action .search-dropdown-item-title {
+    color: var(--accent);
+    font-size: 13px;
+}
+
+/* ---- 提示词 Tab：手机端防单字换行 ---- */
+.prompt-tabs {
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+}
+.prompt-tabs::-webkit-scrollbar { display: none; }
+.prompt-tab {
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+@media (max-width: 480px) {
+    .prompt-tab {
+        padding: 7px 10px;
+        font-size: 12px;
+    }
+}
+
+/* ---- 知识图谱：桌面端常显图例，移动端默认折叠为小胶囊 ---- */
+.graph-legend-toggle {
+    display: none;
+}
+.graph-legend-body {
+    display: block;
+}
+
+@media (max-width: 768px) {
+    .graph-legend {
+        left: 10px;
+        bottom: 16px;
+        width: auto;
+        min-width: 0;
+        padding: 0;
+        border-radius: 999px;
+    }
+    .graph-legend-toggle {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        padding: 7px 13px;
+        border: none;
+        background: transparent;
+        color: var(--on-surface-strong);
+        font-size: 12px;
+        font-weight: 600;
+        font-family: inherit;
+        cursor: pointer;
+        white-space: nowrap;
+        line-height: 1;
+    }
+    .graph-legend-toggle-arrow {
+        font-size: 11px;
+        transition: transform 0.18s ease;
+    }
+    .graph-legend:not(.expanded) .graph-legend-body {
+        display: none;
+    }
+    .graph-legend.expanded {
+        width: 164px;
+        padding: 10px 12px;
+        border-radius: 10px;
+    }
+    .graph-legend.expanded .graph-legend-toggle {
+        width: 100%;
+        justify-content: space-between;
+        padding: 0 0 6px;
+        margin-bottom: 6px;
+        border-bottom: 1px solid var(--border-color);
+    }
+    .graph-legend.expanded .graph-legend-toggle-arrow {
+        transform: rotate(180deg);
+    }
+    .graph-legend.expanded .graph-legend-title {
+        display: none;
+    }
+    .graph-concepts {
+        padding-right: 12px;
     }
 }

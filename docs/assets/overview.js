@@ -45,6 +45,44 @@ class Overview {
 
             this.renderStageContent();
         }
+
+        this.renderTopics();
+    }
+
+    escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    renderTopics() {
+        const container = document.getElementById('overview-topics');
+        if (!container) return;
+        const articles = (this.data && this.data.articles) || [];
+        if (!articles.length) {
+            container.hidden = true;
+            return;
+        }
+        container.hidden = false;
+        container.innerHTML = `
+            <div class="overview-topics-header">
+                <div>
+                    <span class="overview-topics-kicker">专题精读</span>
+                    <h2 class="oriental-serif">深度专题导读</h2>
+                </div>
+                <span class="overview-topics-count">${articles.length} 篇专题</span>
+            </div>
+            <div class="overview-topics-grid">
+                ${articles.map((a) => `
+                    <a class="overview-topic-card" href="#/note/${encodeURIComponent(a.title)}">
+                        <strong class="oriental-serif">${this.escapeHtml(a.title)}</strong>
+                        <span>${this.escapeHtml(a.definition || '')}</span>
+                    </a>
+                `).join('')}
+            </div>
+        `;
     }
 
     renderStageContent() {

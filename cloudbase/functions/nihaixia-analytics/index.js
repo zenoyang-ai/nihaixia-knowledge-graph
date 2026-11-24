@@ -15,12 +15,12 @@
 const crypto = require('crypto');
 const cloudbase = require('@cloudbase/node-sdk');
 
-const VERSION = '0.2.0';
+const VERSION = '0.2.1';
 const COLLECTION = 'site_daily_stats';
 const FEISHU_TOKEN_URL = 'https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal';
 const FEISHU_IM_URL = 'https://open.feishu.cn/open-apis/im/v1/messages?receive_id_type=open_id';
 const SITES = new Set(['cn', 'overseas', 'local']);
-const CLICK_SOURCES = new Set(['header', 'prompts', 'other']);
+const CLICK_SOURCES = new Set(['header', 'prompts', 'note_source', 'other']);
 
 function parseAllowedOrigins(env) {
   const raw = (env.ALLOWED_ORIGINS
@@ -185,6 +185,7 @@ async function recordGithubClick(db, { site, source, path }) {
     };
     if (src === 'header') patch.githubClicksHeader = _.inc(1);
     else if (src === 'prompts') patch.githubClicksPrompts = _.inc(1);
+    else if (src === 'note_source') patch.githubClicksNoteSource = _.inc(1);
     await col.doc(docId).update(patch);
   } else {
     await col.doc(docId).set({
@@ -195,6 +196,7 @@ async function recordGithubClick(db, { site, source, path }) {
       githubClicks: 1,
       githubClicksHeader: src === 'header' ? 1 : 0,
       githubClicksPrompts: src === 'prompts' ? 1 : 0,
+      githubClicksNoteSource: src === 'note_source' ? 1 : 0,
       lastGithubClickPath: path,
       createdAt: Date.now(),
       updatedAt: Date.now(),
@@ -207,7 +209,14 @@ async function recordGithubClick(db, { site, source, path }) {
 async function loadDayStats(db, day) {
   const res = await db.collection(COLLECTION).where({ day }).limit(20).get();
   const rows = res.data || [];
-  const empty = () => ({ pv: 0, uv: 0, githubClicks: 0, githubClicksHeader: 0, githubClicksPrompts: 0 });
+  const empty = () => ({
+    pv: 0,
+    uv: 0,
+    githubClicks: 0,
+    githubClicksHeader: 0,
+    githubClicksPrompts: 0,
+    githubClicksNoteSource: 0,
+  });
   const bySite = { cn: empty(), overseas: empty(), local: empty() };
   for (const row of rows) {
     const site = normalizeSite(row.site);
@@ -218,6 +227,7 @@ async function loadDayStats(db, day) {
       githubClicks: Number(row.githubClicks) || 0,
       githubClicksHeader: Number(row.githubClicksHeader) || 0,
       githubClicksPrompts: Number(row.githubClicksPrompts) || 0,
+      githubClicksNoteSource: Number(row.githubClicksNoteSource) || 0,
     };
   }
   return bySite;
@@ -232,6 +242,7 @@ function buildDailyReportText(day, bySite) {
   const totalGhClicks = (cn.githubClicks || 0) + (ov.githubClicks || 0);
   const headerGhClicks = (cn.githubClicksHeader || 0) + (ov.githubClicksHeader || 0);
   const promptsGhClicks = (cn.githubClicksPrompts || 0) + (ov.githubClicksPrompts || 0);
+  const noteSourceGhClicks = (cn.githubClicksNoteSource || 0) + (ov.githubClicksNoteSource || 0);
   const lines = [
     '【图谱访问日报】',
     `日期：${day}`,
@@ -241,7 +252,10 @@ function buildDailyReportText(day, bySite) {
     `海外站：UV ${ov.uv} · PV ${ov.pv}`,
   ];
   if (totalGhClicks > 0) {
-    lines.push(`GitHub 导流点击：${totalGhClicks} 次（顶栏 ${headerGhClicks} · 提示词 ${promptsGhClicks}）`);
+    const breakdown = noteSourceGhClicks > 0
+      ? `顶栏 ${headerGhClicks} · 原典 ${noteSourceGhClicks} · 提示词 ${promptsGhClicks}`
+      : `顶栏 ${headerGhClicks} · 提示词 ${promptsGhClicks}`;
+    lines.push(`GitHub 导流点击：${totalGhClicks} 次（${breakdown}）`);
   }
   if (loc.pv > 0) {
     lines.push(`本地调试：UV ${loc.uv} · PV ${loc.pv}`);

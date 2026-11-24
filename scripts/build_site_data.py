@@ -387,6 +387,13 @@ def validate(graph):
                 f"以下 {len(uncovered)} 个条目未纳入任何学习路径（请补充到 learning_paths）: {', '.join(uncovered)}"
             )
 
+    # 检查 graph.json 节点与专题文章无私人文件夹路径与过时后缀残留
+    for item in content_items:
+        blob = json.dumps(item, ensure_ascii=False)
+        for bad in ("倪海厦资料", "天机道终稿", "注解B5", "个人整理", ".docx"):
+            if bad in blob:
+                errors.append(f"条目「{item.get('title', '?')}」含未清洗内部标识: {bad}")
+
     return {
         "ok": len(errors) == 0,
         "errors": errors,

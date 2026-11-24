@@ -35,7 +35,7 @@
   }
 
   function sendPayload(payload) {
-    if (window.location.protocol === 'file:') return;
+    if (window.location.protocol === 'file:' || detectSite() === 'local') return;
     const body = JSON.stringify(payload);
     fetch(ENDPOINT, {
       method: 'POST',
@@ -91,10 +91,12 @@
 
   document.addEventListener('click', (e) => {
     const target = e.target && e.target.closest
-      ? e.target.closest('#header-github-btn, .prompt-skill-link')
+      ? e.target.closest('#header-github-btn, .prompt-skill-link, .note-source-link')
       : null;
     if (!target) return;
-    const source = target.id === 'header-github-btn' ? 'header' : 'prompts';
+    let source = 'prompts';
+    if (target.id === 'header-github-btn') source = 'header';
+    else if (target.classList.contains('note-source-link')) source = 'note_source';
     sendGithubClick(source);
   }, { passive: true });
 

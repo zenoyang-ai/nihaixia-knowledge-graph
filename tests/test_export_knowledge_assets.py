@@ -233,6 +233,21 @@ class ExportKnowledgeAssetsTests(unittest.TestCase):
         self.assertNotIn("人间道", {lk["alias"] for lk in by_title["紫微斗数"]["node_links"]})
         self.assertNotIn("紫微斗数", {lk["alias"] for lk in by_title["人间道"]["node_links"]})
 
+        # 节点与专题的 原始出处 / source_links 等字段无私人路径或过时文件后缀残留
+        items_blob = json.dumps(all_items, ensure_ascii=False)
+        for forbidden in ("倪海厦资料", "天机道终稿", "注解B5", "个人整理", ".docx", ".doc", ".pdf", ".txt"):
+            self.assertNotIn(forbidden, items_blob, f"Residual internal string {forbidden} in nodes/articles")
+        for item in all_items:
+            for sl in item.get("source_links") or []:
+                self.assertIn("label", sl)
+                if sl.get("repo_path"):
+                    self.assertTrue((REPO_ROOT / sl["repo_path"]).exists(), f"Missing repo_path: {sl['repo_path']}")
+
+        # 提示词标签与易经三才定位一致性
+        prompts = json.loads((REPO_ROOT / "docs" / "data" / "prompts.json").read_text(encoding="utf-8"))
+        yijing_prompt = next(p for p in prompts if p["id"] == "yijing-sancai")
+        self.assertEqual(yijing_prompt["tags"], ["易经", "人间道", "三才"])
+
 
 if __name__ == "__main__":
     unittest.main()

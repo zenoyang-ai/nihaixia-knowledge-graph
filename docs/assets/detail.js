@@ -21,19 +21,23 @@ class NoteDetail {
 
         // 计算"为什么重要"
         const importanceText = this.generateImportance(node, upstream, downstream);
+        const backRoute = (typeof window.getNihaixiaReturnRoute === 'function' && window.getNihaixiaReturnRoute())
+            || { href: '#/graph', label: '← 返回图谱' };
+        const layerBadge = node.layer || (node.node_type === 'topic' ? '深度专题' : '经典概念');
+        const qaQuestion = `请结合知识库讲讲「${node.title}」的核心思想与上下游关系`;
 
         window.currentNodeData = node;
 
         this.view.innerHTML = `
             <div class="note-breadcrumb">
-                <a class="note-back" href="#/graph">← 返回图谱</a>
+                <a class="note-back" href="${this.escapeHtml(backRoute.href)}">${this.escapeHtml(backRoute.label)}</a>
                 <span class="note-breadcrumb-sep">›</span>
-                <span class="note-breadcrumb-current">${node.title}</span>
+                <span class="note-breadcrumb-current">${this.escapeHtml(node.title)}</span>
             </div>
 
             <div class="note-meta">
-                <span class="note-tag">${this.typeLabel(node.node_type)}</span>
-                <span class="note-tag layer">${node.layer || '未分类'}</span>
+                <span class="note-tag">${this.escapeHtml(this.typeLabel(node.node_type))}</span>
+                <span class="note-tag layer">${this.escapeHtml(layerBadge)}</span>
                 ${node.importance === 'core' ? '<span class="note-tag note-tag--core">核心节点</span>' : ''}
                 <button type="button" class="poster-trigger-btn"
                     onclick="window.generatePoster && window.generatePoster(window.currentNodeData)">
@@ -165,19 +169,89 @@ class NoteDetail {
                 </div>
             ` : ''}
 
+            <!-- 原始出处与开源精读 -->
+            ${this.renderSourcesSection(node)}
+
+            <!-- 围绕本节点向 AI 追问 -->
+            <div class="note-qa-box">
+                <div class="note-qa-copy">
+                    <strong>对「${this.escapeHtml(node.title)}」还有疑问？</strong>
+                    <span>前往站内 AI 问答，围绕它的核心思想、原文出处与上下游关系继续追问。</span>
+                </div>
+                <a class="note-qa-cta" href="#/qa?q=${encodeURIComponent(qaQuestion)}">💬 围绕本节点向 AI 追问 →</a>
+            </div>
+
             <!-- 安全边界 -->
             ${(node.sections && node.sections['安全边界']) ? `
-                <div class="note-section" style="margin-top:32px; padding-top:16px; border-top:1px solid var(--border);">
+                <div class="note-section note-section--safety">
                     <div class="note-section-header">
                         <span class="note-section-icon">⚕️</span>
                         安全边界
                     </div>
-                    <div class="note-section-content" style="font-size:13px; color:var(--text-light); line-height:1.6;">
-                        ${node.sections['安全边界']}
+                    <div class="note-section-content note-safety-content">
+                        ${this.escapeHtml(node.sections['安全边界'])}
                     </div>
                 </div>
             ` : ''}
         `;
+    }
+
+    escapeHtml(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    renderSourcesSection(node) {
+        const sources = Array.isArray(node.source_links) && node.source_links.length
+            ? node.source_links
+            : this.parseFallbackSources((node.sections && node.sections['原始出处']) || '');
+        if (!sources.length) return '';
+
+        const GITHUB_BLOB_BASE = 'https://github.com/zenoyang-ai/nihaixia-knowledge-graph/blob/main/';
+        const rows = sources.map((sl) => {
+            const label = this.escapeHtml(sl.label || sl.alias || '参考资料');
+            const note = sl.note ? `<span class="note-source-note"> — ${this.escapeHtml(sl.note)}</span>` : '';
+            const repoPath = (sl.repo_path || '').trim();
+            if (repoPath) {
+                const url = `${GITHUB_BLOB_BASE}${encodeURI(repoPath)}`;
+                return `
+                    <li class="note-source-item">
+                        <div class="note-source-main">
+                            <span class="note-source-label">${label}</span>${note}
+                        </div>
+                        <a class="note-source-link" href="${url}" target="_blank" rel="noopener noreferrer" data-analytics-source="note_source">开源原典精读 →</a>
+                    </li>
+                `;
+            }
+            return `
+                <li class="note-source-item note-source-item--plain">
+                    <div class="note-source-main">
+                        <span class="note-source-label">${label}</span>${note}
+                    </div>
+                </li>
+            `;
+        }).join('');
+
+        return `
+            <div class="note-section">
+                <div class="note-section-header">
+                    <span class="note-section-icon">📚</span>
+                    原始出处与开源精读
+                </div>
+                <ul class="note-source-list">${rows}</ul>
+            </div>
+        `;
+    }
+
+    parseFallbackSources(raw) {
+        if (!raw) return [];
+        return raw.split('\n').map((line) => line.replace(/^\s*-\s*/, '').trim()).filter(Boolean).map((line) => {
+            const parts = line.split(/\s+—\s+/);
+            return { label: parts[0].trim(), note: parts.slice(1).join(' — ').trim() };
+        });
     }
 
     // 自动生成"为什么重要"的内容
