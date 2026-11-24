@@ -132,6 +132,12 @@ class NihaixiaApp {
 
         // 4. 初始化各模块（每个独立 try-catch，一个失败不影响其他）
         if (this.data) {
+            window.__nhxNodeTitles = new Set(
+                [...(this.data.nodes || []), ...(this.data.articles || [])].map((n) => n && n.title).filter(Boolean)
+            );
+            window.__nhxTopicTitles = new Set(
+                (this.data.articles || []).map((a) => a && a.title).filter(Boolean)
+            );
             try { this.overview = new Overview(this.data); } catch(e) { console.error('Overview init error:', e); }
             try { this.sidebar = new Sidebar(this.data); } catch(e) { console.error('Sidebar init error:', e); }
             try { this.pathView = new PathView(this.data); } catch(e) { console.error('PathView init error:', e); }
@@ -451,20 +457,194 @@ document.addEventListener('DOMContentLoaded', () => {
         return provider || '未知线路';
     }
 
+    function escapeAttr(str) {
+        return String(str || '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;');
+    }
+
+    const SOURCE_GROUP_LABELS = {
+        '01_知识卡片': '知识卡片',
+        '02_主题文章': '深度专题',
+        '03_经文原文-公开版': '经文原典',
+        '04_经文原文-完整版': '经文原典',
+        '05_医案资料': '临床医案',
+        '06_补充资料': '体系总览',
+        '07_天纪资料': '天纪资料',
+        '08_补充课程': '公开讲座',
+        '09_中医原始资料': '中医原典',
+        '10_人纪资料': '人纪资料',
+        '11_玄学体系': '天纪体系',
+    };
+
+    const CLASSIC_ROOTS = [
+        '黄帝内经', '伤寒论', '金匮要略', '神农本草经', '针灸大成',
+        '天机道', '地脉道', '人间道', '紫微斗数', '四柱命理', '风水堪舆', '易经',
+    ];
+
+    function humanizeSourceGroup(rawGroup) {
+        const g = String(rawGroup || '').trim();
+        if (!g) return '知识库资料';
+        if (SOURCE_GROUP_LABELS[g]) return SOURCE_GROUP_LABELS[g];
+        return g.replace(/^\d+_/, '').replace(/-(?:公开版|完整版)$/, '') || '知识库资料';
+    }
+
+    function normalizeKnowledgeSources(sources) {
+        if (!Array.isArray(sources) || !sources.length) return [];
+        const nodeTitles = window.__nhxNodeTitles instanceof Set ? window.__nhxNodeTitles : new Set();
+        const topicTitles = window.__nhxTopicTitles instanceof Set ? window.__nhxTopicTitles : new Set();
+        const grouped = new Map();
+
+        sources.forEach((s) => {
+            if (!s || typeof s !== 'object') return;
+            const rawGroup = String(s.source_group || '').trim();
+            let category = humanizeSourceGroup(rawGroup);
+            const rawTitle = String(s.chunk_title || s.title || '').trim();
+            const base = rawTitle ? rawTitle.split('/').pop() : '';
+            let cleanTitle = base
+                .replace(/\.(?:md|txt|pdf|docx|doc)$/i, '')
+                .replace(/(?:[-_\s]*(?:ocr[-_]?sample|B5|终稿|个人整理|完整版|公开版))+$/ig, '')
+                .trim();
+
+            // 识别并收敛古籍分册（如 黄帝内经上/中/下册/注解 → 黄帝内经原典与注解），避免 09/03/04 跨目录重复铺屏
+            let matchedClassic = '';
+            let isClassicVolume = false;
+            for (const classic of CLASSIC_ROOTS) {
+                if (cleanTitle.startsWith(classic) && cleanTitle.length > classic.length) {
+                    const tail = cleanTitle.slice(classic.length);
+                    if (/^(?:上册|中册|下册|全册|注解|讲义|白话|原文|卷[一二三四五六七八九十\d]+)$/.test(tail)) {
+                        matchedClassic = classic;
+                        isClassicVolume = true;
+                        break;
+                    }
+                    if (/^(?:体系|笔记)$/.test(tail)) {
+                        matchedClassic = classic;
+                        break;
+                    }
+                }
+            }
+
+            const isCardOrTopicGroup = rawGroup === '01_知识卡片' || rawGroup === '02_主题文章';
+            if (!cleanTitle || /^(?:子文件|chunk[-_]?)\d+$/i.test(cleanTitle)) {
+                cleanTitle = `${category}选篇`;
+            } else if (isClassicVolume && !isCardOrTopicGroup) {
+                cleanTitle = `${matchedClassic}原典与注解`;
+                if (category === '中医原典') category = '经文原典';
+            }
+
+            // 解析站内深链（知识卡片 / 深度专题 / 学习路径）
+            let href = '';
+            let actionLabel = '';
+            if (cleanTitle === '倪海厦天纪学习路径' || cleanTitle === '天纪学习路径') {
+                href = '#/path/tianji';
+                category = '学习路径';
+                actionLabel = '查看路径';
+            } else if (cleanTitle === '倪海厦人纪学习路径' || cleanTitle === '人纪学习路径') {
+                href = '#/path';
+                category = '学习路径';
+                actionLabel = '查看路径';
+            } else if (nodeTitles.has(cleanTitle)) {
+                href = `#/note/${encodeURIComponent(cleanTitle)}`;
+                category = topicTitles.has(cleanTitle) ? '深度专题' : '知识卡片';
+                actionLabel = topicTitles.has(cleanTitle) ? '阅读专题' : '查看卡片';
+            } else if (matchedClassic && nodeTitles.has(matchedClassic)) {
+                href = `#/note/${encodeURIComponent(matchedClassic)}`;
+                actionLabel = '对应卡片';
+            }
+
+            const score = Number.isFinite(Number(s.score)) ? Number(s.score) : 0;
+            const key = `${cleanTitle}::${category}`;
+            const existing = grouped.get(key);
+            if (existing) {
+                existing.hits += 1;
+                if (score > existing.score) existing.score = score;
+                if (!existing.href && href) {
+                    existing.href = href;
+                    existing.actionLabel = actionLabel;
+                }
+            } else {
+                grouped.set(key, {
+                    title: cleanTitle,
+                    category,
+                    href,
+                    actionLabel,
+                    score,
+                    hits: 1,
+                });
+            }
+        });
+
+        const list = Array.from(grouped.values()).sort((a, b) => b.score - a.score || b.hits - a.hits);
+        const maxScore = list.reduce((m, item) => Math.max(m, item.score), 0);
+        return list.map((item) => {
+            const ratio = maxScore > 0 ? item.score / maxScore : 0;
+            let relLabel = '参考';
+            let relLevel = 'low';
+            if (ratio >= 0.78) { relLabel = '高相关'; relLevel = 'high'; }
+            else if (ratio >= 0.50) { relLabel = '较相关'; relLevel = 'mid'; }
+            return { ...item, relLabel, relLevel };
+        });
+    }
+
     function formatKnowledgeSources(sources) {
         if (!sources || !sources.length) return '';
-        // 只显示来源文件名，不显示内容摘要（evidence），避免暴露内部细节
-        const items = sources.map((s) => {
-            const sourceName = s.source_group || s.chunk_title || '未知来源';
-            const scoreInfo = s.score ? ` <span class="qa-source-score">相关度 ${s.score}</span>` : '';
-            return `<div class="qa-source-item">
-                <div class="qa-source-title">📚 ${sourceName}${scoreInfo}</div>
-            </div>`;
+        const normalized = normalizeKnowledgeSources(sources);
+        if (!normalized.length) return '';
+
+        const totalChunks = sources.length;
+        const maxVisible = 8;
+        const visibleItems = normalized.slice(0, maxVisible);
+        const hiddenCount = Math.max(0, normalized.length - visibleItems.length);
+        const previewChips = normalized.slice(0, 3).map((item) =>
+            `<span class="qa-sources-chip">${escapeAttr(item.title)}</span>`
+        ).join('');
+        const moreChip = normalized.length > 3
+            ? `<span class="qa-sources-chip qa-sources-chip--more">+${normalized.length - 3}</span>`
+            : '';
+
+        const rowsHtml = visibleItems.map((item) => {
+            const scoreTip = item.score > 0 ? ` title="BM25 检索引擎最高分：${item.score.toFixed(2)}"` : '';
+            const hitBadge = item.hits > 1 ? `<span class="qa-source-hits">${item.hits} 处片段</span>` : '';
+            const relBadge = item.score > 0
+                ? `<span class="qa-source-rel qa-source-rel--${item.relLevel}"${scoreTip}>${item.relLabel}</span>`
+                : '';
+            const inner = `
+                <div class="qa-source-row-main">
+                    <span class="qa-source-cat">${escapeAttr(item.category)}</span>
+                    <span class="qa-source-name">${escapeAttr(item.title)}</span>
+                    ${hitBadge}
+                </div>
+                <div class="qa-source-row-side">
+                    ${relBadge}
+                    ${item.href ? `<span class="qa-source-jump">${escapeAttr(item.actionLabel || '查看')} →</span>` : ''}
+                </div>
+            `;
+            if (item.href) {
+                return `<a class="qa-source-card qa-source-card--link" href="${item.href}">${inner}</a>`;
+            }
+            return `<div class="qa-source-card">${inner}</div>`;
         }).join('');
-        return `<div class="qa-sources">
-            <div class="qa-sources-title">📎 引用资料（${sources.length} 条）</div>
-            ${items}
-        </div>`;
+
+        const chunkMeta = totalChunks > normalized.length
+            ? `<span class="qa-sources-chunks"> · 合并 ${totalChunks} 处片段</span>`
+            : '';
+
+        return `<details class="qa-sources">
+            <summary class="qa-sources-summary">
+                <span class="qa-sources-summary-left">
+                    <span class="qa-sources-icon" aria-hidden="true">📎</span>
+                    <span class="qa-sources-count">参考 ${normalized.length} 份资料${chunkMeta}</span>
+                    <span class="qa-sources-preview">${previewChips}${moreChip}</span>
+                </span>
+                <span class="qa-sources-chevron" aria-hidden="true">▾</span>
+            </summary>
+            <div class="qa-sources-drawer">
+                ${rowsHtml}
+                ${hiddenCount > 0 ? `<div class="qa-sources-footnote">已精选展示相关度最高的 ${visibleItems.length} 份资料（其余 ${hiddenCount} 份边缘片段已折叠）</div>` : ''}
+            </div>
+        </details>`;
     }
 
     function addMessage(role, content, providerInfo, knowledgeSources) {
@@ -486,7 +666,25 @@ document.addEventListener('DOMContentLoaded', () => {
             ${sourcesHtml}
         `;
         messagesEl.appendChild(div);
-        messagesEl.scrollTop = messagesEl.scrollHeight;
+        const sourcesDetails = div.querySelector('details.qa-sources');
+        if (sourcesDetails) {
+            sourcesDetails.addEventListener('toggle', () => {
+                if (sourcesDetails.open) {
+                    requestAnimationFrame(() => {
+                        try {
+                            sourcesDetails.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                        } catch (_) {}
+                    });
+                }
+            });
+        }
+        if (role === 'assistant') {
+            // 新回复到达时定位到回复开头，避免长答案被滚动到最底部看不见首段
+            const targetTop = Math.max(0, div.offsetTop - 12);
+            messagesEl.scrollTop = targetTop;
+        } else {
+            messagesEl.scrollTop = messagesEl.scrollHeight;
+        }
     }
 
     // ---- HTML 消毒 ----
